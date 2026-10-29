@@ -8,15 +8,17 @@ Hier die wichtigsten Punkte in Kurzform:
 ## Projekt
 
 Instandhaltungsmanagement als Webanwendung für ein Hochschulprojekt.
-Es muss unter **XAMPP auf Windows** laufen: PHP 8 ohne Framework, MySQL/MariaDB.
+**Next.js 15** (App Router, React 19, JavaScript), Datenbank **Supabase (PostgreSQL)**, Hosting **Vercel**.
+Jeder Push nach GitHub wird von Vercel automatisch veröffentlicht. Deshalb vor jedem Push `npm run build` ausführen, er muss fehlerfrei durchlaufen.
 
 ## Regeln
 
 - Oberfläche, Bezeichner, Kommentare und Doku sind auf **Deutsch**. Der Code wird ausführlich kommentiert, weil er in der Projektdoku erklärt wird.
-- Datenbankzugriff nur über `db()` aus `includes/db.php` und **immer** mit Prepared Statements (`prepare()` + `execute()`). Werte nie direkt in SQL-Strings einsetzen.
-- Jede dynamische Ausgabe läuft über `e()`, das entspricht `htmlspecialchars`.
-- Formulare: CSRF mit `csrf_feld()` und `csrf_pruefen()`. Danach das Muster Post/Redirect/Get mit `flash()` und `weiterleiten()`.
-- Neue Seiten folgen dem Aufbau der bestehenden: `require_once __DIR__ . '/includes/funktionen.php';`, dann die Logik, dann `includes/header.php`, dann HTML, dann `includes/footer.php`.
-- Design: Farben nur über die CSS-Variablen in `assets/css/style.css`, eine Akzentfarbe `#0071e3`, Karten mit `.karte`, Status als Pills. Es gibt keinen Build-Schritt, Bootstrap und Chart.js kommen per CDN.
-- Änderungen an der Datenbank immer in `database/schema.sql` **und** passend in `database/testdaten.sql` nachziehen. Beide Dateien beginnen mit `SET NAMES utf8mb4`. Die Testdaten leeren Tabellen mit `DELETE`, nicht mit `TRUNCATE`.
-- Nach Änderungen prüfen, dass alle PHP-Dateien fehlerfrei sind (`php -l datei.php`).
+- Datenbankzugriff nur über `sql` aus `lib/db.js`. Werte **immer** als `${…}` im Tagged Template übergeben, nie in SQL-Strings einbauen. `COUNT(*)` mit `::int` casten.
+- Seiten sind Server-Komponenten (`app/**/page.js`) und rufen zuerst `await benutzerPflicht()` auf.
+- Datenänderungen laufen nur über Server-Aktionen in `app/aktionen.js`: erst Login prüfen, dann Eingaben prüfen (`{ fehler, eingabe }` zurückgeben), dann speichern (bei mehreren Schritten in `sql.begin`), dann `flash()`, `revalidatePath('/', 'layout')` und `redirect()`.
+- Formulare sind Client-Komponenten mit `useActionState`, `noValidate` und Fehleranzeige über `components/Feldfehler.js`.
+- Zeiten: In der Datenbank als `TIMESTAMPTZ`, angezeigt in Europe/Berlin über `lib/format.js`.
+- Design: Farben nur über die CSS-Variablen in `app/globals.css`, jeweils hell **und** dunkel. Karten mit `.karte`, Status als Pills (`components/Pills.js`). Animationen müssen bei `prefers-reduced-motion` aus sein.
+- Änderungen an der Datenbank immer in `supabase/schema.sql` **und** passend in `supabase/testdaten.sql` nachziehen. Neue Tabellen bekommen `ENABLE ROW LEVEL SECURITY`, neue Views `WITH (security_invoker = true)`.
+- Zugangsdaten nie in den Code oder ins Repository. Sie gehören in `.env.local` bzw. zu Vercel.

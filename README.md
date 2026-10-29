@@ -1,7 +1,7 @@
 # Instandhaltungsmanagement
 
 Webanwendung zur Erfassung und Bearbeitung von Maschinenstörungen.
-Entstanden im Hochschulprojekt **„Company database“** im Fach **Digital Production**.
+Entstanden im Hochschulprojekt **„Company database“** im Fach **Digital Production** (Hochschule Albstadt-Sigmaringen).
 
 Zielgruppe:
 
@@ -9,96 +9,137 @@ Zielgruppe:
 - **Schichtleiter** behalten offene Meldungen und Kennzahlen im Blick.
 - **Instandhaltungstechniker** bearbeiten Aufträge und buchen Ersatzteile.
 
+Die Anwendung läuft online: Die Webseite liegt bei **Vercel**, die Datenbank bei **Supabase** (PostgreSQL).
+Alle im Team arbeiten mit denselben Daten und brauchen nur einen Browser.
+
+> Die frühere Version mit PHP, MySQL und XAMPP liegt im Branch [`php-xampp`](https://github.com/JonasLebherz/Instandhaltung/tree/php-xampp).
+
 ## Funktionen
 
-| Seite | Datei | Inhalt |
+| Seite | Adresse | Inhalt |
 |---|---|---|
-| Übersicht | `index.php` | offene Meldungen, Aufträge nach Status, Ersatzteile unter Mindestbestand, Wareneingang buchen |
-| Störung melden | `meldung_neu.php` | Formular mit Maschine, Beschreibung, Ursache und Priorität, mit Eingabeprüfung |
-| Aufträge | `auftraege.php` | Liste aller Meldungen, filterbar nach Status, Maschine und Priorität |
-| Auftrag bearbeiten | `auftrag_bearbeiten.php` | Techniker zuweisen, Status ändern, Ersatzteile buchen, Auftrag abschließen |
-| Statistik | `statistik.php` | MTTR, Ausfallzeit pro Maschine, Störungen pro Monat, Top-5-Störursachen, Zeitraumfilter |
+| Anmelden | `/login` | Login mit E-Mail und Passwort, nur für angelegte Team-Konten |
+| Übersicht | `/` | Kennzahlen, offene Meldungen, Aufträge nach Status, Ersatzteile unter Mindestbestand, Wareneingang buchen |
+| Störung melden | `/melden` | Formular mit Maschine, Beschreibung, Ursache und Priorität, mit Eingabeprüfung |
+| Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Maschine und Priorität |
+| Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen, Status ändern, Ersatzteile buchen, Auftrag abschließen |
+| Statistik | `/statistik` | MTTR, Ausfallzeit pro Maschine, Störungen pro Monat, Top-5-Störursachen, Zeitraumfilter |
 
-**Automatik beim Buchen von Ersatzteilen:** Ist ein Teil nicht in ausreichender Menge
-auf Lager, wird nichts gebucht. Stattdessen wechselt der Auftrag auf **„wartet auf Teil“**
-und es wird automatisch eine Bestellung angelegt. Den Eingang der Lieferung bucht man
-auf der Übersichtsseite.
+**Automatik beim Buchen von Ersatzteilen:** Ist ein Teil nicht in ausreichender Menge auf Lager,
+wird nichts gebucht. Der Auftrag wechselt auf **„wartet auf Teil“**, und es wird automatisch eine
+Bestellung angelegt. Den Eingang der Lieferung bucht man auf der Übersicht.
+
+**Darstellung:** Hell, Dunkel oder automatisch nach Systemeinstellung (Symbol oben rechts).
+Sanfte Animationen, die bei „Bewegung reduzieren“ im Betriebssystem automatisch abgeschaltet werden.
 
 ## Technik
 
-- PHP 8 ohne Framework
-- MySQL/MariaDB über PDO mit Prepared Statements
-- Bootstrap 5 und Chart.js 4, beide per CDN eingebunden. Dafür braucht der Browser Internetzugang.
+| Teil | Verwendet | Wofür |
+|---|---|---|
+| Webanwendung | [Next.js](https://nextjs.org) 15 (React 19, JavaScript) | Seiten und Formulare; Datenbankzugriffe laufen nur auf dem Server |
+| Datenbank | [Supabase](https://supabase.com) (PostgreSQL) | Tabellen, Views, Benutzerkonten (Login) |
+| Hosting | [Vercel](https://vercel.com) | Veröffentlicht die Seite, aktualisiert sie automatisch bei jedem Push |
+| Design | Bootstrap 5 (Raster), Bootstrap Icons, eigenes CSS | ruhige, reduzierte Oberfläche mit Dunkelmodus |
+| Diagramme | Chart.js 4 | Statistikseite |
 
-## Installation unter XAMPP (Windows)
+Alle Kosten: **0 €** (kostenlose Tarife von Supabase und Vercel).
 
-### 1. XAMPP installieren und starten
+## Einrichtung (einmalig, ca. 30 Minuten)
 
-1. XAMPP von <https://www.apachefriends.org> herunterladen und installieren. Benötigt wird PHP 8.
-2. Das **XAMPP Control Panel** öffnen.
-3. Bei **Apache** und bei **MySQL** jeweils auf **Start** klicken. Beide Einträge werden grün.
+Diese Schritte macht **eine Person** (Projektleitung). Danach arbeitet das ganze Team mit derselben Online-Version.
 
-### 2. Projektordner kopieren
+### 1. Supabase: Datenbank anlegen
 
-1. Den kompletten Projektordner nach `C:\xampp\htdocs\` kopieren.
-2. Den Ordner in `instandhaltung` umbenennen. Ergebnis: `C:\xampp\htdocs\instandhaltung\index.php`.
+1. Auf <https://supabase.com> mit dem GitHub-Konto anmelden (**Sign in with GitHub**).
+2. **New project** wählen:
+   - Name: `instandhaltung`
+   - **Database Password**: ein sicheres Passwort vergeben und **aufschreiben**. Es wird später gebraucht.
+   - Region: **Central EU (Frankfurt)**
+   - Auf **Create new project** klicken und 1–2 Minuten warten.
+3. Links auf **SQL Editor** → **New query** klicken.
+4. Den kompletten Inhalt von [`supabase/schema.sql`](supabase/schema.sql) einfügen und **Run** klicken.
+   Supabase warnt eventuell vor „destructive operations“. Das liegt an den `DROP`-Befehlen am Anfang, also mit **Run this query** bestätigen.
+5. Eine neue Abfrage öffnen, den Inhalt von [`supabase/testdaten.sql`](supabase/testdaten.sql) einfügen und **Run** klicken.
+6. Zur Kontrolle links **Table Editor** öffnen. Dort stehen 7 Tabellen, z. B. `stoermeldung` mit 150 Einträgen.
 
-### 3. Datenbank importieren (phpMyAdmin)
+### 2. Supabase: Team-Konten anlegen
 
-1. Im Browser <http://localhost/phpmyadmin> öffnen.
-2. Oben auf den Reiter **Importieren** klicken.
-3. Bei **Datei auswählen** die Datei `database/schema.sql` wählen und unten auf **Importieren** klicken.
-   Das Skript legt die Datenbank `instandhaltung` mit allen Tabellen und Views an.
-4. Links die Datenbank **instandhaltung** anklicken, erneut **Importieren** wählen
-   und die Datei `database/testdaten.sql` importieren.
-   Sie enthält 8 Maschinen, 5 Techniker, 15 Ersatzteile und 150 Störmeldungen der letzten 12 Monate.
+1. Links auf **Authentication** → **Users** → **Add user** → **Create new user** klicken.
+2. E-Mail-Adresse und ein Start-Passwort eintragen und **Auto Confirm User** anhaken.
+3. Das für jedes Teammitglied wiederholen.
+4. Empfohlen: Unter **Authentication → Sign In / Providers** die Option **Allow new users to sign up** ausschalten.
+   Dann kann sich niemand selbst ein Konto anlegen.
 
-Beide Dateien kann man jederzeit erneut importieren, z. B. um den Ausgangszustand wiederherzustellen.
-Dabei werden alle vorhandenen Daten überschrieben. Die Zeitangaben der Testdaten beziehen sich auf den
-Importzeitpunkt, die Daten decken also immer die letzten 12 Monate ab.
+### 3. Zugangsdaten heraussuchen
 
-### 4. Anwendung aufrufen
+Oben im Supabase-Projekt auf **Connect** klicken:
 
-Im Browser <http://localhost/instandhaltung/> öffnen.
+| Wert | Wo | Beispiel |
+|---|---|---|
+| `DATABASE_URL` | **Connect** → **Transaction pooler** → URI kopieren, `[YOUR-PASSWORD]` durch das Passwort aus Schritt 1 ersetzen | `postgresql://postgres.abcd:…@aws-0-eu-central-1.pooler.supabase.com:6543/postgres` |
+| `SUPABASE_URL` | **Project Settings** → **Data API** → Project URL | `https://abcd.supabase.co` |
+| `SUPABASE_ANON_KEY` | **Project Settings** → **API Keys** → `anon` bzw. **publishable** key | `eyJ…` oder `sb_publishable_…` |
 
-### Zugangsdaten anpassen (falls nötig)
+### 4. Vercel: Webseite veröffentlichen
 
-Die Zugangsdaten zur Datenbank stehen zentral in `config.php`. Für eine Standard-XAMPP-Installation
-passen sie bereits: Benutzer `root`, kein Passwort. Falls ihr ein Passwort für MySQL vergeben habt,
-tragt es dort bei `DB_PASS` ein.
+1. Auf <https://vercel.com> mit GitHub anmelden. Den kostenlosen Tarif **Hobby** wählen.
+2. **Add New…** → **Project** → das Repository **Instandhaltung** auswählen und auf **Import** klicken.
+   Erscheint es nicht, über **Adjust GitHub App Permissions** den Zugriff freigeben.
+3. Vor dem Deploy **Environment Variables** aufklappen und die drei Werte aus Schritt 3 eintragen:
+   `DATABASE_URL`, `SUPABASE_URL` und `SUPABASE_ANON_KEY`.
+   **Nicht** `LOGIN_DEAKTIVIERT` setzen.
+4. Auf **Deploy** klicken. Nach ca. 1 Minute ist die Seite unter `https://instandhaltung-….vercel.app` erreichbar.
+5. Testen: Die Seite öffnen, mit einem Konto aus Schritt 2 anmelden, und die Übersicht erscheint.
 
-## Fehlerbehebung
+Ab jetzt baut Vercel die Seite **bei jedem Push nach GitHub automatisch neu**. Niemand muss etwas hochladen.
 
-| Problem | Lösung |
+## Mitarbeit im Team
+
+- **Nur benutzen:** Link öffnen und anmelden. Mehr braucht es nicht.
+- **Am Code arbeiten:** Am einfachsten mit Claude oder Codex, die Änderungen nach GitHub pushen. Vercel
+  veröffentlicht sie dann automatisch. Siehe die Team-Anleitungen unter `docs/`.
+
+### Lokal entwickeln (optional)
+
+Wer den Code auf dem eigenen Rechner ausprobieren möchte:
+
+1. [Node.js](https://nodejs.org) installieren (Version „LTS“).
+2. Das Repository klonen, z. B. mit GitHub Desktop.
+3. Im Projektordner die Datei `.env.example` nach **`.env.local`** kopieren und die Werte aus Schritt 3 eintragen.
+4. Im Terminal im Projektordner ausführen:
+   ```bash
+   npm install
+   npm run dev
+   ```
+5. <http://localhost:3000> öffnen.
+
+> **Achtung:** Lokal arbeitet man dann mit **derselben Datenbank** wie die Online-Version.
+> Testmeldungen sind also für alle sichtbar. Zurücksetzen geht jederzeit, indem man `supabase/testdaten.sql` erneut ausführt.
+
+## Auswertung mit Power BI
+
+Für Power BI gibt es fertige Views in der Datenbank:
+
+| View | Inhalt |
 |---|---|
-| „Datenbank nicht erreichbar“ | Prüfen, ob MySQL im XAMPP Control Panel läuft und ob die Datenbank importiert wurde. |
-| Apache startet nicht | Port 80 ist belegt, oft durch Skype oder IIS. Das Programm beenden oder in XAMPP den Port ändern. |
-| Seite ohne Design, keine Diagramme | Bootstrap und Chart.js kommen aus dem Internet (CDN). Internetverbindung prüfen. |
-| Umlaute werden falsch angezeigt | Beide SQL-Dateien erneut importieren. Beim Import in phpMyAdmin den Zeichensatz `utf-8` lassen (Standard). |
-| Beim Import von `schema.sql` erscheinen „#1046 Keine Datenbank ausgewählt“ oder „#4092 Unknown VIEW“ | Harmlos, solange oben „Der Import wurde erfolgreich abgeschlossen“ steht. phpMyAdmin zeigt das an, wenn man auf der Startseite (ohne ausgewählte Datenbank) importiert, und beim allerersten Import gibt es die alten Views noch nicht. |
-| Fehler beim Import von `testdaten.sql` | Zuerst `schema.sql` importieren, erst danach die Testdaten. |
+| `v_mttr_maschine` | MTTR pro Maschine (Minuten und Stunden) |
+| `v_ausfallzeit_maschine` | Anzahl Störungen und Ausfallzeit pro Maschine |
+| `v_stoerungen_monat` | Störungen pro Monat, aufgeteilt nach Priorität |
+| `v_stoerung_details` | Eine Zeile pro Störung mit allen Angaben und Zeiten. Gut geeignet für eigene Filter. |
 
-## Ordnerstruktur
+So verbindet ihr Power BI Desktop mit der Datenbank:
 
-```
-instandhaltung/
-├── config.php               Zentrale Einstellungen (Datenbank-Zugangsdaten)
-├── index.php                Übersicht / Dashboard
-├── meldung_neu.php          Störmeldung erfassen
-├── auftraege.php            Auftragsübersicht mit Filtern
-├── auftrag_bearbeiten.php   Auftrag bearbeiten, Ersatzteile buchen
-├── bestellung_geliefert.php Wareneingang buchen (ohne eigene Ansicht)
-├── statistik.php            Kennzahlen und Diagramme
-├── includes/
-│   ├── db.php               Datenbankverbindung (PDO)
-│   ├── funktionen.php       Hilfsfunktionen, Wertelisten, CSRF-Schutz
-│   ├── header.php           Kopfbereich und Navigation
-│   └── footer.php           Fußbereich
-├── assets/css/style.css     Eigenes Design
-└── database/
-    ├── schema.sql           Tabellen, Fremdschlüssel, Indizes und Views
-    └── testdaten.sql        Beispieldaten (12 Monate Störhistorie)
-```
+1. In Supabase auf **Connect** → **Session pooler** klicken und dort **Host**, **Port** (5432), **Database** und **User** ablesen.
+2. In Power BI auf **Daten abrufen** → **PostgreSQL-Datenbank** klicken.
+3. Server: `<Host>:5432`, Datenbank: `postgres`.
+4. Anmeldung über **Datenbank**: Benutzer `postgres.<projekt-id>` und das Datenbank-Passwort.
+5. Die Views (`v_…`) auswählen und **Laden** klicken.
+
+## Kennzahlen: Definitionen
+
+- **Reparaturdauer:** Zeit vom Arbeitsbeginn bis zum Ende der Reparatur (`start_zeit` bis `ende_zeit`).
+- **MTTR (Mean Time To Repair):** durchschnittliche Reparaturdauer aller erledigten Aufträge.
+- **Ausfallzeit:** Zeit von der Störmeldung bis zum Ende der Reparatur (`zeitpunkt` der Meldung bis `ende_zeit`).
 
 ## Datenmodell
 
@@ -114,30 +155,37 @@ instandhaltung/
 
 Status eines Auftrags: **gemeldet → zugewiesen → in Arbeit → wartet auf Teil → erledigt**
 
-## Auswertung mit Power BI
+## Sicherheit
 
-Für Power BI gibt es fertige Views in der Datenbank:
+- **Login:** Alle Seiten und Aktionen sind nur mit Anmeldung erreichbar (`middleware.js` und zusätzlich jede Seite und Aktion).
+- **SQL-Injection:** Alle Abfragen übergeben Werte als Parameter (`sql\`… ${wert}\``), nie als Teil des SQL-Textes.
+- **Datenbank:** Row Level Security ist für alle Tabellen eingeschaltet. Über die öffentliche Supabase-Schnittstelle sind die Daten nicht erreichbar.
+- **Zugangsdaten:** Sie stehen nur in `.env.local` bzw. bei Vercel, nie im Code oder auf GitHub.
 
-| View | Inhalt |
+## Ordnerstruktur
+
+```
+app/                         Seiten (Next.js App Router)
+├── layout.js                Grundgerüst: Navigation, Hinweise, Fußzeile, Hell/Dunkel
+├── globals.css              Design inkl. Dunkelmodus und Animationen
+├── aktionen.js              Alle Aktionen, die Daten ändern (Server-Aktionen)
+├── page.js                  Übersicht
+├── melden/                  Störung melden
+├── auftraege/               Auftragsübersicht und [id]/ = Auftrag bearbeiten
+├── statistik/               Statistik und Diagramme
+└── login/                   Anmeldung
+components/                  Wiederverwendbare Bausteine (Navigation, Pills, Kennzahlen …)
+lib/                         Datenbankverbindung, Login-Prüfung, Formatierung, Wertelisten
+middleware.js                Schickt nicht angemeldete Besucher zum Login
+supabase/                    schema.sql und testdaten.sql
+docs/                        Team-Anleitungen
+```
+
+## Fehlerbehebung
+
+| Problem | Lösung |
 |---|---|
-| `v_mttr_maschine` | MTTR pro Maschine (Minuten und Stunden) |
-| `v_ausfallzeit_maschine` | Anzahl Störungen und Ausfallzeit pro Maschine |
-| `v_stoerungen_monat` | Störungen pro Monat, aufgeteilt nach Priorität |
-| `v_stoerung_details` | Eine Zeile pro Störung mit allen Angaben und Zeiten. Gut geeignet für eigene Filter in Power BI. |
-
-So verbindet ihr Power BI Desktop mit der Datenbank:
-
-1. Einmalig den **MySQL Connector/NET** installieren: <https://dev.mysql.com/downloads/connector/net/>.
-   Power BI benötigt ihn für MySQL/MariaDB.
-2. In Power BI auf **Daten abrufen → Weitere … → MySQL-Datenbank** klicken.
-3. Server: `localhost`, Datenbank: `instandhaltung` eintragen.
-4. Anmeldung über **Datenbank**: Benutzer `root`, Passwort leer (XAMPP-Standard).
-5. Die gewünschten Views (`v_…`) auswählen und **Laden** klicken.
-
-XAMPP mit MySQL muss dabei laufen.
-
-## Kennzahlen: Definitionen
-
-- **Reparaturdauer:** Zeit vom Arbeitsbeginn bis zum Ende der Reparatur (`start_zeit` bis `ende_zeit`).
-- **MTTR (Mean Time To Repair):** durchschnittliche Reparaturdauer aller erledigten Aufträge.
-- **Ausfallzeit:** Zeit von der Störmeldung bis zum Ende der Reparatur (`zeitpunkt` der Meldung bis `ende_zeit`).
+| „Daten konnten nicht geladen werden“ | Kostenlose Supabase-Projekte werden nach **1 Woche ohne Nutzung pausiert**. Im Supabase-Dashboard auf **Restore project** klicken. Vor Präsentationen rechtzeitig prüfen! |
+| „Login nicht eingerichtet“ | `SUPABASE_URL` und `SUPABASE_ANON_KEY` fehlen bei Vercel. Eintragen und unter **Deployments** → **Redeploy** neu bauen. |
+| Anmeldung schlägt fehl | Im Supabase-Dashboard prüfen, ob das Konto existiert und bestätigt ist („Auto Confirm User“). |
+| Änderungen erscheinen nicht online | Bei Vercel unter **Deployments** prüfen, ob der letzte Build erfolgreich war (grün). |

@@ -1,0 +1,13 @@
+# Abhängigkeiten und Build-Ergebnisse (werden von npm bzw. Next.js erzeugt)
+node_modules/
+.next/
+out/
+
+# Lokale Zugangsdaten – niemals auf GitHub hochladen!
+.env
+.env*.local
+
+# Sonstiges
+.DS_Store
+*.log
+.vercel
