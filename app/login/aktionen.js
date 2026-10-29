@@ -18,11 +18,31 @@ export async function anmelden(vorherigerZustand, formular) {
     return { fehler: 'Bitte E-Mail-Adresse und Passwort eingeben.', email };
   }
 
-  const supabase = await supabaseServer();
-  const { error } = await supabase.auth.signInWithPassword({ email, password: passwort });
+  let error;
+  try {
+    const supabase = await supabaseServer();
+    ({ error } = await supabase.auth.signInWithPassword({ email, password: passwort }));
+  } catch (ausnahme) {
+    error = ausnahme;
+  }
+
   if (error) {
-    // Absichtlich ungenau: verrät nicht, ob es die E-Mail-Adresse gibt
-    return { fehler: 'E-Mail-Adresse oder Passwort ist falsch.', email };
+    // Genaue Ursache nur ins Server-Protokoll (bei Vercel unter "Logs" sichtbar)
+    console.error('Anmeldung fehlgeschlagen:', error.code ?? '', error.status ?? '', error.message);
+
+    if (error.code === 'invalid_credentials') {
+      // Absichtlich ungenau: verrät nicht, ob es die E-Mail-Adresse gibt
+      return { fehler: 'E-Mail-Adresse oder Passwort ist falsch.', email };
+    }
+    if (error.code === 'email_not_confirmed') {
+      return { fehler: 'Dieses Konto ist noch nicht bestätigt. In Supabase beim Anlegen „Auto Confirm User“ anhaken.', email };
+    }
+    // Alles andere ist meist ein Einrichtungsproblem (falsche URL oder falscher Schlüssel)
+    return {
+      fehler: 'Anmeldung zurzeit nicht möglich – die Verbindung zu Supabase ist fehlerhaft eingerichtet '
+        + `(SUPABASE_URL / SUPABASE_ANON_KEY prüfen). Technischer Hinweis: ${error.status ?? ''} ${error.code ?? error.message ?? ''}`.trim(),
+      email,
+    };
   }
 
   revalidatePath('/', 'layout');  // Navigation mit Benutzername neu aufbauen
