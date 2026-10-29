@@ -386,7 +386,7 @@ function OffeneListe({ auftraege, mitGebaeude = false }) {
     <ul className="ort-liste">
       {auftraege.map((a) => (
         <li key={a.auftrag_id}>
-          <Link href={`/auftraege/${a.auftrag_id}`}>
+          <Link href={`/auftraege/${a.auftrag_id}`} prefetch={false}>
             <span className="flex-grow-1">
               <span className="ort-titel">{mitGebaeude ? `${a.maschine} · ${a.gebaeude_kuerzel}` : a.beschreibung}</span>
               {mitGebaeude && <span className="ort-unter">{a.beschreibung}</span>}

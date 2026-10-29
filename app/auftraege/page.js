@@ -160,7 +160,7 @@ export default async function AuftraegeSeite({ searchParams }) {
                   <tr key={a.auftrag_id} className="klickbar">
                     <td className="zahl klein">{a.meldung_id}</td>
                     <td>
-                      <Link className="zeilen-link" href={`/auftraege/${a.auftrag_id}`}>{a.maschine}</Link>
+                      <Link className="zeilen-link" prefetch={false} href={`/auftraege/${a.auftrag_id}`}>{a.maschine}</Link>
                       <div className="klein">{a.stadt} · {a.gebaeude} · {a.anlagennummer}</div>
                       <div className="klein text-truncate beschreibung-kurz">{a.beschreibung}</div>
                     </td>

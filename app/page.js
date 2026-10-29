@@ -132,7 +132,7 @@ export default async function Uebersicht() {
                     {offeneMeldungen.map((m) => (
                       <tr key={m.auftrag_id} className="klickbar">
                         <td>
-                          <Link className="zeilen-link" href={`/auftraege/${m.auftrag_id}`}>{m.maschine}</Link>
+                          <Link className="zeilen-link" prefetch={false} href={`/auftraege/${m.auftrag_id}`}>{m.maschine}</Link>
                           <div className="klein text-truncate beschreibung-kurz">{m.stadt} · {m.gebaeude} – {m.beschreibung}</div>
                         </td>
                         <td><PrioritaetPill prioritaet={m.prioritaet} /></td>

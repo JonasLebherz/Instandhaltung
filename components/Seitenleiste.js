@@ -13,7 +13,7 @@
  * Auf dem Smartphone gibt es stattdessen oben eine schmale Leiste mit
  * Menü-Knopf, die Seitenleiste fährt dann von links herein.
  */
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { abmelden } from '@/app/login/aktionen';
@@ -57,6 +57,15 @@ function darstellungAnwenden(wahl) {
   html.setAttribute('data-theme', dunkel ? 'dark' : 'light');
   html.setAttribute('data-bs-theme', dunkel ? 'dark' : 'light');
   window.dispatchEvent(new Event('darstellungswechsel'));
+}
+
+/**
+ * Kleiner drehender Ring um das Symbol, solange die angeklickte Seite lädt.
+ * useLinkStatus funktioniert nur innerhalb eines <Link>.
+ */
+function LadeRing() {
+  const { pending } = useLinkStatus();
+  return <span className={`leiste-laden${pending ? ' aktiv' : ''}`} aria-hidden="true" />;
 }
 
 /** Initialen für das Konto-Symbol, z. B. "Jonas Lebherz" → "JL" */
@@ -180,6 +189,7 @@ export default function Seitenleiste({ benutzer }) {
                             aria-label={zahl ? `${seite.text} (${zahl} offen)` : seite.text}>
                         <span className="leiste-symbol">
                           <i className={`bi ${aktiv ? seite.symbolAktiv : seite.symbol}`} aria-hidden="true" />
+                          <LadeRing />
                           {zahl && <span className="leiste-punkt" aria-hidden="true">{zahl}</span>}
                         </span>
                         <span className="leiste-text">

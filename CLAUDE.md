@@ -14,7 +14,7 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 - **Live:** Die App läuft bei Vercel mit Supabase. Login funktioniert.
 - **Fertig:** alle Seiten (Übersicht mit Karte oben, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik, Login), Seitenleiste links, Logo, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
 - **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
-- **Getestet** gegen PostgreSQL 16 lokal: 106 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
+- **Getestet** gegen PostgreSQL 16 lokal: 107 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
 - **Nach Schemaänderungen** muss in Supabase `schema.sql` + `testdaten.sql` erneut ausgeführt werden. Das setzt alle Daten zurück, Login-Konten bleiben erhalten.
 
 ## Team & andere KI-Assistenten
@@ -48,7 +48,8 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
   - Vercel-Funktionen laufen in Frankfurt (`vercel.json`: `"regions": ["fra1"]`), nah an der Supabase-Datenbank (eu-central-1). Liegt das Supabase-Projekt woanders, die Region anpassen.
   - Im Layout keine Datenbank-Abfragen: Es läuft bei jeder Anfrage. Die Zahl offener Aufträge holt die Seitenleiste selbst über `app/api/offene-auftraege/route.js`.
   - Pro Seite möglichst wenige Abfragen, gleichzeitig mit `Promise.all`. Daten wiederverwenden (z. B. nutzt die Übersicht die offenen Aufträge aus `alleKartenDaten()`).
-  - `app/loading.js` zeigt sofort „Wird geladen …“. Folge des Streamings: `notFound()` liefert den Status 200 (mit „noindex“), der Inhalt „Nicht gefunden“ erscheint trotzdem.
+  - **Kein `app/loading.js`:** Damit blieben Formulare nach dem Speichern (Server-Aktion mit `redirect`) endlos hängen. Rückmeldung beim Seitenwechsel gibt stattdessen ein drehender Ring in der Seitenleiste (`useLinkStatus`).
+  - `/status` misst Login- und Datenbankzeiten und zeigt Regionen und Port (ohne Zugangsdaten). Hilfreich bei langsamen Ladezeiten.
 - **Datenbank:** nur über `sql` aus `lib/db.js` (Bibliothek `postgres`). Werte **immer** als `${…}` im Tagged Template übergeben, nie per String-Verkettung. Dynamische Bedingungen werden aus `sql\`…\``-Bausteinen zusammengesetzt (siehe `app/auftraege/page.js`).
   - `COUNT(*)` liefert `bigint`, das kommt als String an. Deshalb immer `::int` casten. `AVG`/`ROUND` mit `::float` casten.
   - `prepare: false` wegen des Supabase-Transaction-Poolers.
