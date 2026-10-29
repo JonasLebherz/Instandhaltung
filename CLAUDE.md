@@ -44,6 +44,11 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
   3. Speichern, mehrere Schreibzugriffe in `sql.begin(async (tx) => …)`
   4. `await flash(typ, text)`, `revalidatePath('/', 'layout')`, `redirect(…)`. `redirect` steht nie in try/catch.
 - **Formulare** nutzen `useActionState` und werden mit `key={JSON.stringify(eingabe)}` neu aufgebaut, damit die Eingaben nach Fehlern erhalten bleiben (React setzt Formulare sonst zurück). Fehler zeigt `components/Feldfehler.js` an. Formulare haben `noValidate`, damit die Prüfung serverseitig auf Deutsch passiert.
+- **Ladezeiten:** Jede Abfrage geht über das Internet zu Supabase. Deshalb:
+  - Vercel-Funktionen laufen in Frankfurt (`vercel.json`: `"regions": ["fra1"]`), nah an der Supabase-Datenbank (eu-central-1). Liegt das Supabase-Projekt woanders, die Region anpassen.
+  - Im Layout keine Datenbank-Abfragen: Es läuft bei jeder Anfrage. Die Zahl offener Aufträge holt die Seitenleiste selbst über `app/api/offene-auftraege/route.js`.
+  - Pro Seite möglichst wenige Abfragen, gleichzeitig mit `Promise.all`. Daten wiederverwenden (z. B. nutzt die Übersicht die offenen Aufträge aus `alleKartenDaten()`).
+  - `app/loading.js` zeigt sofort „Wird geladen …“. Folge des Streamings: `notFound()` liefert den Status 200 (mit „noindex“), der Inhalt „Nicht gefunden“ erscheint trotzdem.
 - **Datenbank:** nur über `sql` aus `lib/db.js` (Bibliothek `postgres`). Werte **immer** als `${…}` im Tagged Template übergeben, nie per String-Verkettung. Dynamische Bedingungen werden aus `sql\`…\``-Bausteinen zusammengesetzt (siehe `app/auftraege/page.js`).
   - `COUNT(*)` liefert `bigint`, das kommt als String an. Deshalb immer `::int` casten. `AVG`/`ROUND` mit `::float` casten.
   - `prepare: false` wegen des Supabase-Transaction-Poolers.
@@ -56,7 +61,7 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 
 - Ebenen: Deutschland → Werk (Lageplan) → Gebäude (Grundriss), alles in **einer** Client-Komponente `components/karten/KartenExplorer.js`. Sie bekommt alle Daten auf einmal (`alleKartenDaten()` in `lib/karten/daten.js`) und wechselt die Ebenen ohne Neuladen.
 - Zoom-Animation: Beim Wechsel bleibt die alte Ebene kurz stehen (`.ebene-alt`), die neue wächst aus dem angeklickten Punkt (`transform-origin` = Mitte des Elements mit `data-ort="st-<id>"` bzw. `"g-<id>"`). Beim Herauszoomen wird der Punkt in der neuen Ebene gemessen. CSS: Abschnitt „Zoom-Karte“ in `app/globals.css`.
-- Verwendet auf `/karte` (`adresseMitfuehren`: Adresse `?werk=ham&halle=h2&maschine=12`, per `history.replaceState`), auf der Übersicht (`groesse="mittel"`) und beim Melden (`modus="auswahl"`, `onMaschine`). Alte Adressen `/karte/<werk>/<halle>` leiten auf `/karte?werk=…&halle=…` um. Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
+- Verwendet auf `/karte` (`adresseMitfuehren`: Adresse `?werk=ham&halle=h2&maschine=12`, per `history.replaceState`), auf der Übersicht (`groesse="mittel"`) und beim Melden (`modus="auswahl"`, `onMaschine`). Alte Adressen `/karte/<werk>/<halle>` leiten per `redirects()` in `next.config.mjs` auf `/karte?werk=…&halle=…` um. Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
 - Rechts neben der Karte zeigt die Info-Spalte je Ebene Standorte, Gebäude, offene Störungen, Techniker bzw. Maschinen-Details.
 - Die Zahl auf jedem Punkt ist die Anzahl offener Aufträge (Status ≠ erledigt), die Farbe kommt von der höchsten offenen Priorität (`components/karten/stufe.js`).
 - `DeutschlandKarte.js`, `Lageplan.js` und `Grundriss.js` zeichnen nur die jeweilige Ebene und rufen beim Klick `onWaehle(objekt, event)` auf.

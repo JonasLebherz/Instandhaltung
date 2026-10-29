@@ -201,7 +201,7 @@ app/                         Seiten (Next.js App Router)
 ├── melden/                  Störung melden
 ├── auftraege/               Auftragsübersicht und [id]/ = Auftrag bearbeiten
 ├── statistik/               Statistik und Diagramme
-├── karte/                   Störungskarte mit Zoom (alte Adressen /karte/ham/h2 leiten dorthin um)
+├── karte/                   Störungskarte mit Zoom (alte Adressen /karte/ham/h2 leiten dorthin um, siehe next.config.mjs)
 └── login/                   Anmeldung
 components/                  Wiederverwendbare Bausteine (Seitenleiste, Logo, Pills, Kennzahlen …)
 components/karten/           Zoom-Karte (KartenExplorer) mit Deutschlandkarte, Lageplan, Grundriss
@@ -219,6 +219,7 @@ docs/                        Team-Anleitungen
 | „Daten konnten nicht geladen werden“ | Kostenlose Supabase-Projekte werden nach **1 Woche ohne Nutzung pausiert**. Im Supabase-Dashboard auf **Restore project** klicken. Vor Präsentationen rechtzeitig prüfen! |
 | „Login nicht eingerichtet“ | `SUPABASE_URL` und `SUPABASE_ANON_KEY` fehlen bei Vercel. Eintragen und unter **Deployments** → **Redeploy** neu bauen. |
 | Anmeldung schlägt fehl | Im Supabase-Dashboard prüfen, ob das Konto existiert und bestätigt ist („Auto Confirm User“). |
+| Seiten laden sehr langsam | Prüfen, ob die Supabase-Datenbank in Frankfurt (eu-central-1) liegt: In `DATABASE_URL` steht dann `eu-central-1`. Die App läuft laut `vercel.json` ebenfalls in Frankfurt (`fra1`). Liegt die Datenbank woanders, die Region in `vercel.json` anpassen. Außerdem muss `DATABASE_URL` der **Transaction pooler** (Port **6543**) sein. |
 | Änderungen erscheinen nicht online | Bei Vercel unter **Deployments** prüfen, ob der letzte Build erfolgreich war (grün). |
 
 ## Quellen

@@ -3,9 +3,25 @@
  * app/error.js – freundliche Fehlerseite
  *
  * Erscheint, wenn beim Laden einer Seite etwas schiefgeht – meistens, weil
- * die Datenbank nicht erreichbar ist (z. B. Supabase-Projekt pausiert).
+ * die Datenbank nicht oder zu langsam antwortet.
+ *
+ * "Erneut versuchen" lädt die Daten neu vom Server (router.refresh) und
+ * zeigt die Seite dann wieder an (reset). Nur reset() allein würde die
+ * Seite ohne neue Daten erneut zeichnen – und denselben Fehler zeigen.
  */
-export default function Fehler({ reset }) {
+import { useRouter } from 'next/navigation';
+import { startTransition } from 'react';
+
+export default function Fehler({ error, reset }) {
+  const router = useRouter();
+
+  function erneutVersuchen() {
+    startTransition(() => {
+      router.refresh();
+      reset();
+    });
+  }
+
   return (
     <div className="row justify-content-center">
       <div className="col-lg-7">
@@ -15,12 +31,15 @@ export default function Fehler({ reset }) {
           </div>
           <h1 className="h3 fw-bold">Daten konnten nicht geladen werden</h1>
           <p className="text-leise">
-            Meist ist die Datenbank kurz nicht erreichbar. Kostenlose Supabase-Projekte werden nach einer
-            Woche ohne Nutzung pausiert – dann im Supabase-Dashboard auf „Restore project“ klicken.
+            Die Datenbank hat nicht rechtzeitig geantwortet. Meist hilft es, es gleich noch einmal zu versuchen.
+            Tritt der Fehler dauerhaft auf: Im Supabase-Dashboard prüfen, ob das Projekt pausiert ist
+            (kostenlose Projekte pausieren nach einer Woche ohne Nutzung), und bei Vercel unter „Logs“ nachsehen.
           </p>
-          <button type="button" className="btn btn-primary mt-2" onClick={() => reset()}>
+          <button type="button" className="btn btn-primary mt-2" onClick={erneutVersuchen}>
             <i className="bi bi-arrow-clockwise" aria-hidden="true" /> Erneut versuchen
           </button>
+          {/* Kennung des Fehlers – damit lässt er sich in den Vercel-Logs finden */}
+          {error?.digest && <p className="klein mt-3 mb-0">Fehler-Kennung: {error.digest}</p>}
         </div>
       </div>
     </div>

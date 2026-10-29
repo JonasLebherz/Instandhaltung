@@ -64,12 +64,13 @@ function initialen(name) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((teil) => teil[0].toUpperCase()).join('') || '?';
 }
 
-export default function Seitenleiste({ benutzer, offeneAuftraege = null }) {
+export default function Seitenleiste({ benutzer }) {
   const pfad = usePathname();
   const [aufgeklappt, setAufgeklappt] = useState(false);
   const [mobilOffen, setMobilOffen] = useState(false);
   const [fenster, setFenster] = useState(null);           // 'darstellung' | 'konto' | null
   const [darstellung, setDarstellung] = useState('automatisch');
+  const [offeneAuftraege, setOffeneAuftraege] = useState(null);   // Zahl neben "Aufträge"
   const leisteRef = useRef(null);
 
   // Beim Start: Zustand der Leiste (vom Skript im Layout gesetzt) und gespeicherte Darstellung übernehmen
@@ -88,6 +89,16 @@ export default function Seitenleiste({ benutzer, offeneAuftraege = null }) {
     abfrage.addEventListener('change', folgen);
     return () => abfrage.removeEventListener('change', folgen);
   }, [darstellung]);
+
+  // Zahl offener Aufträge im Hintergrund holen – beim Start und nach jedem Seitenwechsel
+  useEffect(() => {
+    let aktuell = true;
+    fetch('/api/offene-auftraege', { cache: 'no-store' })
+      .then((antwort) => (antwort.ok ? antwort.json() : null))
+      .then((daten) => { if (aktuell && daten) setOffeneAuftraege(daten.anzahl); })
+      .catch(() => { /* ohne Zahl weiter */ });
+    return () => { aktuell = false; };
+  }, [pfad]);
 
   // Menüs schließen bei Seitenwechsel, Klick daneben oder Escape-Taste
   useEffect(() => { setMobilOffen(false); setFenster(null); }, [pfad]);

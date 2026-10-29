@@ -1379,3 +1379,12 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 @keyframes maschine-erscheinen { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
 @keyframes puls-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rot) 50%, transparent); } 70%, 100% { box-shadow: 0 0 0 12px transparent; } }
 @keyframes maschine-puls { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rot) 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 9px transparent; } }
+
+/* Ladeanzeige zwischen zwei Seiten (app/loading.js) – erscheint erst nach kurzer Zeit, damit es nicht flackert */
+.lade-seite {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    min-height: 50vh;
+    color: var(--text-leise);
+    animation: einblenden .3s ease .25s backwards;
+}
+.lade-seite .lade-kreis { width: 22px; height: 22px; color: var(--akzent); }

@@ -10,7 +10,7 @@
 import Link from 'next/link';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
-import { STATUS_WERTE, OFFENE_STATUS } from '@/lib/konstanten';
+import { STATUS_WERTE } from '@/lib/konstanten';
 import { datumZeit, datum, datumLang, begruessung } from '@/lib/format';
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import Kennzahl from '@/components/Kennzahl';
@@ -27,7 +27,7 @@ export default async function Uebersicht() {
   const benutzer = await benutzerPflicht();
 
   // Alle Abfragen gleichzeitig starten – das ist schneller als nacheinander
-  const [[kennzahlen], proStatus, offeneMeldungen, kritischeTeile, kartenDaten] = await Promise.all([
+  const [[kennzahlen], proStatus, kritischeTeile, kartenDaten] = await Promise.all([
     // Anzahl offener Aufträge, davon "hoch", und in den letzten 30 Tagen erledigte
     sql`
       SELECT COUNT(*) FILTER (WHERE w.status <> 'erledigt')::int                          AS offen,
@@ -39,20 +39,6 @@ export default async function Uebersicht() {
 
     // Aufträge nach Status
     sql`SELECT status, COUNT(*)::int AS anzahl FROM wartungsauftrag GROUP BY status`,
-
-    // Offene Störmeldungen: zuerst nach Priorität (hoch → niedrig), dann neueste zuerst
-    sql`
-      SELECT w.id AS auftrag_id, w.status, s.zeitpunkt, s.beschreibung, s.prioritaet,
-             m.bezeichnung AS maschine, st.stadt, g.kuerzel AS gebaeude, t.name AS techniker
-      FROM wartungsauftrag w
-      JOIN stoermeldung s   ON s.id = w.stoermeldung_id
-      JOIN maschine m       ON m.id = s.maschine_id
-      JOIN gebaeude g       ON g.id = m.gebaeude_id
-      JOIN standort st      ON st.id = g.standort_id
-      LEFT JOIN techniker t ON t.id = w.techniker_id
-      WHERE w.status IN ${sql(OFFENE_STATUS)}
-      ORDER BY s.prioritaet DESC, s.zeitpunkt DESC
-      LIMIT 8`,
 
     // Teile unter Mindestbestand sowie alle Teile mit offener Bestellung
     sql`
@@ -66,6 +52,13 @@ export default async function Uebersicht() {
     // Standorte, Gebäude und Maschinen für die Störungskarte
     alleKartenDaten(),
   ]);
+
+  // Offene Störmeldungen: stecken schon in den Kartendaten (dringendste und neueste zuerst).
+  // Das spart eine eigene Abfrage – jede Abfrage kostet über das Internet Zeit.
+  const stadtVon = Object.fromEntries(kartenDaten.standorte.map((st) => [st.id, st.stadt]));
+  const offeneMeldungen = kartenDaten.offene.slice(0, 8).map((a) => ({
+    ...a, stadt: stadtVon[a.standort_id], gebaeude: a.gebaeude_kuerzel,
+  }));
 
   // Alle Status in fester Reihenfolge, auch wenn es 0 Aufträge gibt
   const anzahlNachStatus = Object.fromEntries(proStatus.map((z) => [z.status, z.anzahl]));

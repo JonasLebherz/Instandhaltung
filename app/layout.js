@@ -22,22 +22,6 @@ async function flashLesen() {
   }
 }
 
-/**
- * Anzahl offener Aufträge für die Zahl neben "Aufträge" in der Seitenleiste.
- * Ist die Datenbank nicht erreichbar, fehlt nur die Zahl – die Seite selbst
- * zeigt dann ihre eigene Fehlermeldung.
- */
-async function anzahlOffen() {
-  try {
-    // Erst hier laden: So hängt die Login-Seite nicht von der Datenbank ab
-    const { sql } = await import('@/lib/db');
-    const [{ anzahl }] = await sql`SELECT COUNT(*)::int AS anzahl FROM wartungsauftrag WHERE status <> 'erledigt'`;
-    return anzahl;
-  } catch {
-    return null;
-  }
-}
-
 export const metadata = {
   title: { default: 'Instandhaltung', template: '%s · Instandhaltung' },
   description: 'Instandhaltungsmanagement – Störungen melden, Aufträge bearbeiten, Kennzahlen auswerten',
@@ -73,7 +57,6 @@ const startSkript = `
 export default async function RootLayout({ children }) {
   const benutzer = await aktuellerBenutzer();
   const flashMeldungen = await flashLesen();
-  const offen = benutzer ? await anzahlOffen() : null;
 
   return (
     // suppressHydrationWarning: data-theme und data-leiste werden vom Skript oben gesetzt, nicht von React
@@ -84,7 +67,7 @@ export default async function RootLayout({ children }) {
       <body>
         {benutzer ? (
           <>
-            <Seitenleiste benutzer={benutzer} offeneAuftraege={offen} />
+            <Seitenleiste benutzer={benutzer} />
             {/* Inhalt rechts neben der Seitenleiste (Abstand: siehe .app-rahmen in globals.css) */}
             <div className="app-rahmen">
               <main className="container app-main">
