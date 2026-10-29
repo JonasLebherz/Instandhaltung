@@ -10,11 +10,11 @@
  *
  * Aufbau:
  *  1. Farben als CSS-Variablen – je ein Satz für Hell und Dunkel
- *  2. Grundlayout, Navigation, Karten, Kennzahlen, Pills, Tabellen, Formulare
+ *  2. Grundlayout, Seitenleiste, Logo, Karten, Kennzahlen, Pills, Tabellen, Formulare
  *  3. Animationen (werden bei "Bewegung reduzieren" im Betriebssystem abgeschaltet)
  *
  * Der Dunkelmodus wird über das Attribut data-theme="dark" am <html>-Element
- * gesteuert (gesetzt in app/layout.js bzw. components/Darstellung.js).
+ * gesteuert (gesetzt in app/layout.js bzw. components/Seitenleiste.js).
  */
 
 /* =====================================================================
@@ -159,76 +159,267 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .app-main {
     flex: 1;
     width: 100%;
-    padding-top: 40px;
-    padding-bottom: 64px;
+    padding-top: 36px;
+    padding-bottom: 48px;
 }
 
-/* ---------- Navigation ---------- */
+/* ---------- Seitenleiste (components/Seitenleiste.js) ---------- */
 
-.app-nav {
-    position: sticky;
-    top: 12px;
-    z-index: 1020;
-    width: min(1296px, calc(100% - 24px));
-    margin: 12px auto 0;
-    border-radius: 24px;
+/*
+ * Breite der Leiste: eingeklappt nur Symbole, aufgeklappt mit Text.
+ * Der Zustand steht in <html data-leiste="auf|zu"> (gesetzt in app/layout.js).
+ * Der Inhalt rückt um dieselbe Breite nach rechts (.app-rahmen).
+ */
+:root { --leiste-zu: 76px; --leiste-auf: 256px; --leiste-b: var(--leiste-zu); --leiste-abstand: 12px; }
+:root[data-leiste="auf"] { --leiste-b: var(--leiste-auf); }
+
+.app-rahmen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-left: calc(var(--leiste-b) + var(--leiste-abstand));
+    transition: margin-left .3s var(--weich);
+    min-width: 0;
+}
+@media (min-width: 768px) {
+    .app-rahmen > .container { padding-left: 24px; padding-right: 32px; }
+}
+
+.seitenleiste {
+    position: fixed;
+    z-index: 1030;
+    top: var(--leiste-abstand);
+    bottom: var(--leiste-abstand);
+    left: var(--leiste-abstand);
+    width: var(--leiste-b);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 12px 12px;
+    border-radius: 26px;
     background: var(--karte-erhoeht);
     backdrop-filter: var(--glas-unschaerfe);
     -webkit-backdrop-filter: var(--glas-unschaerfe);
     border: 1px solid var(--glas-rand);
     box-shadow: var(--glas-kante), var(--schatten);
+    transition: width .3s var(--weich), transform .3s var(--weich);
 }
-.app-nav .nav-zeile {
+
+.leiste-kopf { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 2px 6px; }
+.leiste-marke {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-weight: 650; font-size: 1.05rem; letter-spacing: -.02em;
+    color: var(--text); white-space: nowrap;
+}
+.leiste-marke:hover { color: var(--text); text-decoration: none; }
+.leiste-marke .logo { transition: transform .5s var(--weich); }
+.leiste-marke:hover .logo { transform: scale(1.06) rotate(-8deg); }
+.leiste-kopf .leiste-schliessen { display: none; }   /* nur im Handy-Menü */
+
+/* Runder Knopf am rechten Rand: ein- und ausklappen */
+.leiste-umschalter {
+    position: absolute;
+    top: 30px; right: -13px;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    padding: 0;
+    border: 1px solid var(--glas-rand);
+    background: var(--karte-solid);
+    color: var(--text-leise);
+    font-size: .7rem;
+    box-shadow: 0 2px 8px rgba(31, 38, 64, .14);
+    transition: color var(--uebergang), transform .3s var(--weich), box-shadow var(--uebergang);
+    z-index: 2;
+}
+.leiste-umschalter:hover { color: var(--akzent); box-shadow: 0 0 0 4px var(--akzent-ring); }
+:root:not([data-leiste="auf"]) .leiste-umschalter i { transform: rotate(180deg); }
+.leiste-umschalter i { transition: transform .3s var(--weich); }
+
+/* Kein overflow hier: Sonst würden die Sprechblasen der eingeklappten Leiste abgeschnitten */
+.leiste-nav { flex: 1; }
+.leiste-bereich ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.leiste-titel {
+    font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-leise);
+    padding: 16px 12px 6px;
+    white-space: nowrap;
+}
+
+/* Ein Eintrag: Symbol (immer gleich breit) und Text */
+.leiste-link {
+    position: relative;
+    width: 100%;
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 60px;
-    position: relative;
-}
-.marke {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: var(--text);
-    margin-right: auto;
-}
-.marke:hover { color: var(--text); text-decoration: none; }
-.marke-symbol {
-    width: 32px; height: 32px;
-    border-radius: 10px;
-    display: grid; place-items: center;
-    background: linear-gradient(160deg, color-mix(in srgb, var(--akzent) 75%, #fff) 0%, var(--akzent) 60%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 4px 12px var(--akzent-ring);
-    color: #fff;
-    font-size: 1rem;
-    transition: transform .5s var(--weich);
-}
-.marke:hover .marke-symbol { transform: rotate(-20deg); }
-
-.nav-links { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
-.nav-links a {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 13px;
+    background: transparent;
     color: var(--text-leise);
     font-size: .95rem;
-    padding: 8px 14px;
-    border-radius: 980px;
-    transition: color var(--uebergang), background-color var(--uebergang);
+    font-weight: 500;
+    text-align: left;
+    white-space: nowrap;
+    transition: background-color var(--uebergang), color var(--uebergang);
 }
-.nav-links a i { font-size: 1rem; opacity: .85; }
-.nav-links a:hover { color: var(--text); background: var(--fuellung); text-decoration: none; }
-/* Aktiver Punkt: eine helle "Glaslinse" */
-.nav-links a.aktiv {
+.leiste-link:hover { background: var(--fuellung); color: var(--text); text-decoration: none; }
+.leiste-link.aktiv {
     color: var(--text);
     background: var(--glas-linse);
-    font-weight: 500;
+    font-weight: 600;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .08), inset 0 1px 0 rgba(255, 255, 255, .6);
 }
+.leiste-link.aktiv .leiste-symbol i { color: var(--akzent); }
+.leiste-symbol {
+    position: relative;
+    flex: 0 0 30px;
+    height: 30px;
+    display: grid; place-items: center;
+    font-size: 1.15rem;
+}
+.leiste-text {
+    flex: 1;
+    min-width: 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    transition: opacity .2s ease .08s;
+}
+.leiste-zahl, .leiste-punkt {
+    border-radius: 999px;
+    font-size: .72rem; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background: var(--rot);
+}
+.leiste-zahl { padding: 1px 8px; }
+.leiste-punkt {
+    display: none;           /* nur eingeklappt sichtbar */
+    position: absolute; top: -5px; right: -9px;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    place-items: center;
+    font-size: .64rem;
+    box-shadow: 0 0 0 2px var(--karte-solid);
+}
+.leiste-wert { font-size: .8rem; color: var(--text-leise); font-weight: 400; }
 
-.nav-werkzeuge { display: flex; align-items: center; gap: 6px; }
+/* Unten: Darstellung und Konto */
+.leiste-fuss { border-top: 1px solid var(--linie); padding-top: 8px; display: grid; gap: 2px; }
+.leiste-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: .72rem; font-weight: 700; letter-spacing: .02em;
+    color: #fff;
+    background: linear-gradient(150deg, color-mix(in srgb, var(--lila) 70%, #fff), var(--akzent));
+}
+.leiste-konto { min-height: 52px; }
+.konto-name { min-width: 0; color: var(--text); font-weight: 600; font-size: .9rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; }
+.konto-name small { display: block; font-weight: 400; font-size: .75rem; color: var(--text-leise); overflow: hidden; text-overflow: ellipsis; }
+
+/* Aufklappmenüs der Leiste öffnen sich rechts daneben. Feste Fläche statt Glas:
+   Innerhalb der Leiste (die selbst schon Glas ist) würde die Unschärfe nicht wirken. */
+.leiste-fuss .aufklapp-menue {
+    left: calc(100% + 24px); right: auto; top: auto; bottom: 0; transform-origin: bottom left;
+    background: var(--karte-solid);
+}
+
+/* ---------- Eingeklappt (nur ab Tablet-Breite) ---------- */
+@media (min-width: 768px) {
+    :root:not([data-leiste="auf"]) .leiste-titel {
+        /* Bereichsname wird zur feinen Trennlinie */
+        font-size: 0; padding: 0; height: 1px; margin: 12px 14px; background: var(--linie);
+    }
+    :root:not([data-leiste="auf"]) .leiste-bereich:first-child .leiste-titel { margin-top: 4px; }
+    :root:not([data-leiste="auf"]) .leiste-punkt { display: grid; }
+    :root:not([data-leiste="auf"]) .leiste-zahl, :root:not([data-leiste="auf"]) .leiste-wert,
+    :root:not([data-leiste="auf"]) .leiste-konto .leiste-text i { display: none; }
+    /* Der Text wird zur Sprechblase rechts neben dem Symbol – sichtbar beim Darüberfahren */
+    :root:not([data-leiste="auf"]) .leiste-link .leiste-text {
+        position: absolute;
+        left: calc(100% + 22px);
+        top: 50%;
+        flex: none;
+        padding: 6px 12px;
+        border-radius: 10px;
+        background: var(--karte-solid);
+        border: 1px solid var(--linie);
+        box-shadow: var(--schatten-hover);
+        color: var(--text);
+        font-size: .85rem;
+        font-weight: 500;
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        transform: translate(-6px, -50%);
+        transition: opacity .15s ease, transform .15s var(--weich), visibility 0s;
+    }
+    :root:not([data-leiste="auf"]) .leiste-link:hover .leiste-text,
+    :root:not([data-leiste="auf"]) .leiste-link:focus-visible .leiste-text { opacity: 1; visibility: visible; transform: translate(0, -50%); }
+    :root:not([data-leiste="auf"]) .leiste-link[aria-expanded="true"] .leiste-text { opacity: 0; visibility: hidden; }
+    :root:not([data-leiste="auf"]) .leiste-marke .leiste-text { display: none; }
+    :root:not([data-leiste="auf"]) .leiste-kopf { justify-content: center; }
+    :root:not([data-leiste="auf"]) .konto-name small { display: none; }
+}
+
+/* Die schmale Leiste oben gibt es nur auf dem Smartphone */
+.mobil-kopf { display: none; }
+.leiste-hintergrund { display: none; }
+
+@media (max-width: 767.98px) {
+    .app-rahmen { margin-left: 0; }
+    .mobil-kopf {
+        position: sticky; top: 8px; z-index: 1020;
+        display: flex; align-items: center; justify-content: space-between;
+        margin: 8px 8px 0;
+        padding: 8px 8px 8px 12px;
+        border-radius: 20px;
+        background: var(--karte-erhoeht);
+        backdrop-filter: var(--glas-unschaerfe);
+        -webkit-backdrop-filter: var(--glas-unschaerfe);
+        border: 1px solid var(--glas-rand);
+        box-shadow: var(--glas-kante), var(--schatten);
+    }
+    .mobil-kopf .leiste-marke { gap: 10px; font-size: 1rem; }
+    /* Seitenleiste fährt von links herein */
+    .seitenleiste {
+        top: 8px; bottom: 8px; left: 8px;
+        background: color-mix(in srgb, var(--karte-solid) 90%, transparent);
+        width: min(300px, calc(100vw - 56px));
+        transform: translateX(calc(-100% - 20px));
+        visibility: hidden;
+        transition: transform .3s var(--weich), visibility 0s .3s;
+    }
+    .seitenleiste.mobil-offen { transform: none; visibility: visible; transition: transform .3s var(--weich); }
+    .leiste-umschalter { display: none; }
+    .leiste-kopf .leiste-schliessen { display: grid; }
+    .leiste-nav { overflow-y: auto; }
+    .leiste-hintergrund {
+        display: block;
+        position: fixed; inset: 0; z-index: 1025;
+        background: rgba(0, 0, 0, .28);
+        animation: einblenden .25s ease;
+    }
+    .leiste-fuss .aufklapp-menue { left: 0; right: 0; bottom: calc(100% + 8px); transform-origin: bottom center; }
+}
+
+/* ---------- Logo (components/Logo.js) ---------- */
+
+.logo {
+    width: var(--logo-groesse, 32px); height: var(--logo-groesse, 32px);
+    flex: 0 0 var(--logo-groesse, 32px);
+    border-radius: calc(var(--logo-groesse, 32px) * .27);
+    display: grid; place-items: center;
+    color: #fff;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .28), transparent 55%),
+        linear-gradient(155deg, color-mix(in srgb, var(--akzent) 62%, #fff) 0%, var(--akzent) 55%, color-mix(in srgb, var(--akzent) 80%, #000) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 4px 14px var(--akzent-ring);
+}
+.logo svg { width: 76%; height: 76%; }
+
+/* ---------- Runde Knöpfe und Aufklappmenüs ---------- */
+
 .rund-knopf {
     width: 38px; height: 38px;
     border-radius: 50%;
@@ -241,9 +432,8 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 .rund-knopf:hover { background: var(--fuellung); }
 .rund-knopf:active { transform: scale(.92); }
-.nav-menue-knopf { display: none; }
 
-/* Aufklappmenüs (Darstellung, Benutzer) */
+/* Aufklappmenüs (Darstellung, Konto) */
 .aufklapp { position: relative; }
 .aufklapp-menue {
     position: absolute;
@@ -286,26 +476,6 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .aufklapp-menue button .haken { margin-left: auto; color: var(--akzent); }
 .aufklapp-menue .menue-info { padding: 8px 10px; font-size: .9rem; }
 .aufklapp-menue .menue-info small { color: var(--text-leise); display: block; }
-
-@media (max-width: 767.98px) {
-    .nav-menue-knopf { display: grid; }
-    .nav-links {
-        position: absolute;
-        left: -12px; right: -12px;
-        top: calc(100% + 10px);
-        flex-direction: column;
-        padding: 10px;
-        background: var(--karte-erhoeht);
-        backdrop-filter: var(--glas-unschaerfe);
-        -webkit-backdrop-filter: var(--glas-unschaerfe);
-        border: 1px solid var(--glas-rand);
-        border-radius: 20px;
-        box-shadow: var(--glas-kante), var(--schatten-hover);
-        display: none;
-    }
-    .nav-links.offen { display: flex; animation: herabgleiten .25s var(--weich); }
-    .nav-links a { padding: 12px 14px; font-size: 1.05rem; }
-}
 
 /* ---------- Überschriften ---------- */
 
@@ -723,7 +893,7 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
     padding: 48px 16px;
 }
 .login-karte { width: 100%; max-width: 400px; padding: 36px; }
-.login-karte .marke-symbol { width: 52px; height: 52px; border-radius: 14px; font-size: 1.5rem; margin: 0 auto 18px; }
+.login-logo { display: flex; justify-content: center; margin-bottom: 18px; }
 
 /* ---------- Fußzeile ---------- */
 
@@ -737,7 +907,6 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
 
 @media (max-width: 767.98px) {
     .app-main { padding-top: 24px; }
-    .app-nav { top: 8px; margin-top: 8px; width: calc(100% - 16px); border-radius: 20px; }
     .seitenkopf h1 { font-size: 1.95rem; }
     .karte { padding: 20px; }
     .kennzahl-wert { font-size: 2.4rem; }
@@ -1085,36 +1254,128 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .mini-kennzahlen strong { display: block; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
 .mini-kennzahlen span { font-size: .75rem; color: var(--text-leise); }
 
-/* Schritte beim Melden über die Karte */
-.schritte-leiste { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
-.schritte-leiste button {
-    display: inline-flex; align-items: center; gap: 8px;
-    border: 1px solid var(--glas-rand); border-radius: 999px;
-    padding: 7px 14px 7px 8px; font-size: .9rem;
-    background: var(--karte); backdrop-filter: blur(12px); color: var(--text-leise);
-    transition: background-color var(--uebergang), color var(--uebergang);
-}
-.schritte-leiste button:disabled { opacity: .55; }
-.schritte-leiste .nr {
-    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
-    background: var(--fuellung); font-weight: 700; font-size: .8rem;
-}
-.schritte-leiste .aktiv { color: var(--text); background: var(--karte-erhoeht); font-weight: 600; }
-.schritte-leiste .aktiv .nr { background: var(--akzent); color: #fff; }
-.schritte-leiste .fertig .nr { background: var(--gruen); color: #fff; }
+/* Gewählte Maschine über dem Meldeformular */
 .auswahl-chip {
     display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
     padding: 10px 14px; border-radius: 14px; background: var(--akzent-zart); color: var(--text); margin-bottom: 18px;
+}
+
+/* ---------- Zoom-Karte (components/karten/KartenExplorer.js) ---------- */
+
+/*
+ * Die "Bühne" hat eine feste Höhe. Darin liegen eine oder – während des
+ * Zooms – zwei Ebenen übereinander. Jede Ebene zentriert ihren Inhalt und
+ * passt ihn über das Seitenverhältnis (--verhaeltnis = Breite / Höhe) ein.
+ */
+.explorer-karte { padding: 16px; }
+.explorer-pfad { margin: 2px 6px 12px; }
+.explorer-pfad button {
+    border: 0; background: none; padding: 2px 4px; border-radius: 6px;
+    color: var(--akzent); display: inline-flex; align-items: center; gap: 6px;
+}
+.explorer-pfad button:hover:not(:disabled) { background: var(--fuellung); }
+.explorer-pfad button:disabled { color: var(--text); font-weight: 600; opacity: 1; }
+.explorer-pfad [aria-current] { color: var(--text); font-weight: 600; }
+
+.explorer-buehne {
+    --buehne-h: clamp(440px, 66vh, 700px);
+    --kopf-h: 66px;                          /* Platz für Titel und Zurück-Knopf */
+    position: relative;
+    height: var(--buehne-h);
+    overflow: hidden;
+    border-radius: 16px;
+    background:
+        radial-gradient(120% 90% at 50% 0%, var(--zeile-hover), transparent 70%),
+        var(--fuellung);
+    border: 1px solid var(--linie);
+    isolation: isolate;
+}
+.explorer-buehne.buehne-mittel { --buehne-h: clamp(400px, 58vh, 580px); }
+
+.buehne-kopf {
+    position: absolute; top: 12px; left: 12px; z-index: 5;
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 14px 6px 6px;
+    border-radius: 999px;
+    background: var(--karte-erhoeht);
+    backdrop-filter: var(--glas-unschaerfe);
+    -webkit-backdrop-filter: var(--glas-unschaerfe);
+    border: 1px solid var(--glas-rand);
+    box-shadow: var(--glas-kante), 0 4px 16px rgba(31, 38, 64, .08);
+    max-width: calc(100% - 24px);
+}
+.buehne-kopf:not(:has(button)) { padding-left: 14px; }
+.buehne-titel { font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.buehne-hinweis { font-size: .78rem; color: var(--text-leise); line-height: 1.2; }
+.glas-knopf { width: 34px; height: 34px; background: var(--fuellung); }
+
+.explorer-ebene {
+    position: absolute; inset: 0;
+    display: flex;
+    padding: var(--kopf-h) 22px 22px;
+    overflow: auto;
+    will-change: transform, opacity;
+}
+/* margin:auto zentriert – und lässt bei zu breitem Inhalt (Handy) seitlich scrollen */
+.ebene-inhalt {
+    margin: auto;
+    width: min(100%, calc((var(--buehne-h) - var(--kopf-h) - 22px) * var(--verhaeltnis)));
+}
+/* In der Bühne passt sich alles der verfügbaren Fläche an (keine Mindestbreite, kein eigenes Scrollen) */
+.explorer-ebene .lageplan-rahmen, .explorer-ebene .grundriss-rahmen { overflow: visible; margin: 0; padding: 0; }
+.explorer-ebene .lageplan, .explorer-ebene .grundriss { min-width: 0; }
+.explorer-ebene .dkarte { max-width: none; }
+/* Die Deutschlandkarte ist hochkant: Sie darf bis unter den Titel reichen (dort liegt nur Meer) */
+.explorer-ebene:has(> .ebene-land) { --kopf-h: 18px; }
+
+/* Info-Spalte neben der Karte: auf breiten Bildschirmen genau so hoch wie die Karte, mit eigenem Scrollen */
+@media (min-width: 1200px) {
+    .explorer-info-spalte { position: relative; }
+    .explorer-info {
+        position: absolute; inset: -14px -14px 10px;
+        padding: 14px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+    .explorer-info > .karte:last-child { margin-bottom: 0; }
+}
+
+/* Elemente der neuen Ebene erscheinen schneller als auf den Einzelseiten */
+.explorer-ebene .karten-punkt { animation-delay: calc(var(--i, 0) * 30ms + 140ms); }
+.explorer-ebene .plan-gebaeude { animation-delay: calc(var(--i, 0) * 45ms + 120ms); }
+.explorer-ebene .plan-maschine { animation-delay: calc(var(--i, 0) * 12ms + 160ms); }
+
+/* Die alte Ebene ist nur noch Kulisse: nicht anklickbar, keine eigenen Animationen */
+.ebene-alt { pointer-events: none; z-index: 1; }
+.ebene-alt *, .ebene-alt *::before, .ebene-alt *::after,
+.explorer-ebene.messen, .explorer-ebene.messen * { animation: none !important; }
+.ebene-neu { z-index: 2; }
+
+/* Hineinzoomen: alte Ebene wächst über den Rand hinaus, neue wächst aus dem angeklickten Punkt */
+.ebene-alt.zoom-rein { animation: zoom-rein-alt .56s cubic-bezier(.45, 0, .2, 1) forwards; }
+.ebene-neu.zoom-rein { animation: zoom-rein-neu .56s cubic-bezier(.3, 0, .1, 1) backwards; }
+/* Herauszoomen: genau umgekehrt – die alte Ebene schrumpft zurück an ihren Platz */
+.ebene-alt.zoom-raus { animation: zoom-raus-alt .56s cubic-bezier(.45, 0, .2, 1) forwards; }
+.ebene-neu.zoom-raus { animation: zoom-raus-neu .56s cubic-bezier(.3, 0, .1, 1) backwards; }
+
+@keyframes zoom-rein-alt { 0% { transform: none; opacity: 1; } 65% { opacity: 0; } 100% { transform: scale(3.2); opacity: 0; } }
+@keyframes zoom-rein-neu { 0% { transform: scale(.18); opacity: 0; } 30% { opacity: .35; } 100% { transform: none; opacity: 1; } }
+@keyframes zoom-raus-alt { 0% { transform: none; opacity: 1; } 70% { opacity: 0; } 100% { transform: scale(.2); opacity: 0; } }
+@keyframes zoom-raus-neu { 0% { transform: scale(2.6); opacity: 0; } 35% { opacity: .4; } 100% { transform: none; opacity: 1; } }
+
+.explorer-karte .karten-legende { margin: 12px 6px 2px; }
+.explorer-seite .abschnitt-titel { font-size: 1.1rem; }
+.ort-zeile { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; background: var(--fuellung); }
+
+@media (max-width: 767.98px) {
+    .explorer-karte { padding: 10px; }
+    .explorer-buehne, .explorer-buehne.buehne-mittel { --buehne-h: 460px; --kopf-h: 62px; }
+    .explorer-ebene { padding-left: 10px; padding-right: 10px; }
+    /* Auf dem Handy wäre der Grundriss zu klein: Mindestbreite, seitlich wischen */
+    .ebene-inhalt.ebene-gebaeude { min-width: 560px; }
 }
 
 @keyframes punkt-erscheinen { from { opacity: 0; transform: var(--anker) scale(.6); } to { opacity: 1; transform: var(--anker) scale(1); } }
 @keyframes maschine-erscheinen { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
 @keyframes puls-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rot) 50%, transparent); } 70%, 100% { box-shadow: 0 0 0 12px transparent; } }
 @keyframes maschine-puls { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rot) 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 9px transparent; } }
-
-/* Mittlere Breite (z. B. Tablet quer): in der Navigation nur Symbole zeigen */
-@media (min-width: 768px) and (max-width: 1099.98px) {
-    .nav-links .nav-text { display: none; }
-    .nav-links a { padding: 9px 12px; }
-    .nav-links a i { font-size: 1.1rem; }
-}

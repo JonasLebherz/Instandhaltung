@@ -1,14 +1,14 @@
 /**
  * app/layout.js – Grundgerüst jeder Seite
  *
- * Enthält <html>, <head>, die Navigation, die Hinweise (Flash-Meldungen)
+ * Enthält <html>, <head>, die Seitenleiste links, die Hinweise (Flash-Meldungen)
  * und die Fußzeile. Der eigentliche Seiteninhalt wird als "children" eingesetzt.
  */
 import 'bootstrap/dist/css/bootstrap.min.css';      // Raster (row/col) und Formular-Grundlagen
 import 'bootstrap-icons/font/bootstrap-icons.min.css'; // dezente Symbole
 import './globals.css';                              // eigenes Design (überschreibt Bootstrap)
 
-import Navigation from '@/components/Navigation';
+import Seitenleiste from '@/components/Seitenleiste';
 import FlashMeldungen from '@/components/FlashMeldungen';
 import { aktuellerBenutzer } from '@/lib/auth';
 import { cookies } from 'next/headers';
@@ -19,6 +19,22 @@ async function flashLesen() {
     return JSON.parse((await cookies()).get('flash')?.value ?? '[]');
   } catch {
     return [];
+  }
+}
+
+/**
+ * Anzahl offener Aufträge für die Zahl neben "Aufträge" in der Seitenleiste.
+ * Ist die Datenbank nicht erreichbar, fehlt nur die Zahl – die Seite selbst
+ * zeigt dann ihre eigene Fehlermeldung.
+ */
+async function anzahlOffen() {
+  try {
+    // Erst hier laden: So hängt die Login-Seite nicht von der Datenbank ab
+    const { sql } = await import('@/lib/db');
+    const [{ anzahl }] = await sql`SELECT COUNT(*)::int AS anzahl FROM wartungsauftrag WHERE status <> 'erledigt'`;
+    return anzahl;
+  } catch {
+    return null;
   }
 }
 
@@ -38,47 +54,52 @@ export const viewport = {
 
 /*
  * Kleines Skript, das VOR dem ersten Anzeigen läuft: Es setzt Hell/Dunkel
- * sofort richtig, damit die Seite nicht kurz weiß aufblitzt.
- * Gespeicherte Wahl: 'hell', 'dunkel' oder nichts (= wie das Betriebssystem).
+ * und den Zustand der Seitenleiste sofort richtig, damit nichts aufblitzt oder springt.
+ * Darstellung: 'hell', 'dunkel' oder nichts (= wie das Betriebssystem).
+ * Seitenleiste: 'auf' oder 'zu'; ohne Wahl ab 1200 px Breite offen.
  */
-const darstellungSkript = `
+const startSkript = `
 (function () {
-  var wahl = null;
-  try { wahl = localStorage.getItem('darstellung'); } catch (e) {}
+  var wahl = null, leiste = null;
+  try { wahl = localStorage.getItem('darstellung'); leiste = localStorage.getItem('seitenleiste'); } catch (e) {}
   var dunkel = wahl === 'dunkel' || (wahl !== 'hell' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   var html = document.documentElement;
   html.setAttribute('data-theme', dunkel ? 'dark' : 'light');
   html.setAttribute('data-bs-theme', dunkel ? 'dark' : 'light');
+  if (leiste !== 'auf' && leiste !== 'zu') leiste = window.innerWidth >= 1200 ? 'auf' : 'zu';
+  html.setAttribute('data-leiste', leiste);
 })();`;
 
 export default async function RootLayout({ children }) {
   const benutzer = await aktuellerBenutzer();
   const flashMeldungen = await flashLesen();
+  const offen = benutzer ? await anzahlOffen() : null;
 
   return (
-    // suppressHydrationWarning: data-theme wird vom Skript oben gesetzt, nicht von React
+    // suppressHydrationWarning: data-theme und data-leiste werden vom Skript oben gesetzt, nicht von React
     <html lang="de" data-theme="light" data-bs-theme="light" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: darstellungSkript }} />
+        <script dangerouslySetInnerHTML={{ __html: startSkript }} />
       </head>
       <body>
-        {benutzer && <Navigation benutzer={benutzer} />}
-
         {benutzer ? (
-          <main className="container app-main">
-            <FlashMeldungen neu={flashMeldungen} />
-            {children}
-          </main>
-        ) : (
-          children /* Login-Seite: ohne Navigation */
-        )}
-
-        {benutzer && (
-          <footer className="app-footer">
-            <div className="container">
-              Instandhaltung · Hochschulprojekt „Company database“ · Digital Production
+          <>
+            <Seitenleiste benutzer={benutzer} offeneAuftraege={offen} />
+            {/* Inhalt rechts neben der Seitenleiste (Abstand: siehe .app-rahmen in globals.css) */}
+            <div className="app-rahmen">
+              <main className="container app-main">
+                <FlashMeldungen neu={flashMeldungen} />
+                {children}
+              </main>
+              <footer className="app-footer">
+                <div className="container">
+                  Instandhaltung · Hochschulprojekt „Company database“ · Digital Production
+                </div>
+              </footer>
             </div>
-          </footer>
+          </>
+        ) : (
+          children /* Login-Seite: ohne Seitenleiste */
         )}
       </body>
     </html>

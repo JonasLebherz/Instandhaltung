@@ -12,9 +12,9 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 ## Stand
 
 - **Live:** Die App läuft bei Vercel mit Supabase. Login funktioniert.
-- **Fertig:** alle Seiten (Übersicht, Melden-Assistent über die Karte, Störungskarte Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik, Login), Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
+- **Fertig:** alle Seiten (Übersicht mit Karte oben, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik, Login), Seitenleiste links, Logo, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
 - **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
-- **Getestet** gegen PostgreSQL 16 lokal: 76 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melde-Assistent, Karte, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
+- **Getestet** gegen PostgreSQL 16 lokal: 106 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
 - **Nach Schemaänderungen** muss in Supabase `schema.sql` + `testdaten.sql` erneut ausgeführt werden. Das setzt alle Daten zurück, Login-Konten bleiben erhalten.
 
 ## Team & andere KI-Assistenten
@@ -37,7 +37,7 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 ## Aufbau & Konventionen
 
 - **Seiten** sind Server-Komponenten in `app/**/page.js` mit `export const dynamic = 'force-dynamic'`. Jede Seite ruft zuerst `await benutzerPflicht()` auf (`lib/auth.js`).
-- **Interaktive Teile** (Formulare, Navigation, Diagramme) sind Client-Komponenten mit `'use client'` in eigenen Dateien.
+- **Interaktive Teile** (Formulare, Seitenleiste, Karte, Diagramme) sind Client-Komponenten mit `'use client'` in eigenen Dateien.
 - **Datenänderungen** laufen nur über Server-Aktionen in `app/aktionen.js` bzw. `app/login/aktionen.js`. Muster:
   1. `await benutzerPflicht()`
   2. Eingaben prüfen und bei Fehlern `return { fehler: { feld: 'Meldung' }, eingabe }` zurückgeben
@@ -54,12 +54,23 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 
 ## Störungskarte
 
-- Ebenen: `/karte` (Deutschland) → `/karte/<standort-kürzel>` (Lageplan) → `/karte/<standort>/<gebäude-kürzel>` (Grundriss). Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
-- Abfragen in `lib/karten/daten.js`. Die Zahl auf jedem Punkt ist die Anzahl offener Aufträge (Status ≠ erledigt), die Farbe kommt von der höchsten offenen Priorität (`components/karten/stufe.js`).
-- `components/karten/DeutschlandKarte.js`, `Lageplan.js` und `Grundriss.js` haben zwei Modi: `modus="link"` (Anzeige, Klick navigiert) und `modus="auswahl"` mit `onWaehle` (Melde-Assistent). Der Grundriss ruft immer `onWaehle` auf.
+- Ebenen: Deutschland → Werk (Lageplan) → Gebäude (Grundriss), alles in **einer** Client-Komponente `components/karten/KartenExplorer.js`. Sie bekommt alle Daten auf einmal (`alleKartenDaten()` in `lib/karten/daten.js`) und wechselt die Ebenen ohne Neuladen.
+- Zoom-Animation: Beim Wechsel bleibt die alte Ebene kurz stehen (`.ebene-alt`), die neue wächst aus dem angeklickten Punkt (`transform-origin` = Mitte des Elements mit `data-ort="st-<id>"` bzw. `"g-<id>"`). Beim Herauszoomen wird der Punkt in der neuen Ebene gemessen. CSS: Abschnitt „Zoom-Karte“ in `app/globals.css`.
+- Verwendet auf `/karte` (`adresseMitfuehren`: Adresse `?werk=ham&halle=h2&maschine=12`, per `history.replaceState`), auf der Übersicht (`groesse="mittel"`) und beim Melden (`modus="auswahl"`, `onMaschine`). Alte Adressen `/karte/<werk>/<halle>` leiten auf `/karte?werk=…&halle=…` um. Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
+- Rechts neben der Karte zeigt die Info-Spalte je Ebene Standorte, Gebäude, offene Störungen, Techniker bzw. Maschinen-Details.
+- Die Zahl auf jedem Punkt ist die Anzahl offener Aufträge (Status ≠ erledigt), die Farbe kommt von der höchsten offenen Priorität (`components/karten/stufe.js`).
+- `DeutschlandKarte.js`, `Lageplan.js` und `Grundriss.js` zeichnen nur die jeweilige Ebene und rufen beim Klick `onWaehle(objekt, event)` auf.
 - Aufbau: SVG für Hintergrund (Umriss, Gelände, Wände, Bereiche), darüber absolut positionierte HTML-Elemente in Prozent der Größe in Metern. Container haben `aspect-ratio` = Breite/Tiefe.
 - Deutschland-Umriss: vorab berechnete SVG-Pfade in `lib/karten/deutschland.js` (Natural Earth über `world-atlas`, Mercator). `projizieren(breite, länge)` nutzt dieselbe Formel. Zur Laufzeit werden keine Kartenbibliotheken geladen.
-- Melden: `app/melden/MeldeAssistent.js` (Schritte Werk → Gebäude → Maschine → Beschreibung) und `MeldeFormular.js` (sendet `maschine_id` als verstecktes Feld). `?maschine=<id>` springt zu Schritt 4, `?standort=<id>` zu Schritt 2.
+- Melden: `app/melden/MeldeAssistent.js` (erst Karte, nach Wahl der Maschine das Formular; „Ändern“ öffnet die Karte im Gebäude der Maschine) und `MeldeFormular.js` (sendet `maschine_id` als verstecktes Feld). `?maschine=<id>` springt direkt zum Formular, `?standort=<id>` startet im Werk.
+
+## Seitenleiste & Logo
+
+- `components/Seitenleiste.js` ersetzt die frühere Navigation oben. Bereiche: Überblick (Übersicht, Störungskarte), Instandhaltung (Störung melden, Aufträge mit Zahl offener Aufträge), Auswertung (Statistik). Unten Darstellung und Konto (Abmelden).
+- Zustand in `<html data-leiste="auf|zu">`, gemerkt in `localStorage` unter `seitenleiste`. Das Start-Skript in `app/layout.js` setzt ihn vor dem ersten Anzeigen (ohne Wahl: ab 1200 px offen). Die Breite steuert `--leiste-b`, der Inhalt rückt per `.app-rahmen` daneben.
+- Eingeklappt wird der Text zur Sprechblase beim Darüberfahren. Unter 768 px gibt es oben `.mobil-kopf`, die Leiste fährt dann von links herein.
+- Neue Seiten in `BEREICHE` in `Seitenleiste.js` eintragen (mit `symbol` und gefüllter Variante `symbolAktiv`).
+- Logo: `components/Logo.js` (Sechseck mit Pulslinie auf Akzentfläche, Farbe aus CSS). Das Browser-Symbol `app/icon.svg` hat dieselbe Form mit festen Farben.
 
 ## Design
 

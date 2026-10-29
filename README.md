@@ -23,11 +23,9 @@ aus den letzten 12 Monaten.
 | Seite | Adresse | Inhalt |
 |---|---|---|
 | Anmelden | `/login` | Login mit E-Mail und Passwort, nur für angelegte Team-Konten |
-| Übersicht | `/` | Kennzahlen, offene Meldungen, Aufträge nach Status, Ersatzteile unter Mindestbestand, Wareneingang buchen |
-| Störung melden | `/melden` | In 4 Schritten: Werk auf der Karte → Gebäude im Lageplan → Maschine im Grundriss → Beschreibung, Ursache und Priorität (mit Eingabeprüfung) |
-| Störungskarte | `/karte` | Deutschlandkarte mit allen Werken und der Zahl offener Störungen |
-| Werk | `/karte/ham` | Lageplan des Werksgeländes mit den Gebäuden, offene Störungen, Techniker vor Ort |
-| Gebäude | `/karte/ham/h2` | Grundriss mit allen Maschinen. Klick auf eine Maschine zeigt ihre Störungen und „Störung melden“. |
+| Übersicht | `/` | Ganz oben die Störungskarte, darunter Kennzahlen, offene Meldungen, Aufträge nach Status, Ersatzteile unter Mindestbestand, Wareneingang buchen |
+| Störung melden | `/melden` | Maschine auf der Karte suchen (Werk → Gebäude → Maschine), dann Beschreibung, Ursache und Priorität angeben (mit Eingabeprüfung) |
+| Störungskarte | `/karte` | Deutschlandkarte mit allen Werken und der Zahl offener Störungen. Ein Klick zoomt animiert in das Werk (Lageplan mit Gebäuden, offenen Störungen, Technikern vor Ort), ein weiterer in das Gebäude (Grundriss mit allen Maschinen). |
 | Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Standort, Maschine und Priorität |
 | Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen, Status ändern, Ersatzteile buchen, Auftrag abschließen |
 | Statistik | `/statistik` | MTTR, Ausfallzeit, Störungen pro Monat, Top-5-Störursachen, Kennzahlen pro Standort, Top 10 Maschinen, Filter nach Zeitraum und Standort |
@@ -36,11 +34,17 @@ aus den letzten 12 Monaten.
 wird nichts gebucht. Der Auftrag wechselt auf **„wartet auf Teil“**, und es wird automatisch eine
 Bestellung angelegt. Den Eingang der Lieferung bucht man auf der Übersicht.
 
-**Direktlinks:** `/melden?maschine=12` springt direkt zur Beschreibung. Das eignet sich z. B. für einen QR-Code an der Maschine.
+**Direktlinks:**
+- `/melden?maschine=12` springt direkt zur Beschreibung. Das eignet sich z. B. für einen QR-Code an der Maschine.
+- `/karte?werk=ham&halle=h2&maschine=12` öffnet die Karte gleich im Grundriss mit markierter Maschine.
+
+**Störungskarte ohne Wartezeit:** Alle Standorte, Gebäude und Maschinen werden beim Öffnen einmal geladen
+(nur wenige Kilobyte). Das Hinein- und Herauszoomen läuft danach komplett im Browser, ohne die Seite neu zu laden.
 
 **Darstellung:**
 - Ruhige „Glas“-Optik mit halbtransparenten Karten auf einem weichen Hintergrund.
-- Hell, Dunkel oder automatisch nach Systemeinstellung (Symbol oben rechts).
+- Navigation in einer Seitenleiste links: eingeklappt nur Symbole, aufgeklappt mit Text. Unten stehen Darstellung und Konto. Auf dem Handy öffnet sie sich über den Menü-Knopf.
+- Hell, Dunkel oder automatisch nach Systemeinstellung (unten in der Seitenleiste).
 - Sanfte Animationen.
 - Bei „Bewegung reduzieren“ bzw. „Transparenz reduzieren“ im Betriebssystem werden Animationen und Glas-Effekt automatisch abgeschaltet.
 
@@ -190,17 +194,17 @@ Status eines Auftrags: **gemeldet → zugewiesen → in Arbeit → wartet auf Te
 
 ```
 app/                         Seiten (Next.js App Router)
-├── layout.js                Grundgerüst: Navigation, Hinweise, Fußzeile, Hell/Dunkel
+├── layout.js                Grundgerüst: Seitenleiste, Hinweise, Fußzeile, Hell/Dunkel
 ├── globals.css              Design inkl. Dunkelmodus und Animationen
 ├── aktionen.js              Alle Aktionen, die Daten ändern (Server-Aktionen)
 ├── page.js                  Übersicht
 ├── melden/                  Störung melden
 ├── auftraege/               Auftragsübersicht und [id]/ = Auftrag bearbeiten
 ├── statistik/               Statistik und Diagramme
-├── karte/                   Störungskarte: Deutschland → [standort]/ → [gebaeude]/
+├── karte/                   Störungskarte mit Zoom (alte Adressen /karte/ham/h2 leiten dorthin um)
 └── login/                   Anmeldung
-components/                  Wiederverwendbare Bausteine (Navigation, Pills, Kennzahlen …)
-components/karten/           Deutschlandkarte, Lageplan, Grundriss
+components/                  Wiederverwendbare Bausteine (Seitenleiste, Logo, Pills, Kennzahlen …)
+components/karten/           Zoom-Karte (KartenExplorer) mit Deutschlandkarte, Lageplan, Grundriss
 lib/                         Datenbankverbindung, Login-Prüfung, Formatierung, Wertelisten
 lib/karten/                  Kartendaten (Umriss Deutschland) und Abfragen für die Karte
 middleware.js                Schickt nicht angemeldete Besucher zum Login

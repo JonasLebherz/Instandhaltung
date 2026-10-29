@@ -88,7 +88,7 @@ export default async function AuftragSeite({ params }) {
         <h1>{auftrag.maschine}</h1>
         <p>
           Störmeldung Nr. {auftrag.stoermeldung_id} · {auftrag.standort} · {auftrag.gebaeude} · {auftrag.anlagennummer}{' '}
-          <Link href={`/karte/${auftrag.standort_kuerzel.toLowerCase()}/${auftrag.gebaeude_kuerzel.toLowerCase()}?maschine=${auftrag.maschine_id}`}
+          <Link href={`/karte?werk=${auftrag.standort_kuerzel.toLowerCase()}&halle=${auftrag.gebaeude_kuerzel.toLowerCase()}&maschine=${auftrag.maschine_id}`}
                 className="ms-1 text-nowrap">
             <i className="bi bi-geo-alt" aria-hidden="true" /> Auf der Karte zeigen
           </Link>

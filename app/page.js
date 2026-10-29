@@ -2,9 +2,9 @@
  * app/page.js – Startseite / Übersicht (Dashboard)
  *
  * Zeigt auf einen Blick:
+ *  - ganz oben die Störungskarte aller Standorte (zum Hineinzoomen, KartenExplorer.js)
  *  - wichtige Kennzahlen (offene Meldungen, dringende Meldungen, Teile unter Mindestbestand)
- *  - die Verteilung der Aufträge nach Status
- *  - die aktuell offenen Störmeldungen
+ *  - die aktuell offenen Störmeldungen und die Verteilung der Aufträge nach Status
  *  - Ersatzteile unter Mindestbestand inkl. offener Bestellungen (mit Wareneingang)
  */
 import Link from 'next/link';
@@ -16,8 +16,8 @@ import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import Kennzahl from '@/components/Kennzahl';
 import SpeichernKnopf from '@/components/SpeichernKnopf';
 import { lieferungBuchen } from '@/app/aktionen';
-import { standorteMitZahlen } from '@/lib/karten/daten';
-import DeutschlandKarte from '@/components/karten/DeutschlandKarte';
+import { alleKartenDaten } from '@/lib/karten/daten';
+import KartenExplorer from '@/components/karten/KartenExplorer';
 
 // Immer aktuelle Daten aus der Datenbank (kein Zwischenspeichern der Seite)
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,7 @@ export default async function Uebersicht() {
   const benutzer = await benutzerPflicht();
 
   // Alle Abfragen gleichzeitig starten – das ist schneller als nacheinander
-  const [[kennzahlen], proStatus, offeneMeldungen, kritischeTeile, standorte] = await Promise.all([
+  const [[kennzahlen], proStatus, offeneMeldungen, kritischeTeile, kartenDaten] = await Promise.all([
     // Anzahl offener Aufträge, davon "hoch", und in den letzten 30 Tagen erledigte
     sql`
       SELECT COUNT(*) FILTER (WHERE w.status <> 'erledigt')::int                          AS offen,
@@ -63,8 +63,8 @@ export default async function Uebersicht() {
       WHERE e.bestand < e.mindestbestand OR b.id IS NOT NULL
       ORDER BY (e.bestand < e.mindestbestand) DESC, e.bestand::float / NULLIF(e.mindestbestand, 0), e.bezeichnung`,
 
-    // Standorte mit offenen Störungen für die kleine Deutschlandkarte
-    standorteMitZahlen(),
+    // Standorte, Gebäude und Maschinen für die Störungskarte
+    alleKartenDaten(),
   ]);
 
   // Alle Status in fester Reihenfolge, auch wenn es 0 Aufträge gibt
@@ -77,38 +77,46 @@ export default async function Uebersicht() {
 
   return (
     <>
-      <div className="seitenkopf">
-        <div className="eyebrow">{begruessung()}, {benutzer.anzeigename}</div>
-        <h1>Übersicht</h1>
-        <p>{datumLang()}</p>
+      <div className="seitenkopf d-flex justify-content-between align-items-end flex-wrap gap-3">
+        <div>
+          <div className="eyebrow">{begruessung()}, {benutzer.anzeigename}</div>
+          <h1>Übersicht</h1>
+          <p>{datumLang()}</p>
+        </div>
+        <Link className="btn btn-primary" href="/melden">
+          <i className="bi bi-plus-lg" aria-hidden="true" /> Neue Störung melden
+        </Link>
       </div>
 
+      {/* Im Mittelpunkt: die Störungskarte. Klick auf ein Werk zoomt hinein. */}
+      <KartenExplorer daten={kartenDaten} groesse="mittel" />
+
       {/* Kennzahlen */}
-      <div className="row g-4 mb-2">
+      <div className="row g-4 mb-2 mt-0">
         <div className="col-6 col-lg-3">
           <Kennzahl titel="Offene Meldungen" wert={kennzahlen.offen} zusatz="noch nicht erledigt"
-                    symbol="bi-exclamation-circle" link="/auftraege?status=offen" i={0} />
+                    symbol="bi-exclamation-circle" link="/auftraege?status=offen" i={2} />
         </div>
         <div className="col-6 col-lg-3">
           <Kennzahl titel="Priorität hoch" wert={kennzahlen.dringend} zusatz="sofort bearbeiten"
                     symbol="bi-lightning-charge" link="/auftraege?status=offen&prioritaet=hoch"
-                    art={kennzahlen.dringend > 0 ? 'rot' : ''} i={1} />
+                    art={kennzahlen.dringend > 0 ? 'rot' : ''} i={3} />
         </div>
         <div className="col-6 col-lg-3">
           <Kennzahl titel="Teile unter Mindestbestand" wert={anzahlKritisch}
                     zusatz={anzahlKritisch > 0 ? 'Nachschub prüfen' : 'Lager in Ordnung'}
-                    symbol="bi-box-seam" art={anzahlKritisch > 0 ? 'warnung' : 'gruen'} i={2} />
+                    symbol="bi-box-seam" art={anzahlKritisch > 0 ? 'warnung' : 'gruen'} i={4} />
         </div>
         <div className="col-6 col-lg-3">
           <Kennzahl titel="Erledigt (30 Tage)" wert={kennzahlen.erledigt30} zusatz="abgeschlossene Aufträge"
-                    symbol="bi-check2-circle" art="gruen" i={3} />
+                    symbol="bi-check2-circle" art="gruen" i={5} />
         </div>
       </div>
 
       <div className="row g-4">
         {/* Offene Störmeldungen */}
         <div className="col-lg-8">
-          <section className="karte" style={{ '--i': 4 }}>
+          <section className="karte" style={{ '--i': 6 }}>
             <div className="karte-kopf">
               <h2 className="abschnitt-titel">Offene Störmeldungen</h2>
               <Link href="/auftraege?status=offen">Alle anzeigen</Link>
@@ -151,7 +159,7 @@ export default async function Uebersicht() {
 
         {/* Aufträge nach Status */}
         <div className="col-lg-4">
-          <section className="karte" style={{ '--i': 5 }}>
+          <section className="karte" style={{ '--i': 7 }}>
             <h2 className="abschnitt-titel">Aufträge nach Status</h2>
             <ul className="status-liste">
               {statusVerteilung.map(({ status, anzahl }) => (
@@ -169,24 +177,11 @@ export default async function Uebersicht() {
               ))}
             </ul>
           </section>
-
-          <Link className="btn btn-primary w-100 btn-gross mb-4" href="/melden">
-            <i className="bi bi-plus-lg" aria-hidden="true" /> Neue Störung melden
-          </Link>
-
-          {/* Kleine Deutschlandkarte: Klick auf ein Werk öffnet dessen Lageplan */}
-          <section className="karte" style={{ '--i': 6 }}>
-            <div className="karte-kopf">
-              <h2 className="abschnitt-titel">Standorte</h2>
-              <Link href="/karte">Zur Karte</Link>
-            </div>
-            <DeutschlandKarte standorte={standorte} />
-          </section>
         </div>
       </div>
 
       {/* Ersatzteile unter Mindestbestand & offene Bestellungen */}
-      <section className="karte mt-4" style={{ '--i': 7 }}>
+      <section className="karte" style={{ '--i': 8 }}>
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">Ersatzteile unter Mindestbestand</h2>
           <span className="klein">inkl. offener Bestellungen</span>

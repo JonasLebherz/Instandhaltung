@@ -4,10 +4,8 @@
  *
  * Gelände, Zufahrt und Parkplatz werden als SVG gezeichnet, die Gebäude liegen
  * als anklickbare Flächen darüber (Position und Größe aus der Datenbank, in Metern).
- * modus="link":    Klick öffnet den Grundriss (/karte/<werk>/<gebäude>)
- * modus="auswahl": Klick ruft onWaehle(gebaeude) auf (Störung melden)
+ * Ein Klick ruft onWaehle(gebaeude) auf – die Zoom-Karte zoomt in das Gebäude.
  */
-import Link from 'next/link';
 import { stufe, offenText } from './stufe';
 
 /** Kleine, gleichmäßig verteilte Bäume entlang des Zauns (rein dekorativ) */
@@ -18,7 +16,7 @@ function baeume(B, T, zufahrtY) {
   return liste;
 }
 
-export default function Lageplan({ standort, gebaeude, modus = 'link', auswahlId = null, onWaehle }) {
+export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehle }) {
   const B = standort.gelaende_breite_m;
   const T = standort.gelaende_tiefe_m;
   const prozent = (wert, gesamt) => `${(wert / gesamt) * 100}%`;
@@ -64,25 +62,21 @@ export default function Lageplan({ standort, gebaeude, modus = 'link', auswahlId
         <span className="plan-beschriftung" style={{ left: prozent(B - parkplatzBreite / 2 - 10, B), top: prozent(zufahrtY - 3, T) }}>Parkplatz</span>
         {gebaeude.map((g, i) => {
           const farbe = stufe(g.offen, g.hoechste_prioritaet);
-          const inhalt = (
-            <>
+          return (
+            <button key={g.id} type="button" onClick={(e) => onWaehle?.(g, e)}
+                    className={`plan-gebaeude stufe-${farbe}${auswahlId === g.id ? ' gewaehlt' : ''}`}
+                    style={{
+                      left: prozent(g.lage_x_m, B), top: prozent(g.lage_y_m, T),
+                      width: prozent(g.breite_m, B), height: prozent(g.tiefe_m, T), '--i': i,
+                    }}
+                    aria-label={`${g.bezeichnung}: ${offenText(g.offen)}`}
+                    data-ort={`g-${g.id}`}>
               <span className="gebaeude-kuerzel">{g.kuerzel}</span>
               <span className="gebaeude-name">{g.bezeichnung.split('–').pop().trim()}</span>
               <span className="gebaeude-info">{g.maschinen} Maschinen</span>
               <span className={`zaehl-marke stufe-${farbe}`}>{g.offen > 0 ? g.offen : <i className="bi bi-check-lg" />}</span>
-            </>
+            </button>
           );
-          const eigenschaften = {
-            className: `plan-gebaeude stufe-${farbe}${auswahlId === g.id ? ' gewaehlt' : ''}`,
-            style: {
-              left: prozent(g.lage_x_m, B), top: prozent(g.lage_y_m, T),
-              width: prozent(g.breite_m, B), height: prozent(g.tiefe_m, T), '--i': i,
-            },
-            'aria-label': `${g.bezeichnung}: ${offenText(g.offen)}`,
-          };
-          return modus === 'link'
-            ? <Link key={g.id} href={`/karte/${standort.kuerzel.toLowerCase()}/${g.kuerzel.toLowerCase()}`} {...eigenschaften}>{inhalt}</Link>
-            : <button key={g.id} type="button" onClick={() => onWaehle?.(g)} {...eigenschaften}>{inhalt}</button>;
         })}
       </div>
     </div>

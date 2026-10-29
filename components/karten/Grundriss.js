@@ -92,7 +92,8 @@ export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWae
                       left: prozent(m.pos_x_m, B), top: prozent(m.pos_y_m, T),
                       width: prozent(m.breite_m, B), height: prozent(m.tiefe_m, T), '--i': i,
                     }}
-                    onClick={() => onWaehle?.(m)}
+                    onClick={(e) => onWaehle?.(m, e)}
+                    data-ort={`m-${m.id}`}
                     aria-pressed={auswahlId === m.id}
                     aria-label={`${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen)}`}
                     title={`${m.bezeichnung} · ${m.anlagennummer}`}>

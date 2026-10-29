@@ -292,7 +292,7 @@ export default async function StatistikSeite({ searchParams }) {
                   <tr key={m.id} className="klickbar">
                     <td>
                       <Link className="zeilen-link"
-                            href={`/karte/${m.standort_kuerzel.toLowerCase()}/${m.gebaeude_kuerzel.toLowerCase()}?maschine=${m.id}`}>
+                            href={`/karte?werk=${m.standort_kuerzel.toLowerCase()}&halle=${m.gebaeude_kuerzel.toLowerCase()}&maschine=${m.id}`}>
                         {m.bezeichnung}
                       </Link>
                       <div className="klein">{m.anlagennummer} · {m.stadt}</div>

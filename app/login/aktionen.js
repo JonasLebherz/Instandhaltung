@@ -45,7 +45,7 @@ export async function anmelden(vorherigerZustand, formular) {
     };
   }
 
-  revalidatePath('/', 'layout');  // Navigation mit Benutzername neu aufbauen
+  revalidatePath('/', 'layout');  // Seitenleiste mit Benutzername neu aufbauen
   redirect('/');
 }
 

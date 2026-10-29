@@ -1,77 +1,74 @@
 /**
- * app/karte/page.js – Störungskarte, Ebene 1: Deutschland
+ * app/karte/page.js – Störungskarte
  *
- * Zeigt alle Standorte des Unternehmens auf der Deutschlandkarte mit der Zahl
- * der offenen Störungen. Klick auf einen Standort öffnet dessen Lageplan.
+ * Eine einzige Seite für alle drei Ebenen: Deutschland → Werk → Gebäude.
+ * Die Daten aller Standorte, Gebäude und Maschinen werden einmal geladen,
+ * danach zoomt die Karte im Browser ohne Neuladen (components/karten/KartenExplorer.js).
+ *
+ * Die Adresse merkt sich die aktuelle Ebene, damit man Links teilen kann:
+ *   /karte?werk=ham               Lageplan des Werks Hamburg
+ *   /karte?werk=ham&halle=h2      Grundriss von Halle 2
+ *   /karte?maschine=12            Grundriss mit ausgewählter Maschine
  */
-import Link from 'next/link';
 import { benutzerPflicht } from '@/lib/auth';
-import { standorteMitZahlen } from '@/lib/karten/daten';
-import DeutschlandKarte from '@/components/karten/DeutschlandKarte';
-import { Legende, stufe } from '@/components/karten/stufe';
+import { alleKartenDaten } from '@/lib/karten/daten';
+import KartenExplorer from '@/components/karten/KartenExplorer';
 import Kennzahl from '@/components/Kennzahl';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Störungskarte' };
 
-export default async function KartenSeite() {
+/**
+ * Startebene aus der Adresse ermitteln. Unbekannte Werte werden ignoriert.
+ * Eine Maschine legt Werk und Gebäude automatisch mit fest.
+ */
+function startAusAdresse(parameter, daten) {
+  const werk = String(parameter?.werk ?? '').toUpperCase();
+  const halle = String(parameter?.halle ?? '').toUpperCase();
+  const maschine = daten.maschinen.find((m) => String(m.id) === String(parameter?.maschine ?? ''));
+  if (maschine) {
+    const g = daten.gebaeude.find((x) => x.id === maschine.gebaeude_id);
+    return { standortId: g.standort_id, gebaeudeId: g.id, maschineId: maschine.id };
+  }
+  const standort = daten.standorte.find((st) => st.kuerzel === werk);
+  if (!standort) return {};
+  const gebaeude = daten.gebaeude.find((g) => g.standort_id === standort.id && g.kuerzel === halle);
+  return { standortId: standort.id, gebaeudeId: gebaeude?.id ?? null };
+}
+
+export default async function KartenSeite({ searchParams }) {
   await benutzerPflicht();
-  const standorte = await standorteMitZahlen();
+  const parameter = await searchParams;
+  const daten = await alleKartenDaten();
+  const { standorte } = daten;
 
   const offenGesamt = standorte.reduce((summe, st) => summe + st.offen, 0);
   const hochGesamt = standorte.reduce((summe, st) => summe + st.hoch, 0);
   const betroffen = standorte.filter((st) => st.offen > 0).length;
-  // Liste: Werke mit den meisten offenen Störungen zuerst
-  const sortiert = [...standorte].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || a.stadt.localeCompare(b.stadt));
 
   return (
     <>
       <div className="seitenkopf">
         <h1>Störungskarte</h1>
-        <p>{standorte.length} Standorte in Deutschland – Werk anklicken, um Gebäude und Maschinen zu sehen.</p>
+        <p>{standorte.length} Standorte in Deutschland – Werk anklicken, um hineinzuzoomen.</p>
       </div>
 
-      <div className="row g-4 mb-2">
+      <KartenExplorer daten={daten} start={startAusAdresse(parameter, daten)} adresseMitfuehren />
+
+      <div className="row g-4 mt-0">
         <div className="col-6 col-lg-3">
           <Kennzahl titel="Offene Störungen" wert={offenGesamt} zusatz="an allen Standorten" symbol="bi-exclamation-circle"
-                    link="/auftraege?status=offen" i={0} />
+                    link="/auftraege?status=offen" i={2} />
         </div>
         <div className="col-6 col-lg-3">
           <Kennzahl titel="Priorität hoch" wert={hochGesamt} zusatz="sofort bearbeiten" symbol="bi-lightning-charge"
-                    art={hochGesamt > 0 ? 'rot' : ''} link="/auftraege?status=offen&prioritaet=hoch" i={1} />
+                    art={hochGesamt > 0 ? 'rot' : ''} link="/auftraege?status=offen&prioritaet=hoch" i={3} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Betroffene Werke" wert={betroffen} zusatz={`von ${standorte.length} Standorten`} symbol="bi-buildings" i={2} />
+          <Kennzahl titel="Betroffene Werke" wert={betroffen} zusatz={`von ${standorte.length} Standorten`} symbol="bi-buildings" i={4} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Ohne Störung" wert={standorte.length - betroffen} zusatz="alles läuft" symbol="bi-check2-circle" art="gruen" i={3} />
-        </div>
-      </div>
-
-      <div className="row g-4">
-        <div className="col-lg-7">
-          <section className="karte" style={{ '--i': 4 }}>
-            <DeutschlandKarte standorte={standorte} />
-            <Legende />
-          </section>
-        </div>
-        <div className="col-lg-5">
-          <section className="karte" style={{ '--i': 5 }}>
-            <h2 className="abschnitt-titel">Standorte</h2>
-            <ul className="ort-liste">
-              {sortiert.map((st) => (
-                <li key={st.id}>
-                  <Link href={`/karte/${st.kuerzel.toLowerCase()}`} className={`stufe-${stufe(st.offen, st.hoechste_prioritaet)}`}>
-                    <span>
-                      <span className="ort-titel">{st.name}</span>
-                      <span className="ort-unter">{st.schwerpunkt} · {st.gebaeude} Gebäude · {st.maschinen} Maschinen</span>
-                    </span>
-                    <span className="ort-zahl" aria-label={`${st.offen} offene Störungen`}>{st.offen}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <Kennzahl titel="Ohne Störung" wert={standorte.length - betroffen} zusatz="alles läuft" symbol="bi-check2-circle" art="gruen" i={5} />
         </div>
       </div>
     </>
