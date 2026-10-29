@@ -58,6 +58,7 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
 ## SQL-Dateien
 
 - Beide Dateien beginnen mit `SET NAMES utf8mb4`. Ohne diese Zeile verfälscht ein Client, der als latin1 liest, beim Import die Umlaute (doppelt kodiert), und `chk_stoermeldung_ursache` schlägt dann für „Verschleiß“ fehl.
+- `testdaten.sql` leert die Tabellen mit `DELETE` in Fremdschlüssel-Reihenfolge, **nicht** mit `TRUNCATE` und `FOREIGN_KEY_CHECKS = 0`. phpMyAdmin schaltet die Prüfung beim Import wieder ein, dann scheitert `TRUNCATE` mit #1701.
 - Die Zeitangaben in `testdaten.sql` sind relativ zu `@jetzt` (Importzeitpunkt) geschrieben, z. B. `@jetzt - INTERVAL 90 MINUTE`.
 - Die Testdaten wurden mit einem Python-Skript mit festem Zufalls-Seed erzeugt. Das Skript liegt nicht im Repository. Kleine Änderungen direkt in der SQL-Datei vornehmen.
 - Neue Ursachen-Kategorien müssen an drei Stellen ergänzt werden: `URSACHEN_LISTE` in `includes/funktionen.php`, `chk_stoermeldung_ursache` in `schema.sql` und gegebenenfalls in den Testdaten.

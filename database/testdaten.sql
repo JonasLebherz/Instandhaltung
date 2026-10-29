@@ -23,16 +23,25 @@ SET NAMES utf8mb4;
 -- Bezugszeitpunkt: jetzt, auf volle Minuten gerundet
 SET @jetzt = CAST(DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:00') AS DATETIME);
 
--- Vorhandene Daten löschen (Fremdschlüsselprüfung dafür kurz aus)
-SET FOREIGN_KEY_CHECKS = 0;
-TRUNCATE TABLE bestellung;
-TRUNCATE TABLE auftrag_ersatzteil;
-TRUNCATE TABLE wartungsauftrag;
-TRUNCATE TABLE stoermeldung;
-TRUNCATE TABLE ersatzteil;
-TRUNCATE TABLE techniker;
-TRUNCATE TABLE maschine;
-SET FOREIGN_KEY_CHECKS = 1;
+-- Vorhandene Daten löschen. Reihenfolge wichtig: erst die Tabellen, die auf
+-- andere verweisen (Fremdschlüssel), dann die Stammdaten. So klappt das Löschen
+-- auch bei eingeschalteter Fremdschlüsselprüfung (Standard in phpMyAdmin).
+DELETE FROM bestellung;
+DELETE FROM auftrag_ersatzteil;
+DELETE FROM wartungsauftrag;
+DELETE FROM stoermeldung;
+DELETE FROM ersatzteil;
+DELETE FROM techniker;
+DELETE FROM maschine;
+
+-- Fortlaufende Nummern (AUTO_INCREMENT) zurücksetzen, damit neue Einträge
+-- direkt nach den Testdaten weiterzählen
+ALTER TABLE bestellung      AUTO_INCREMENT = 1;
+ALTER TABLE wartungsauftrag AUTO_INCREMENT = 1;
+ALTER TABLE stoermeldung    AUTO_INCREMENT = 1;
+ALTER TABLE ersatzteil      AUTO_INCREMENT = 1;
+ALTER TABLE techniker       AUTO_INCREMENT = 1;
+ALTER TABLE maschine        AUTO_INCREMENT = 1;
 
 -- ---------------------------------------------------------------------
 -- Maschinen
