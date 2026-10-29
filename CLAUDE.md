@@ -90,6 +90,10 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
 
 ## SQL-Dateien
 
+- **Die Datenbank läuft produktiv bei Supabase und enthält echte Eingaben des Teams.** Künftige Änderungen an der Struktur (neue Tabellen, Spalten, Views) deshalb **nicht** durch erneutes Ausführen von `schema.sql` + `testdaten.sql` einspielen, sondern als **Migrationsdatei** `supabase/migrationen/NNN_beschreibung.sql` (z. B. `001_wartungsplan.sql`). Sie soll vorhandene Daten erhalten (`ALTER TABLE …`, `CREATE TABLE IF NOT EXISTS …`, `CREATE OR REPLACE VIEW …`) und mehrfach ausführbar sein.
+- Gleichzeitig `schema.sql` (und bei Bedarf `testdaten.sql`) nachziehen, damit eine Neuinstallation denselben Stand ergibt.
+- Dem Nutzer bei jeder Strukturänderung ausdrücklich sagen, welche Migrationsdatei er im Supabase SQL Editor ausführen muss. Reine Code-Änderungen veröffentlicht Vercel automatisch.
+
 - `schema.sql` ist wiederholt ausführbar. Es löscht alles und legt es neu an.
 - `testdaten.sql` leert die Tabellen mit `TRUNCATE … RESTART IDENTITY CASCADE`, fügt feste IDs per `OVERRIDING SYSTEM VALUE` ein und setzt die Sequenzen danach mit `setval`.
 - Zeitangaben in den Testdaten sind relativ: `now() - interval '90 minutes'`.
