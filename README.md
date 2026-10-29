@@ -75,6 +75,7 @@ tragt es dort bei `DB_PASS` ein.
 | Apache startet nicht | Port 80 ist belegt, oft durch Skype oder IIS. Das Programm beenden oder in XAMPP den Port ändern. |
 | Seite ohne Design, keine Diagramme | Bootstrap und Chart.js kommen aus dem Internet (CDN). Internetverbindung prüfen. |
 | Umlaute werden falsch angezeigt | Beide SQL-Dateien erneut importieren. Beim Import in phpMyAdmin den Zeichensatz `utf-8` lassen (Standard). |
+| Beim Import von `schema.sql` erscheinen „#1046 Keine Datenbank ausgewählt“ oder „#4092 Unknown VIEW“ | Harmlos, solange oben „Der Import wurde erfolgreich abgeschlossen“ steht. phpMyAdmin zeigt das an, wenn man auf der Startseite (ohne ausgewählte Datenbank) importiert, und beim allerersten Import gibt es die alten Views noch nicht. |
 | Fehler beim Import von `testdaten.sql` | Zuerst `schema.sql` importieren, erst danach die Testdaten. |
 
 ## Ordnerstruktur
