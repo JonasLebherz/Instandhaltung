@@ -10,7 +10,9 @@
  * springt. Ohne gespeicherte Wahl ist die Leiste auf großen Bildschirmen offen.
  *
  * Unten: Sprache (Deutsch/Englisch), Darstellung (Hell/Dunkel/Automatisch)
- * und das Konto mit Abmelden.
+ * und das Konto. Das Konto zeigt die echte Anmeldung (E-Mail) und die
+ * gewählte fiktive Person mit Rolle und Werk (siehe lib/person.js). Über
+ * „Person wechseln …“ öffnet sich die Auswahl (components/PersonWahl.js).
  * Auf dem Smartphone gibt es stattdessen oben eine schmale Leiste mit
  * Menü-Knopf, die Seitenleiste fährt dann von links herein.
  */
@@ -21,6 +23,7 @@ import { abmelden } from '@/app/login/aktionen';
 import { SPRACHEN, T } from '@/lib/sprache';
 import { useSprache, useSpracheWechseln, useT } from './SpracheKontext';
 import Logo from './Logo';
+import PersonWahl, { RollenAbzeichen, PERSON_WAEHLEN } from './PersonWahl';
 
 /** Seiten, nach Bereichen gruppiert. "symbolAktiv" ist die gefüllte Variante für die aktuelle Seite. */
 // Texte mit T() markiert – übersetzt werden sie beim Anzeigen mit t()
@@ -83,7 +86,7 @@ function initialen(name) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((teil) => teil[0].toUpperCase()).join('') || '?';
 }
 
-export default function Seitenleiste({ benutzer }) {
+export default function Seitenleiste({ benutzer, person }) {
   const pfad = usePathname();
   const t = useT();
   const sprache = useSprache();
@@ -93,6 +96,7 @@ export default function Seitenleiste({ benutzer }) {
   const [fenster, setFenster] = useState(null);           // 'sprache' | 'darstellung' | 'konto' | null
   const [darstellung, setDarstellung] = useState('automatisch');
   const [offeneAuftraege, setOffeneAuftraege] = useState(null);   // Zahl neben "Aufträge"
+  const [personWahl, setPersonWahl] = useState(false);            // Fenster "Person wechseln"
   const leisteRef = useRef(null);
 
   // Beim Start: Zustand der Leiste (vom Skript im Layout gesetzt) und gespeicherte Darstellung übernehmen
@@ -130,6 +134,13 @@ export default function Seitenleiste({ benutzer }) {
     document.addEventListener('mousedown', klick);
     document.addEventListener('keydown', taste);
     return () => { document.removeEventListener('mousedown', klick); document.removeEventListener('keydown', taste); };
+  }, []);
+
+  // Andere Stellen (z. B. die Übersicht) können die Personenwahl über ein Ereignis öffnen
+  useEffect(() => {
+    const oeffnen = () => setPersonWahl(true);
+    window.addEventListener(PERSON_WAEHLEN, oeffnen);
+    return () => window.removeEventListener(PERSON_WAEHLEN, oeffnen);
   }, []);
 
   function umschalten() {
@@ -269,26 +280,49 @@ export default function Seitenleiste({ benutzer }) {
             )}
           </div>
 
-          {/* Konto & Abmelden */}
+          {/* Konto: echte Anmeldung + gewählte Person, Person wechseln, Abmelden */}
           <div className="aufklapp">
             <button type="button" className="leiste-link leiste-konto" aria-haspopup="menu" aria-expanded={fenster === 'konto'}
-                    aria-label={`${t('Konto')}: ${benutzer.anzeigename}`}
+                    aria-label={`${t('Konto')}: ${person ? `${person.name}, ${benutzer.email}` : benutzer.anzeigename}`}
                     onClick={() => setFenster(fenster === 'konto' ? null : 'konto')}>
-              <span className="leiste-symbol"><span className="leiste-avatar">{initialen(benutzer.anzeigename)}</span></span>
+              <span className="leiste-symbol">
+                <span className={`leiste-avatar${person ? ` rolle-${person.rolle.toLowerCase()}` : ''}`}>
+                  {initialen(person?.name ?? benutzer.anzeigename)}
+                </span>
+              </span>
               <span className="leiste-text">
                 <span className="konto-name">
-                  {benutzer.anzeigename}
-                  <small>{benutzer.email}</small>
+                  {person?.name ?? benutzer.anzeigename}
+                  <small>{person ? `${t(person.rolle === 'Instandhaltung' ? 'Instandhaltung|Rolle' : person.rolle)}${person.stadt ? ` · ${person.stadt}` : ''}` : benutzer.email}</small>
                 </span>
                 <i className="bi bi-chevron-expand" aria-hidden="true" />
               </span>
             </button>
             {fenster === 'konto' && (
-              <div className="aufklapp-menue" role="menu">
+              <div className="aufklapp-menue konto-menue" role="menu">
+                <div className="menue-titel">{t('Angemeldet als')}</div>
                 <div className="menue-info">
                   {benutzer.anzeigename}
                   <small>{benutzer.email}</small>
                 </div>
+                <div className="menue-titel">{t('Du arbeitest als')}</div>
+                <div className="menue-info">
+                  {person ? (
+                    <>
+                      {person.name}
+                      <span className="d-flex align-items-center gap-2 mt-1">
+                        <RollenAbzeichen rolle={person.rolle} />
+                        {person.stadt && <small className="d-inline">{person.stadt}</small>}
+                      </span>
+                    </>
+                  ) : (
+                    <small>{t('Keine Person gewählt')}</small>
+                  )}
+                </div>
+                <button type="button" role="menuitem" onClick={() => { setFenster(null); setPersonWahl(true); }}>
+                  <i className="bi bi-person-badge" /> {person ? t('Person wechseln …') : t('Person wählen …')}
+                </button>
+                <div className="menue-trenner" />
                 <form action={abmelden}>
                   <button type="submit" role="menuitem"><i className="bi bi-box-arrow-right" /> {t('Abmelden')}</button>
                 </form>
@@ -297,6 +331,8 @@ export default function Seitenleiste({ benutzer }) {
           </div>
         </div>
       </aside>
+
+      {personWahl && <PersonWahl aktuelleId={person?.id ?? null} onSchliessen={() => setPersonWahl(false)} />}
     </>
   );
 }

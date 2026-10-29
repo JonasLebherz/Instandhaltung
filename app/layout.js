@@ -13,6 +13,7 @@ import Seitenleiste from '@/components/Seitenleiste';
 import FlashMeldungen from '@/components/FlashMeldungen';
 import { SpracheProvider } from '@/components/SpracheKontext';
 import { aktuellerBenutzer } from '@/lib/auth';
+import { personAusCookie } from '@/lib/person';
 import { aktuelleSprache, uebersetzer } from '@/lib/sprache/server';
 import { cookies } from 'next/headers';
 
@@ -66,6 +67,8 @@ export default async function RootLayout({ children }) {
   const flashMeldungen = await flashLesen();
   const sprache = await aktuelleSprache();
   const t = await uebersetzer();
+  // Gewählte (fiktive) Person nur aus dem Cookie – im Layout keine Datenbankabfrage
+  const person = await personAusCookie();
 
   return (
     // suppressHydrationWarning: data-theme und data-leiste werden vom Skript oben gesetzt, nicht von React
@@ -78,7 +81,7 @@ export default async function RootLayout({ children }) {
         <SpracheProvider sprache={sprache}>
         {benutzer ? (
           <>
-            <Seitenleiste benutzer={benutzer} />
+            <Seitenleiste benutzer={benutzer} person={person} />
             {/* Inhalt rechts neben der Seitenleiste (Abstand: siehe .app-rahmen in globals.css) */}
             <div className="app-rahmen">
               <main className="container app-main">

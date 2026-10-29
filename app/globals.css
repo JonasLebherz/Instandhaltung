@@ -174,7 +174,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
  * Der Zustand steht in <html data-leiste="auf|zu"> (gesetzt in app/layout.js).
  * Der Inhalt rückt um dieselbe Breite nach rechts (.app-rahmen).
  */
-:root { --leiste-zu: 76px; --leiste-auf: 256px; --leiste-b: var(--leiste-zu); --leiste-abstand: 12px; }
+:root { --leiste-zu: 76px; --leiste-auf: 256px; --leiste-b: var(--leiste-zu); --leiste-abstand: 0px; }
 :root[data-leiste="auf"] { --leiste-b: var(--leiste-auf); }
 
 .app-rahmen {
@@ -189,23 +189,22 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     .app-rahmen > .container { padding-left: 24px; padding-right: 32px; }
 }
 
+/* Die Leiste liegt bündig am linken Rand über die volle Höhe – getrennt nur durch eine feine Linie */
 .seitenleiste {
     position: fixed;
     z-index: 1030;
-    top: var(--leiste-abstand);
-    bottom: var(--leiste-abstand);
-    left: var(--leiste-abstand);
+    top: 0;
+    bottom: 0;
+    left: 0;
     width: var(--leiste-b);
     display: flex;
     flex-direction: column;
     gap: 6px;
     padding: 14px 12px 12px;
-    border-radius: 26px;
-    background: var(--karte-erhoeht);
+    background: var(--karte);
     backdrop-filter: var(--glas-unschaerfe);
     -webkit-backdrop-filter: var(--glas-unschaerfe);
-    border: 1px solid var(--glas-rand);
-    box-shadow: var(--glas-kante), var(--schatten);
+    border-right: 1px solid var(--linie);
     transition: width .3s var(--weich), transform .3s var(--weich);
 }
 
@@ -388,6 +387,9 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     /* Seitenleiste fährt von links herein */
     .seitenleiste {
         top: 8px; bottom: 8px; left: 8px;
+        border-radius: 20px;
+        border: 1px solid var(--glas-rand);
+        box-shadow: var(--glas-kante), var(--schatten-hover);
         background: color-mix(in srgb, var(--karte-solid) 90%, transparent);
         width: min(300px, calc(100vw - 56px));
         transform: translateX(calc(-100% - 20px));
@@ -1766,4 +1768,105 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     .er-linien { display: none; }
     .er-ziel { display: inline; font-size: .66rem; color: var(--akzent); }
     .er-spalte { grid-template-columns: 16px 1fr auto auto; }
+}
+
+/* =====================================================================
+   Personen & Rollen (components/PersonWahl.js, Konto, Übersicht, Verlauf)
+   Jede Rolle hat eine Farbe: Produktion orange (wie "Melden"),
+   Schichtleitung lila, Instandhaltung blau.
+   ===================================================================== */
+.rolle-produktion     { --rolle: var(--orange); --rolle-bg: var(--orange-bg); }
+.rolle-schichtleitung { --rolle: var(--lila);   --rolle-bg: var(--lila-bg); }
+.rolle-instandhaltung { --rolle: var(--blau);   --rolle-bg: var(--blau-bg); }
+
+.rollen-abzeichen {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 8px; border-radius: 999px;
+    font-size: .72rem; font-weight: 600; white-space: nowrap;
+    color: var(--rolle); background: var(--rolle-bg);
+}
+/* Avatar im Konto: mit gewählter Person in der Farbe ihrer Rolle */
+.leiste-avatar[class*="rolle-"] { background: linear-gradient(150deg, color-mix(in srgb, var(--rolle) 65%, #fff), var(--rolle)); }
+
+.min-w-0 { min-width: 0; }
+.konto-menue { min-width: 250px; }
+.aufklapp-menue .menue-trenner { height: 1px; margin: 4px 6px; background: var(--linie); }
+
+/* Knopf, der wie ein Link aussieht (z. B. "Mir zuweisen") */
+.text-knopf {
+    border: 0; background: none; padding: 0; margin-bottom: .5rem;
+    color: var(--akzent); font-size: .875rem; font-weight: 500;
+}
+.text-knopf:hover { text-decoration: underline; }
+fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
+
+/* ---------- Fenster "Als welche Person arbeitest du?" ---------- */
+.dialog-hintergrund {
+    position: fixed; inset: 0; z-index: 1050;
+    display: grid; place-items: center; padding: 16px;
+    background: rgba(0, 0, 0, .32);
+    animation: einblenden .2s ease;
+}
+.dialog {
+    width: min(760px, 100%); max-height: min(720px, calc(100dvh - 32px));
+    display: flex; flex-direction: column;
+    background: var(--karte-solid);
+    border: 1px solid var(--glas-rand);
+    border-radius: var(--radius-karte);
+    box-shadow: var(--glas-kante), var(--schatten-hover);
+    animation: aufklappen .22s var(--weich);
+}
+.dialog-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 22px 22px 12px; }
+.dialog-fuss {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 22px 18px; border-top: 1px solid var(--linie);
+}
+.person-filter { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 0 22px 12px; }
+.person-filter .form-control { flex: 1 1 200px; }
+.rollen-filter button { font-size: .8rem; }
+.person-liste { overflow-y: auto; padding: 0 22px 12px; }
+.person-werk { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-leise); margin: 12px 0 6px; }
+.person-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
+.person-knopf {
+    display: flex; align-items: center; gap: 10px; text-align: left;
+    padding: 8px 10px; border-radius: 12px;
+    border: 1px solid transparent; background: var(--fuellung); color: var(--text);
+    transition: background-color var(--uebergang), border-color var(--uebergang);
+}
+.person-knopf:hover { background: var(--fuellung-hover); }
+.person-knopf.gewaehlt { border-color: var(--akzent); background: var(--akzent-zart); }
+.person-knopf .min-w-0 { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.person-avatar {
+    flex: 0 0 34px; width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: .74rem; font-weight: 700; color: var(--rolle); background: var(--rolle-bg);
+}
+.person-name { font-weight: 600; font-size: .9rem; }
+.person-unter { font-size: .74rem; color: var(--text-leise); }
+
+/* ---------- Übersicht: Aufgaben der Person ---------- */
+.person-hinweis { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.person-hinweis-symbol {
+    width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+    font-size: 1.3rem; color: var(--akzent); background: var(--akzent-zart);
+}
+.aufgaben-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.aufgabe {
+    display: block; height: 100%; padding: 12px 14px; border-radius: 14px;
+    background: var(--fuellung); color: var(--text); text-decoration: none;
+    transition: background-color var(--uebergang), transform var(--uebergang);
+}
+.aufgabe:hover { background: var(--fuellung-hover); color: var(--text); text-decoration: none; transform: translateY(-1px); }
+.aufgabe-kopf { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.aufgabe-kopf strong { margin-right: auto; }
+
+/* ---------- Auftrag: Verlauf ---------- */
+.verlauf { list-style: none; margin: 0; padding: 0; position: relative; }
+.verlauf li { display: flex; gap: 12px; padding-bottom: 14px; position: relative; }
+.verlauf li:not(:last-child)::before {
+    content: ''; position: absolute; left: 15px; top: 32px; bottom: 2px; width: 2px; background: var(--linie);
+}
+.verlauf-symbol {
+    flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%;
+    display: grid; place-items: center; color: var(--akzent); background: var(--akzent-zart);
 }

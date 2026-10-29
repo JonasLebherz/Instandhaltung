@@ -23,6 +23,7 @@ import { revalidatePath } from 'next/cache';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
 import { uebersetzer } from '@/lib/sprache/server';
+import { aktuellePerson, darfBearbeiten } from '@/lib/person';
 import { flash } from '@/lib/flash';
 import { berlinZuDate, datumZeit } from '@/lib/format';
 import { URSACHEN_LISTE, PRIORITAET_WERTE, STATUS_WERTE } from '@/lib/konstanten';
@@ -41,6 +42,7 @@ function ganzzahl(text) {
 export async function meldungAnlegen(vorherigerZustand, formular) {
   await benutzerPflicht();
   const t = await uebersetzer();   // Meldungen in der gewählten Sprache
+  const person = await aktuellePerson();   // für den Verlauf: wer meldet
 
   const eingabe = {
     maschine_id: feld(formular, 'maschine_id'),
@@ -95,7 +97,9 @@ export async function meldungAnlegen(vorherigerZustand, formular) {
                 ${eingabe.ursache_kategorie}, ${eingabe.prioritaet})
         RETURNING id`;
       // Zu jeder Meldung gehört genau ein Wartungsauftrag
-      await tx`INSERT INTO wartungsauftrag (stoermeldung_id, status) VALUES (${meldung.id}, 'gemeldet')`;
+      const [auftrag] = await tx`INSERT INTO wartungsauftrag (stoermeldung_id, status) VALUES (${meldung.id}, 'gemeldet') RETURNING id`;
+      // Verlauf: wer hat gemeldet (gewählte Person, falls vorhanden)
+      await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion) VALUES (${auftrag.id}, ${person?.id ?? null}, 'gemeldet')`;
       return meldung.id;
     });
   } catch (fehlerObjekt) {
@@ -130,8 +134,15 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
   };
   const fehler = {};
 
+  // Produktion darf melden, aber keine Aufträge bearbeiten
+  const person = await aktuellePerson();
+  if (!darfBearbeiten(person)) {
+    return { fehler: { allgemein: t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.') }, eingabe };
+  }
+
   const [auftrag] = await sql`
-    SELECT w.id, s.zeitpunkt FROM wartungsauftrag w
+    SELECT w.id, w.techniker_id, w.status, w.start_zeit, w.ende_zeit, w.massnahme, s.zeitpunkt
+    FROM wartungsauftrag w
     JOIN stoermeldung s ON s.id = w.stoermeldung_id
     WHERE w.id = ${auftragId}`;
   if (!auftrag) return { fehler: { allgemein: t('Der Auftrag wurde nicht gefunden.') }, eingabe };
@@ -195,14 +206,38 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
     return { fehler, eingabe };
   }
 
-  await sql`
-    UPDATE wartungsauftrag
-    SET techniker_id = ${technikerId},
-        status       = ${status},
-        start_zeit   = ${startZeit},
-        ende_zeit    = ${endeZeit},
-        massnahme    = ${eingabe.massnahme !== '' ? eingabe.massnahme : null}
-    WHERE id = ${auftragId}`;
+  // Was hat sich geändert? → Einträge für den Verlauf
+  const neuerTechniker = technikerId !== auftrag.techniker_id;
+  const neuerStatus = status !== auftrag.status;
+  const massnahme = eingabe.massnahme !== '' ? eingabe.massnahme : null;
+  const sonstiges = massnahme !== auftrag.massnahme
+    || String(startZeit?.getTime() ?? '') !== String(auftrag.start_zeit?.getTime() ?? '')
+    || String(endeZeit?.getTime() ?? '') !== String(auftrag.ende_zeit?.getTime() ?? '');
+
+  // Auftrag und Verlauf zusammen speichern
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE wartungsauftrag
+      SET techniker_id   = ${technikerId},
+          status         = ${status},
+          start_zeit     = ${startZeit},
+          ende_zeit      = ${endeZeit},
+          massnahme      = ${massnahme},
+          -- Wer den Techniker zugewiesen hat, merken (nur bei einer neuen Zuweisung)
+          zugewiesen_von = ${neuerTechniker ? (technikerId === null ? null : person?.id ?? null) : sql`zugewiesen_von`}
+      WHERE id = ${auftragId}`;
+    const personId = person?.id ?? null;
+    if (neuerTechniker && technikerId !== null) {
+      const [tech] = await tx`SELECT name FROM techniker WHERE id = ${technikerId}`;
+      await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion, details) VALUES (${auftragId}, ${personId}, 'zugewiesen', ${tech.name})`;
+    }
+    if (neuerStatus) {
+      await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion, details) VALUES (${auftragId}, ${personId}, 'status', ${status})`;
+    }
+    if (!neuerTechniker && !neuerStatus && sonstiges) {
+      await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion) VALUES (${auftragId}, ${personId}, 'bearbeitet')`;
+    }
+  });
 
   await flash('erfolg', status === 'erledigt' ? t('Auftrag abgeschlossen. Danke!') : t('Änderungen gespeichert. Status: {status}.', { status: t(status) }));
   revalidatePath('/', 'layout');
@@ -227,9 +262,14 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
   if (teilId === null) fehler.ersatzteil_id = t('Bitte ein Ersatzteil auswählen.');
   if (menge === null || menge < 1 || menge > 999) fehler.menge = t('Bitte eine Menge zwischen 1 und 999 angeben.');
 
+  const person = await aktuellePerson();
+  if (!darfBearbeiten(person)) {
+    fehler.allgemein = t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.');
+  }
+
   const [auftrag] = await sql`SELECT status FROM wartungsauftrag WHERE id = ${auftragId}`;
   if (!auftrag) fehler.allgemein = t('Der Auftrag wurde nicht gefunden.');
-  else if (auftrag.status === 'erledigt') fehler.allgemein = t('Auf erledigte Aufträge können keine Teile mehr gebucht werden.');
+  else if (auftrag.status === 'erledigt' && !fehler.allgemein) fehler.allgemein = t('Auf erledigte Aufträge können keine Teile mehr gebucht werden.');
 
   if (Object.keys(fehler).length > 0) return { fehler, eingabe };
 
@@ -252,6 +292,8 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
           INSERT INTO auftrag_ersatzteil (auftrag_id, ersatzteil_id, menge)
           VALUES (${auftragId}, ${teilId}, ${menge})
           ON CONFLICT (auftrag_id, ersatzteil_id) DO UPDATE SET menge = auftrag_ersatzteil.menge + EXCLUDED.menge`;
+        await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion, details)
+                 VALUES (${auftragId}, ${person?.id ?? null}, 'teil', ${`${menge} × ${teil.bezeichnung}`})`;
         return { art: 'gebucht', teil, neuerBestand: teil.bestand - menge };
       }
 
@@ -259,6 +301,10 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
       await tx`UPDATE wartungsauftrag SET status = 'wartet auf Teil', ende_zeit = NULL,
                       start_zeit = COALESCE(start_zeit, now())
                WHERE id = ${auftragId}`;
+      if (auftrag.status !== 'wartet auf Teil') {
+        await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion, details)
+                 VALUES (${auftragId}, ${person?.id ?? null}, 'status', 'wartet auf Teil')`;
+      }
 
       const [offen] = await tx`SELECT id FROM bestellung WHERE ersatzteil_id = ${teilId} AND status = 'bestellt' LIMIT 1`;
       if (offen) return { art: 'schon_bestellt', teil };

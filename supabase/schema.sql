@@ -21,9 +21,9 @@
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS v_stoerung_details, v_stoerungen_monat, v_ausfallzeit_maschine, v_mttr_maschine,
                     v_kennzahlen_standort;
-DROP TABLE IF EXISTS bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
-                     stoermeldung, techniker, maschine, gebaeude, standort CASCADE;
-DROP TYPE IF EXISTS auftragsstatus, prioritaet, schicht, bestellstatus, ursache, maschinentyp;
+DROP TABLE IF EXISTS auftrag_verlauf, bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
+                     stoermeldung, person, techniker, maschine, gebaeude, standort CASCADE;
+DROP TYPE IF EXISTS auftragsstatus, prioritaet, schicht, bestellstatus, ursache, maschinentyp, rolle;
 
 
 -- ---------------------------------------------------------------------
@@ -38,6 +38,7 @@ CREATE TYPE ursache        AS ENUM ('Mechanischer Defekt', 'Elektrischer Fehler'
                                     'Steuerung/Software', 'Verschleiß', 'Bedienfehler',
                                     'Materialfehler', 'Sonstiges');
 -- Maschinenart: bestimmt u. a. das Symbol im Grundriss
+CREATE TYPE rolle          AS ENUM ('Produktion', 'Schichtleitung', 'Instandhaltung');
 CREATE TYPE maschinentyp   AS ENUM ('Fräsen', 'Drehen', 'Spritzguss', 'Laserschneiden', 'Schweißen', 'Pressen',
                                     'Fördertechnik', 'Lackieren', 'Montage', 'Druckluft', 'Lagertechnik');
 
@@ -106,6 +107,19 @@ CREATE TABLE techniker (
     schicht        schicht      NOT NULL
 );
 COMMENT ON TABLE techniker IS 'Techniker der Instandhaltung';
+
+-- Personen des Unternehmens mit Rolle und Werk. In der Anwendung wählt man,
+-- als welche Person man arbeitet (Seitenleiste → Konto).
+CREATE TABLE person (
+    id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name          VARCHAR(100) NOT NULL UNIQUE,
+    rolle         rolle        NOT NULL,
+    standort_id   INTEGER NULL REFERENCES standort (id) ON UPDATE CASCADE ON DELETE SET NULL,
+    -- Nur bei der Rolle Instandhaltung: der zugehörige Techniker (höchstens eine Person je Techniker)
+    techniker_id  INTEGER NULL UNIQUE REFERENCES techniker (id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT chk_person_techniker CHECK (techniker_id IS NULL OR rolle = 'Instandhaltung')
+);
+COMMENT ON TABLE person IS 'Personen des Unternehmens mit Rolle und Werk';
 CREATE INDEX idx_techniker_standort ON techniker (standort_id);
 
 -- Ersatzteillager
@@ -154,6 +168,8 @@ CREATE TABLE wartungsauftrag (
     start_zeit       TIMESTAMPTZ NULL,       -- Beginn der Reparatur
     ende_zeit        TIMESTAMPTZ NULL,       -- Maschine läuft wieder
     massnahme        VARCHAR(2000) NULL,     -- durchgeführte Arbeiten
+    -- Wer den Techniker zugewiesen hat (Person, als die man in der App arbeitet)
+    zugewiesen_von   INTEGER NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE SET NULL,
     -- Plausibilität: Ende nicht vor Beginn
     CONSTRAINT chk_wartungsauftrag_zeiten CHECK (ende_zeit IS NULL OR start_zeit IS NULL OR ende_zeit >= start_zeit),
     -- Ein erledigter Auftrag braucht ein Ende
@@ -176,6 +192,19 @@ CREATE TABLE auftrag_ersatzteil (
 );
 COMMENT ON TABLE auftrag_ersatzteil IS 'Gebuchte Ersatzteile je Wartungsauftrag';
 CREATE INDEX idx_auftrag_ersatzteil_teil ON auftrag_ersatzteil (ersatzteil_id);
+
+-- Verlauf: wer wann was an einem Auftrag getan hat
+CREATE TABLE auftrag_verlauf (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    auftrag_id  INTEGER NOT NULL REFERENCES wartungsauftrag (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    person_id   INTEGER NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE SET NULL,
+    zeitpunkt   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Was passiert ist; details enthält z. B. den neuen Status oder das gebuchte Teil
+    aktion      VARCHAR(20) NOT NULL CHECK (aktion IN ('gemeldet', 'zugewiesen', 'status', 'teil', 'bearbeitet')),
+    details     VARCHAR(300) NULL
+);
+COMMENT ON TABLE auftrag_verlauf IS 'Wer wann was an einem Wartungsauftrag getan hat';
+CREATE INDEX idx_auftrag_verlauf_auftrag ON auftrag_verlauf (auftrag_id, zeitpunkt);
 
 -- Bestellungen von Ersatzteilen
 CREATE TABLE bestellung (
@@ -210,6 +239,8 @@ ALTER TABLE stoermeldung       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wartungsauftrag    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auftrag_ersatzteil ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bestellung         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE person             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auftrag_verlauf    ENABLE ROW LEVEL SECURITY;
 
 
 -- =====================================================================

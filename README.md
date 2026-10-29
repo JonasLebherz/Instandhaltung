@@ -23,17 +23,28 @@ aus den letzten 12 Monaten.
 | Seite | Adresse | Inhalt |
 |---|---|---|
 | Anmelden | `/login` | Login mit E-Mail und Passwort, nur für angelegte Team-Konten |
-| Übersicht | `/` | Kennzahlen, offene Meldungen, Aufträge nach Status, kleine Deutschlandkarte (Klick öffnet die Störungskarte im Werk), Ersatzteile unter Mindestbestand, Wareneingang buchen |
+| Übersicht | `/` | Aufgaben der gewählten Person („Dir zugewiesene Aufgaben“), Kennzahlen, offene Meldungen, Aufträge nach Status, kleine Deutschlandkarte (Klick öffnet die Störungskarte im Werk), Ersatzteile unter Mindestbestand, Wareneingang buchen |
 | Störung melden | `/melden` | In vier Schritten mit eigener Schritt-Leiste: Werk → Gebäude → Maschine auf der Karte antippen (ohne Störungszahlen), dann Beschreibung, Ursache und Priorität angeben (mit Eingabeprüfung) |
 | Störungskarte | `/karte` | Deutschlandkarte mit allen Werken und der Zahl offener Störungen. Ein Klick zoomt animiert in das Werk (Lageplan mit Gebäuden, offenen Störungen, Technikern vor Ort), ein weiterer in das Gebäude (Grundriss mit allen Maschinen). |
 | Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Standort, Maschine und Priorität |
-| Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen, Status ändern, Ersatzteile buchen, Auftrag abschließen |
+| Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen („Mir zuweisen“), Status ändern, Ersatzteile buchen, Auftrag abschließen; Verlauf zeigt, wer wann gemeldet, zugewiesen und bearbeitet hat |
 | Statistik | `/statistik` | Zum Hineinzoomen wie die Karte: alle Standorte → Werk → Gebäude → Maschine. Je Ebene MTTR, Ausfallzeit, Störungen, offene Aufträge, MTBF bzw. Störungen je Maschine, Vergleich der Unterebene, Störungen und MTTR pro Monat, Ursachen, Wochentag × Uhrzeit, Prioritäten, Schichten, Techniker, verbaute Ersatzteile. Filter nach Zeitraum. |
 | Datenbasis | `/datenbasis` | Verbindungen mit Live-Status (Claude/Codex → GitHub → Vercel → Supabase-Datenbank und -Login, Power BI), Datenmodell als Diagramm mit allen Tabellen, Spalten und Beziehungen, Views, Wertelisten und eine Vorschau der Datensätze jeder Tabelle |
 
 **Automatik beim Buchen von Ersatzteilen:** Ist ein Teil nicht in ausreichender Menge auf Lager,
 wird nichts gebucht. Der Auftrag wechselt auf **„wartet auf Teil“**, und es wird automatisch eine
 Bestellung angelegt. Den Eingang der Lieferung bucht man auf der Übersicht.
+
+**Personen und Rollen:** Unten in der Seitenleiste (Konto) steht die echte Anmeldung (E-Mail). Zusätzlich
+wählt man eine fiktive Person des Unternehmens, als die man arbeitet – mit Rolle und Werk:
+
+| Rolle | darf | Übersicht zeigt |
+|---|---|---|
+| Produktion | Störungen melden (Name ist vorausgefüllt, Karte startet im eigenen Werk) – Aufträge nur ansehen | offene Störungen im eigenen Werk |
+| Schichtleitung | Techniker zuweisen, Aufträge bearbeiten | offene Aufträge im eigenen Werk, nicht zugewiesene zuerst |
+| Instandhaltung | eigene Aufträge bearbeiten, „Mir zuweisen“ | die dem eigenen Techniker zugewiesenen Aufträge |
+
+Gespeichert wird, wer einen Techniker zugewiesen hat (`zugewiesen_von`), und jeder Schritt landet im Verlauf (`auftrag_verlauf`).
 
 **Direktlinks:**
 - `/melden?maschine=12` springt direkt zur Beschreibung. Das eignet sich z. B. für einen QR-Code an der Maschine.
@@ -44,7 +55,7 @@ Bestellung angelegt. Den Eingang der Lieferung bucht man auf der Übersicht.
 
 **Darstellung:**
 - Ruhige „Glas“-Optik mit halbtransparenten Karten auf einem weichen Hintergrund.
-- Navigation in einer Seitenleiste links: eingeklappt nur Symbole, aufgeklappt mit Text. Unten stehen Darstellung und Konto. Auf dem Handy öffnet sie sich über den Menü-Knopf.
+- Navigation in einer Seitenleiste links, bündig am Rand mit feiner Trennlinie: eingeklappt nur Symbole, aufgeklappt mit Text. Unten stehen Sprache, Darstellung und Konto (mit Personenwahl). Auf dem Handy öffnet sie sich über den Menü-Knopf.
 - Hell, Dunkel oder automatisch nach Systemeinstellung (unten in der Seitenleiste).
 - Sprache Deutsch oder Englisch (unten in der Seitenleiste bzw. auf der Login-Seite). Daten wie Maschinennamen und Beschreibungen bleiben so, wie sie eingegeben wurden.
 - Sanfte Animationen.
@@ -113,7 +124,10 @@ Ab jetzt baut Vercel die Seite **bei jedem Push nach GitHub automatisch neu**. N
 
 ### Datenbank aktualisieren
 
-Ändert sich das Datenbankschema (z. B. durch neue Tabellen), im SQL Editor erst `schema.sql` und danach `testdaten.sql` erneut ausführen.
+Änderungen am Datenbankschema kommen als **Migrationsdatei** in `supabase/migrationen/` (z. B. `001_personen_und_verlauf.sql`).
+Die Datei im SQL Editor öffnen und einmal ausführen. Vorhandene Daten bleiben erhalten, mehrfaches Ausführen schadet nicht.
+
+Nur für einen kompletten Neuanfang: erst `schema.sql` und danach `testdaten.sql` ausführen.
 **Achtung:** Dabei werden alle Daten auf den Stand der Testdaten zurückgesetzt. Die Team-Konten (Login) bleiben erhalten.
 
 ## Mitarbeit im Team
@@ -178,8 +192,10 @@ standort (Werk) 1 ── n gebaeude 1 ── n maschine 1 ── n stoermeldung 
 | `gebaeude` | Gebäude eines Werks mit Lage auf dem Werksgelände und Raumaufteilung (`bereiche`, JSON) |
 | `maschine` | Maschinen mit Anlagennummer, Typ, Baujahr und Position bzw. Stellfläche im Grundriss (Meter) |
 | `techniker` | Techniker mit Standort, Qualifikation und Schicht |
+| `person` | Fiktive Personen des Unternehmens mit Rolle (Produktion, Schichtleitung, Instandhaltung) und Werk; Personen der Instandhaltung sind mit ihrem Techniker verbunden |
 | `stoermeldung` | Gemeldete Störungen (Maschine, Zeitpunkt, Beschreibung, Ursache, Priorität) |
-| `wartungsauftrag` | Bearbeitung einer Störung: genau ein Auftrag pro Meldung (Techniker, Status, Start, Ende, Maßnahme) |
+| `wartungsauftrag` | Bearbeitung einer Störung: genau ein Auftrag pro Meldung (Techniker, wer zugewiesen hat, Status, Start, Ende, Maßnahme) |
+| `auftrag_verlauf` | Wer wann was an einem Auftrag getan hat (gemeldet, zugewiesen, Status, Teil gebucht, bearbeitet) |
 | `ersatzteil` | Lagerbestand und Mindestbestand |
 | `auftrag_ersatzteil` | Verwendete Ersatzteile pro Auftrag (n:m) |
 | `bestellung` | Nachbestellungen von Ersatzteilen |

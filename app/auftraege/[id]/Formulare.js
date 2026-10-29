@@ -7,6 +7,10 @@
  *
  * Geprüft und gespeichert wird auf dem Server (app/aktionen.js).
  * ".bind(null, auftragId)" gibt der Server-Aktion die Auftrags-ID mit.
+ *
+ * Arbeitet man als Techniker (Rolle Instandhaltung), gibt es den Knopf
+ * „Mir zuweisen“. Als Person aus der Produktion ist das Formular gesperrt
+ * (die Server-Aktion prüft das zusätzlich).
  */
 import { useActionState, useRef } from 'react';
 import { auftragSpeichern, teilBuchen } from '@/app/aktionen';
@@ -23,11 +27,13 @@ function jetztFuerInput() {
   return jetzt.toISOString().slice(0, 16);
 }
 
-export function BearbeitungsFormular({ auftragId, techniker, startwerte }) {
+export function BearbeitungsFormular({ auftragId, techniker, startwerte, person = null, gesperrt = false }) {
   const [zustand, aktion] = useActionState(auftragSpeichern.bind(null, auftragId), { fehler: {}, eingabe: startwerte });
   const { fehler, eingabe } = zustand;
   const endeRef = useRef(null);
   const massnahmeRef = useRef(null);
+  const technikerRef = useRef(null);
+  const statusRef = useRef(null);
   const hatFehler = Object.keys(fehler).length > 0;
   const t = useT();
 
@@ -36,6 +42,14 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte }) {
     if (e.target.value !== 'erledigt') return;
     if (endeRef.current && endeRef.current.value === '') endeRef.current.value = jetztFuerInput();
     massnahmeRef.current?.focus();
+  }
+
+  // "Mir zuweisen": eigenen Techniker auswählen; ein nur gemeldeter Auftrag wird dabei "zugewiesen"
+  const eigeneId = person?.rolle === 'Instandhaltung' && person.techniker_id ? String(person.techniker_id) : null;
+  function mirZuweisen() {
+    if (technikerRef.current) technikerRef.current.value = eigeneId;
+    if (statusRef.current?.value === 'gemeldet') statusRef.current.value = 'zugewiesen';
+    technikerRef.current?.focus();
   }
 
   return (
@@ -48,11 +62,26 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte }) {
           <span className="hinweis-text">{fehler.allgemein ?? t('Bitte prüfen Sie die markierten Felder.')}</span>
         </div>
       )}
+      {gesperrt && (
+        <div className="hinweis hinweis-hinweis">
+          <i className="bi bi-lock-fill" aria-hidden="true" />
+          <span className="hinweis-text">{t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.')}</span>
+        </div>
+      )}
 
+      {/* Gesperrt: alle Felder auf einmal über das fieldset deaktivieren */}
+      <fieldset disabled={gesperrt}>
       <div className="row g-4 mb-4">
         <div className="col-md-6">
-          <label htmlFor="techniker_id" className="form-label">{t('Techniker|Feld')}</label>
-          <select id="techniker_id" name="techniker_id" className={`form-select${fehlerklasse(fehler, 'techniker_id')}`}
+          <div className="d-flex justify-content-between align-items-baseline gap-2">
+            <label htmlFor="techniker_id" className="form-label">{t('Techniker|Feld')}</label>
+            {eigeneId && !gesperrt && (
+              <button type="button" className="text-knopf" onClick={mirZuweisen}>
+                <i className="bi bi-person-check" aria-hidden="true" /> {t('Mir zuweisen')}
+              </button>
+            )}
+          </div>
+          <select id="techniker_id" name="techniker_id" ref={technikerRef} className={`form-select${fehlerklasse(fehler, 'techniker_id')}`}
                   defaultValue={eingabe.techniker_id}>
             <option value="">{t('Noch nicht zugewiesen')}</option>
             {/* Zuerst die Techniker vor Ort, darunter alle anderen Standorte */}
@@ -72,7 +101,7 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte }) {
 
         <div className="col-md-6">
           <label htmlFor="status" className="form-label">{t('Status')}</label>
-          <select id="status" name="status" className={`form-select${fehlerklasse(fehler, 'status')}`}
+          <select id="status" name="status" ref={statusRef} className={`form-select${fehlerklasse(fehler, 'status')}`}
                   defaultValue={eingabe.status} onChange={statusGeaendert}>
             {STATUS_WERTE.map((s) => <option key={s} value={s}>{gross(t(s))}</option>)}
           </select>
@@ -106,9 +135,12 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte }) {
         <div className="form-text">{t('Pflicht beim Abschluss.')}</div>
       </div>
 
-      <div className="d-flex justify-content-end">
-        <SpeichernKnopf><i className="bi bi-check2" aria-hidden="true" /> {t('Speichern')}</SpeichernKnopf>
-      </div>
+      {!gesperrt && (
+        <div className="d-flex justify-content-end">
+          <SpeichernKnopf><i className="bi bi-check2" aria-hidden="true" /> {t('Speichern')}</SpeichernKnopf>
+        </div>
+      )}
+      </fieldset>
     </form>
   );
 }

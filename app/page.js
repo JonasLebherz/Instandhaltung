@@ -2,6 +2,7 @@
  * app/page.js – Startseite / Übersicht (Dashboard)
  *
  * Zeigt auf einen Blick:
+ *  - die Aufgaben der gewählten Person (je nach Rolle, siehe aufgabenDerPerson)
  *  - wichtige Kennzahlen (offene Meldungen, dringende Meldungen, Teile unter Mindestbestand)
  *  - die aktuell offenen Störmeldungen und die Verteilung der Aufträge nach Status
  *  - eine kleine Deutschlandkarte; Klick auf ein Werk öffnet die Störungskarte
@@ -17,12 +18,48 @@ import Kennzahl from '@/components/Kennzahl';
 import SpeichernKnopf from '@/components/SpeichernKnopf';
 import { lieferungBuchen } from '@/app/aktionen';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
+import { T } from '@/lib/sprache';
 import { standorteMitZahlen } from '@/lib/karten/daten';
 import KleineKarte from '@/components/karten/KleineKarte';
+import { aktuellePerson } from '@/lib/person';
+import { PersonWaehlenKnopf, RollenAbzeichen } from '@/components/PersonWahl';
 
 // Immer aktuelle Daten aus der Datenbank (kein Zwischenspeichern der Seite)
 export const dynamic = 'force-dynamic';
 export const generateMetadata = () => seitentitel('Übersicht');
+
+/**
+ * Offene Aufträge, um die sich die gewählte Person kümmern sollte:
+ *  - Instandhaltung: die ihr (ihrem Techniker) zugewiesenen Aufträge
+ *  - Schichtleitung: offene Aufträge im eigenen Werk, noch nicht zugewiesene zuerst
+ *  - Produktion:     offene Störungen im eigenen Werk (zum Nachverfolgen)
+ */
+function aufgabenDerPerson(person) {
+  const bedingung = person.rolle === 'Instandhaltung'
+    ? sql`w.techniker_id = ${person.techniker_id ?? -1}`
+    : sql`st.id = ${person.standort_id ?? -1}`;
+  return sql`
+    SELECT w.id AS auftrag_id, w.status, s.zeitpunkt, s.beschreibung, s.prioritaet,
+           m.bezeichnung AS maschine, st.stadt, g.kuerzel AS gebaeude,
+           t.name AS techniker, zv.name AS zugewiesen_von
+    FROM wartungsauftrag w
+    JOIN stoermeldung s   ON s.id = w.stoermeldung_id
+    JOIN maschine m       ON m.id = s.maschine_id
+    JOIN gebaeude g       ON g.id = m.gebaeude_id
+    JOIN standort st      ON st.id = g.standort_id
+    LEFT JOIN techniker t ON t.id = w.techniker_id
+    LEFT JOIN person zv   ON zv.id = w.zugewiesen_von
+    WHERE w.status <> 'erledigt' AND ${bedingung}
+    ORDER BY (w.techniker_id IS NULL) DESC, s.prioritaet DESC, s.zeitpunkt DESC
+    LIMIT 6`;
+}
+
+/** Überschrift und Leertext des Abschnitts je Rolle */
+const AUFGABEN_TEXTE = {
+  Instandhaltung: { titel: T('Dir zugewiesene Aufgaben'), leer: T('Dir ist gerade kein offener Auftrag zugewiesen.') },
+  Schichtleitung: { titel: T('Aufgaben in deinem Werk'), leer: T('In deinem Werk ist gerade alles erledigt.') },
+  Produktion: { titel: T('Offene Störungen in deinem Werk'), leer: T('In deinem Werk gibt es gerade keine offenen Störungen.') },
+};
 
 export default async function Uebersicht() {
   const benutzer = await benutzerPflicht();
@@ -69,6 +106,11 @@ export default async function Uebersicht() {
     standorteMitZahlen(),
   ]);
 
+  // Danach (nicht gleichzeitig – höchstens 5 Abfragen auf einmal): Person und ihre Aufgaben
+  const person = await aktuellePerson();
+  const aufgaben = person ? await aufgabenDerPerson(person) : [];
+  const aufgabenTexte = person ? AUFGABEN_TEXTE[person.rolle] : null;
+
   // Alle Status in fester Reihenfolge, auch wenn es 0 Aufträge gibt
   const anzahlNachStatus = Object.fromEntries(proStatus.map((z) => [z.status, z.anzahl]));
   const statusVerteilung = STATUS_WERTE.map((s) => ({ status: s, anzahl: anzahlNachStatus[s] ?? 0 }));
@@ -81,7 +123,7 @@ export default async function Uebersicht() {
     <>
       <div className="seitenkopf d-flex justify-content-between align-items-end flex-wrap gap-3">
         <div>
-          <div className="eyebrow">{t(begruessung())}, {benutzer.anzeigename}</div>
+          <div className="eyebrow">{t(begruessung())}, {person?.name ?? benutzer.anzeigename}</div>
           <h1>{t('Übersicht')}</h1>
           <p>{datumLang(new Date(), t.sprache)}</p>
         </div>
@@ -112,10 +154,65 @@ export default async function Uebersicht() {
         </div>
       </div>
 
+      {/* Aufgaben der gewählten Person (oder Hinweis, eine Person zu wählen) */}
+      <section className="karte aufgaben-karte" style={{ '--i': 4 }}>
+        {person ? (
+          <>
+            <div className="karte-kopf">
+              <div>
+                <h2 className="abschnitt-titel mb-1">{t(aufgabenTexte.titel)}</h2>
+                <div className="d-flex align-items-center gap-2 flex-wrap klein">
+                  {person.name} <RollenAbzeichen rolle={person.rolle} /> {person.standort}
+                </div>
+              </div>
+              <PersonWaehlenKnopf className="btn btn-sekundaer btn-klein">{t('Person wechseln …')}</PersonWaehlenKnopf>
+            </div>
+            {aufgaben.length === 0 ? (
+              <p className="leer"><i className="bi bi-check-circle" />{t(aufgabenTexte.leer)}</p>
+            ) : (
+              <ul className="aufgaben-liste">
+                {aufgaben.map((a) => (
+                  <li key={a.auftrag_id}>
+                    <Link href={`/auftraege/${a.auftrag_id}`} prefetch={false} className="aufgabe">
+                      <span className="aufgabe-kopf">
+                        <strong>{a.maschine}</strong>
+                        <PrioritaetPill prioritaet={a.prioritaet} />
+                        <StatusPill status={a.status} />
+                      </span>
+                      <span className="klein text-truncate d-block">{a.stadt} · {a.gebaeude} – {a.beschreibung}</span>
+                      <span className="klein d-block">
+                        {/* Bei den eigenen Aufgaben steht nur, wer zugewiesen hat */}
+                        {a.techniker && person.rolle === 'Instandhaltung'
+                          ? (a.zugewiesen_von ? t('zugewiesen von {name}', { name: a.zugewiesen_von }) : t('zugewiesen'))
+                          : a.techniker
+                          ? (a.zugewiesen_von
+                            ? t('{techniker} · zugewiesen von {name}', { techniker: a.techniker, name: a.zugewiesen_von })
+                            : a.techniker)
+                          : <span className="text-orange">{t('Noch nicht zugewiesen')}</span>}
+                        {' · '}{datumZeit(a.zeitpunkt, t.sprache)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <div className="person-hinweis">
+            <span className="person-hinweis-symbol" aria-hidden="true"><i className="bi bi-person-badge" /></span>
+            <div className="flex-grow-1">
+              <h2 className="abschnitt-titel mb-1">{t('Dir zugewiesene Aufgaben')}</h2>
+              <p className="klein mb-0">{t('Wähle eine Person aus dem Unternehmen – dann siehst du hier ihre Aufgaben und arbeitest in ihrer Rolle.')}</p>
+            </div>
+            <PersonWaehlenKnopf>{t('Person wählen …')}</PersonWaehlenKnopf>
+          </div>
+        )}
+      </section>
+
       <div className="row g-4">
         {/* Offene Störmeldungen */}
         <div className="col-lg-8">
-          <section className="karte" style={{ '--i': 4 }}>
+          <section className="karte" style={{ '--i': 5 }}>
             <div className="karte-kopf">
               <h2 className="abschnitt-titel">{t('Offene Störmeldungen')}</h2>
               <Link href="/auftraege?status=offen">{t('Alle anzeigen')}</Link>
@@ -158,7 +255,7 @@ export default async function Uebersicht() {
 
         {/* Aufträge nach Status */}
         <div className="col-lg-4">
-          <section className="karte" style={{ '--i': 5 }}>
+          <section className="karte" style={{ '--i': 6 }}>
             <h2 className="abschnitt-titel">{t('Aufträge nach Status')}</h2>
             <ul className="status-liste">
               {statusVerteilung.map(({ status, anzahl }) => (
@@ -178,7 +275,7 @@ export default async function Uebersicht() {
           </section>
 
           {/* Kleine Deutschlandkarte: Klick auf ein Werk öffnet die Störungskarte dort */}
-          <section className="karte" style={{ '--i': 6 }}>
+          <section className="karte" style={{ '--i': 7 }}>
             <div className="karte-kopf">
               <h2 className="abschnitt-titel">{t('Standorte')}</h2>
               <Link href="/karte">{t('Zur Karte')}</Link>
@@ -189,7 +286,7 @@ export default async function Uebersicht() {
       </div>
 
       {/* Ersatzteile unter Mindestbestand & offene Bestellungen */}
-      <section className="karte" style={{ '--i': 7 }}>
+      <section className="karte" style={{ '--i': 8 }}>
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">{t('Ersatzteile unter Mindestbestand')}</h2>
           <span className="klein">{t('inkl. offener Bestellungen')}</span>

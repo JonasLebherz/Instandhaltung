@@ -19,8 +19,8 @@
 
 -- Vorhandene Daten löschen und die fortlaufenden Nummern (IDs) zurücksetzen.
 -- CASCADE leert auch alle Tabellen, die per Fremdschlüssel darauf verweisen.
-TRUNCATE standort, gebaeude, maschine, techniker, ersatzteil, stoermeldung, wartungsauftrag,
-         auftrag_ersatzteil, bestellung RESTART IDENTITY CASCADE;
+TRUNCATE standort, gebaeude, maschine, techniker, person, ersatzteil, stoermeldung, wartungsauftrag,
+         auftrag_ersatzteil, bestellung, auftrag_verlauf RESTART IDENTITY CASCADE;
 
 -- ---------------------------------------------------------------------
 -- Standorte (Werke) mit GPS-Position und Größe des Werksgeländes
@@ -1864,6 +1864,64 @@ INSERT INTO bestellung (ersatzteil_id, menge, bestelldatum, lieferdatum, status)
 (4, 12, current_date - 21, current_date - 16, 'geliefert'),
 (1, 6, current_date - 2, NULL, 'bestellt'),
 (9, 8, current_date - 1, NULL, 'bestellt');
+
+-- ---------------------------------------------------------------------
+-- Personen (Rollen in der Anwendung) – gleiche Daten wie in migrationen/001
+-- ---------------------------------------------------------------------
+-- Jeder Techniker wird eine Person der Instandhaltung
+INSERT INTO person (name, rolle, standort_id, techniker_id)
+SELECT t.name, 'Instandhaltung', t.standort_id, t.id FROM techniker t
+ON CONFLICT (name) DO NOTHING;
+
+-- Je Werk eine Schichtleitung und eine Person aus der Produktion
+INSERT INTO person (name, rolle, standort_id)
+SELECT v.name, v.rolle::rolle, st.id
+FROM (VALUES
+    ('Claudia Richter', 'Schichtleitung', 'ALB'), ('Sabine Vogt', 'Produktion', 'ALB'),
+    ('Peter Lang', 'Schichtleitung', 'STR'),      ('Jana Keller', 'Produktion', 'STR'),
+    ('Murat Yılmaz', 'Schichtleitung', 'MUC'),    ('Elif Kaya', 'Produktion', 'MUC'),
+    ('Ahmet Öztürk', 'Schichtleitung', 'NUE'),    ('Felix Bauer', 'Produktion', 'NUE'),
+    ('Thomas Maier', 'Schichtleitung', 'KOE'),    ('Ivan Petrov', 'Produktion', 'KOE'),
+    ('Heike Schwarz', 'Schichtleitung', 'DOR'),   ('Sven Neumann', 'Produktion', 'DOR'),
+    ('Sandra Wolff', 'Schichtleitung', 'HAN'),    ('Laura Zimmermann', 'Produktion', 'HAN'),
+    ('Oliver Franke', 'Schichtleitung', 'HAM'),   ('Julia Krause', 'Produktion', 'HAM'),
+    ('Bettina Kühn', 'Schichtleitung', 'LEI'),    ('Marco Rossi', 'Produktion', 'LEI'),
+    ('Kemal Aydın', 'Schichtleitung', 'BER'),     ('Nina Schäfer', 'Produktion', 'BER')
+) AS v (name, rolle, kuerzel)
+JOIN standort st ON st.kuerzel = v.kuerzel
+ON CONFLICT (name) DO NOTHING;
+
+-- Wer hat zugewiesen? In den Testdaten immer die Schichtleitung des Werks
+UPDATE wartungsauftrag w
+SET zugewiesen_von = p.id
+FROM stoermeldung s
+JOIN maschine m ON m.id = s.maschine_id
+JOIN gebaeude g ON g.id = m.gebaeude_id
+JOIN person p   ON p.standort_id = g.standort_id AND p.rolle = 'Schichtleitung'
+WHERE s.id = w.stoermeldung_id AND w.techniker_id IS NOT NULL;
+
+-- Verlauf der Aufträge: Zuweisung (spätestens 20 Minuten nach der Meldung,
+-- immer vor Arbeitsbeginn), Arbeitsbeginn und Abschluss durch den Techniker.
+-- Die Meldung selbst zeigt die App aus der Störmeldung an.
+INSERT INTO auftrag_verlauf (auftrag_id, person_id, zeitpunkt, aktion, details)
+SELECT w.id, w.zugewiesen_von,
+       LEAST(s.zeitpunkt + interval '20 minutes', s.zeitpunkt + (COALESCE(w.start_zeit, now()) - s.zeitpunkt) / 2),
+       'zugewiesen', t.name
+FROM wartungsauftrag w
+JOIN stoermeldung s ON s.id = w.stoermeldung_id
+JOIN techniker t    ON t.id = w.techniker_id;
+
+INSERT INTO auftrag_verlauf (auftrag_id, person_id, zeitpunkt, aktion, details)
+SELECT w.id, p.id, w.start_zeit, 'status', 'in Arbeit'
+FROM wartungsauftrag w
+LEFT JOIN person p ON p.techniker_id = w.techniker_id
+WHERE w.start_zeit IS NOT NULL;
+
+INSERT INTO auftrag_verlauf (auftrag_id, person_id, zeitpunkt, aktion, details)
+SELECT w.id, p.id, w.ende_zeit, 'status', 'erledigt'
+FROM wartungsauftrag w
+LEFT JOIN person p ON p.techniker_id = w.techniker_id
+WHERE w.status = 'erledigt' AND w.ende_zeit IS NOT NULL;
 
 -- ---------------------------------------------------------------------
 -- Fortlaufende Nummern hinter die vergebenen IDs setzen, damit neue

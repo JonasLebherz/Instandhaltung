@@ -13,9 +13,9 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 
 - **Live:** Die App läuft bei Vercel mit Supabase. Login funktioniert.
 - **Fertig:** alle Seiten (Übersicht mit kleiner Karte, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik mit Zoom, Datenbasis, Login), Seitenleiste links, Logo, Sprache Deutsch/Englisch, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
-- **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
-- **Getestet** gegen PostgreSQL 16 lokal: 138 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Statistik-Zoom gegen SQL, Datenbasis, Sprache Englisch, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
-- **Nach Schemaänderungen** muss in Supabase `schema.sql` + `testdaten.sql` erneut ausgeführt werden. Das setzt alle Daten zurück, Login-Konten bleiben erhalten.
+- **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 40 Personen (je Werk 2 Instandhaltung, 1 Schichtleitung, 1 Produktion), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
+- **Getestet** gegen PostgreSQL 16 lokal: 150 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Personenwahl und Rollen, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Statistik-Zoom gegen SQL, Datenbasis, Sprache Englisch, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
+- **Nach Schemaänderungen** wird in Supabase nur die neue Migrationsdatei aus `supabase/migrationen/` ausgeführt (Daten bleiben erhalten, siehe „SQL-Dateien“). `schema.sql` + `testdaten.sql` nur für eine Neuinstallation – das setzt alle Daten zurück, Login-Konten bleiben erhalten.
 
 ## Team & andere KI-Assistenten
 
@@ -96,11 +96,23 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 
 ## Seitenleiste & Logo
 
-- `components/Seitenleiste.js` ersetzt die frühere Navigation oben. Bereiche: Überblick (Übersicht, Störungskarte), Instandhaltung (Störung melden, Aufträge mit Zahl offener Aufträge), Auswertung (Statistik), System (Datenbasis). Unten Sprache, Darstellung und Konto (Abmelden).
+- `components/Seitenleiste.js` ersetzt die frühere Navigation oben. Bereiche: Überblick (Übersicht, Störungskarte), Instandhaltung (Störung melden, Aufträge mit Zahl offener Aufträge), Auswertung (Statistik), System (Datenbasis). Unten Sprache, Darstellung und Konto (E-Mail der Anmeldung, gewählte Person, „Person wechseln …“, Abmelden).
+- Die Leiste liegt bündig am linken Rand (`--leiste-abstand: 0px`) mit Trennlinie `border-right`, ohne Schatten. Auf dem Handy schwebt sie mit Abstand und Rundung.
 - Zustand in `<html data-leiste="auf|zu">`, gemerkt in `localStorage` unter `seitenleiste`. Das Start-Skript in `app/layout.js` setzt ihn vor dem ersten Anzeigen (ohne Wahl: ab 1200 px offen). Die Breite steuert `--leiste-b`, der Inhalt rückt per `.app-rahmen` daneben.
 - Eingeklappt wird der Text zur Sprechblase beim Darüberfahren. Unter 768 px gibt es oben `.mobil-kopf`, die Leiste fährt dann von links herein.
 - Neue Seiten in `BEREICHE` in `Seitenleiste.js` eintragen (mit `symbol` und gefüllter Variante `symbolAktiv`).
-- Logo: `components/Logo.js` (Sechseck mit Pulslinie auf Akzentfläche, Farbe aus CSS). Das Browser-Symbol `app/icon.svg` hat dieselbe Form mit festen Farben.
+- Logo: `components/Logo.js` (Schild mit Pulslinie auf Akzentfläche, Farbe aus CSS). Das Browser-Symbol `app/icon.svg` hat dieselbe Form mit festen Farben.
+
+## Personen & Rollen
+
+- Tabelle `person` (Rolle als ENUM `rolle`: `Produktion`, `Schichtleitung`, `Instandhaltung`; `standort_id`; `techniker_id` nur bei Instandhaltung). Eingeführt mit `supabase/migrationen/001_personen_und_verlauf.sql`.
+- Gewählt wird im Konto-Menü der Seitenleiste über `components/PersonWahl.js` (Fenster per Portal in `<body>`, Liste aus `/api/personen`). Andere Stellen öffnen die Wahl mit `PersonWaehlenKnopf` (Ereignis `person-waehlen`).
+- Cookie `person` = URL-kodiertes JSON `{ id, name, rolle, stadt }`. Das Layout liest es ohne Datenbank (`personAusCookie()`) nur zur Anzeige. Für Rechte und Speichern immer `aktuellePerson()` (mit `cache`, gleicht die ID mit der Datenbank ab).
+- Rechte: `darfBearbeiten(person)` – Produktion darf melden, aber keine Aufträge bearbeiten und keine Teile buchen. Die Seite sperrt das Formular (`<fieldset disabled>`), die Server-Aktionen prüfen es zusätzlich. Ohne gewählte Person ist alles erlaubt.
+- `wartungsauftrag.zugewiesen_von` speichert, wer den Techniker zugewiesen hat. `auftrag_verlauf` (aktion `gemeldet|zugewiesen|status|teil|bearbeitet`, `details`) wird in `meldungAnlegen`, `auftragSpeichern` und `teilBuchen` in derselben Transaktion geschrieben. Auf der Auftragsseite steht die Meldung selbst immer als erster Eintrag (aus `stoermeldung`, auch für alte Meldungen ohne Verlauf).
+- Übersicht: Abschnitt „Dir zugewiesene Aufgaben“ (`aufgabenDerPerson` in `app/page.js`) läuft **nach** den 5 gleichzeitigen Abfragen. Instandhaltung: eigene Aufträge; Schichtleitung: Aufträge im Werk, nicht zugewiesene zuerst; Produktion: offene Störungen im Werk.
+- Melden: Name der Person in „Gemeldet von“, Karte startet in ihrem Werk. Auftragsseite: „Mir zuweisen“ für Personen der Instandhaltung.
+- Rollenfarben: `.rolle-produktion` (orange), `.rolle-schichtleitung` (lila), `.rolle-instandhaltung` (blau), Abzeichen `RollenAbzeichen`.
 
 ## Design
 
@@ -116,9 +128,9 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
 
 ## Datenmodell (siehe `supabase/schema.sql`)
 
-- Tabellen: `standort`, `gebaeude`, `maschine`, `techniker`, `stoermeldung`, `wartungsauftrag`, `ersatzteil`, `auftrag_ersatzteil`, `bestellung`.
+- Tabellen: `standort`, `gebaeude`, `maschine`, `techniker`, `person`, `stoermeldung`, `wartungsauftrag`, `ersatzteil`, `auftrag_ersatzteil`, `bestellung`, `auftrag_verlauf`.
 - `standort` (GPS-Position, Geländegröße) 1:n `gebaeude` (Lage auf dem Gelände, `bereiche` als JSONB) 1:n `maschine` (`anlagennummer` eindeutig, `typ` vom ENUM `maschinentyp`, Position und Stellfläche in Metern). Techniker gehören zu einem Standort, Ersatzteile liegen zentral.
-- Wertelisten als ENUM-Typen: `auftragsstatus`, `prioritaet` (Reihenfolge niedrig < mittel < hoch, deshalb gehen `ORDER BY prioritaet DESC` und `MAX(prioritaet)`), `schicht`, `bestellstatus`, `ursache`, `maschinentyp`. Gespiegelt in `lib/konstanten.js` (inkl. `MASCHINEN_SYMBOLE`).
+- Wertelisten als ENUM-Typen: `auftragsstatus`, `prioritaet` (Reihenfolge niedrig < mittel < hoch, deshalb gehen `ORDER BY prioritaet DESC` und `MAX(prioritaet)`), `schicht`, `bestellstatus`, `ursache`, `maschinentyp`, `rolle`. Gespiegelt in `lib/konstanten.js` (inkl. `MASCHINEN_SYMBOLE`).
 - **Zu jeder Störmeldung gibt es genau einen Wartungsauftrag.** Links auf Detailseiten verwenden die **Auftrags-ID**: `/auftraege/<id>`.
 - `auftrag_ersatzteil` hat den Primärschlüssel `(auftrag_id, ersatzteil_id)`. Mehrfachbuchungen laufen über `ON CONFLICT … DO UPDATE`.
 - `bestellung.lieferdatum` ist das tatsächliche Lieferdatum und bis zur Lieferung NULL.
