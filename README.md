@@ -45,16 +45,17 @@ auf der Übersichtsseite.
 
 ### 3. Datenbank importieren (phpMyAdmin)
 
-> **Hinweis:** Die SQL-Dateien `database/schema.sql` und `database/testdaten.sql`
-> kommen im nächsten Projektschritt dazu. Bis dahin zeigt die Anwendung beim Aufruf
-> die Meldung „Datenbank nicht erreichbar“.
-
 1. Im Browser <http://localhost/phpmyadmin> öffnen.
 2. Oben auf den Reiter **Importieren** klicken.
 3. Bei **Datei auswählen** die Datei `database/schema.sql` wählen und unten auf **Importieren** klicken.
    Das Skript legt die Datenbank `instandhaltung` mit allen Tabellen und Views an.
 4. Links die Datenbank **instandhaltung** anklicken, erneut **Importieren** wählen
    und die Datei `database/testdaten.sql` importieren.
+   Sie enthält 8 Maschinen, 5 Techniker, 15 Ersatzteile und 150 Störmeldungen der letzten 12 Monate.
+
+Beide Dateien kann man jederzeit erneut importieren, z. B. um den Ausgangszustand wiederherzustellen.
+Dabei werden alle vorhandenen Daten überschrieben. Die Zeitangaben der Testdaten beziehen sich auf den
+Importzeitpunkt, die Daten decken also immer die letzten 12 Monate ab.
 
 ### 4. Anwendung aufrufen
 
@@ -73,7 +74,8 @@ tragt es dort bei `DB_PASS` ein.
 | „Datenbank nicht erreichbar“ | Prüfen, ob MySQL im XAMPP Control Panel läuft und ob die Datenbank importiert wurde. |
 | Apache startet nicht | Port 80 ist belegt, oft durch Skype oder IIS. Das Programm beenden oder in XAMPP den Port ändern. |
 | Seite ohne Design, keine Diagramme | Bootstrap und Chart.js kommen aus dem Internet (CDN). Internetverbindung prüfen. |
-| Umlaute werden falsch angezeigt | Die Datenbank muss mit `utf8mb4` angelegt sein. `schema.sql` macht das automatisch. |
+| Umlaute werden falsch angezeigt | Beide SQL-Dateien erneut importieren. Beim Import in phpMyAdmin den Zeichensatz `utf-8` lassen (Standard). |
+| Fehler beim Import von `testdaten.sql` | Zuerst `schema.sql` importieren, erst danach die Testdaten. |
 
 ## Ordnerstruktur
 
@@ -92,8 +94,46 @@ instandhaltung/
 │   ├── header.php           Kopfbereich und Navigation
 │   └── footer.php           Fußbereich
 ├── assets/css/style.css     Eigenes Design
-└── database/                SQL-Dateien (Schema, Testdaten), folgen im nächsten Schritt
+└── database/
+    ├── schema.sql           Tabellen, Fremdschlüssel, Indizes und Views
+    └── testdaten.sql        Beispieldaten (12 Monate Störhistorie)
 ```
+
+## Datenmodell
+
+| Tabelle | Inhalt |
+|---|---|
+| `maschine` | Maschinen mit Standort und Baujahr |
+| `techniker` | Techniker mit Qualifikation und Schicht |
+| `stoermeldung` | Gemeldete Störungen (Maschine, Zeitpunkt, Beschreibung, Ursache, Priorität) |
+| `wartungsauftrag` | Bearbeitung einer Störung: genau ein Auftrag pro Meldung (Techniker, Status, Start, Ende, Maßnahme) |
+| `ersatzteil` | Lagerbestand und Mindestbestand |
+| `auftrag_ersatzteil` | Verwendete Ersatzteile pro Auftrag (n:m) |
+| `bestellung` | Nachbestellungen von Ersatzteilen |
+
+Status eines Auftrags: **gemeldet → zugewiesen → in Arbeit → wartet auf Teil → erledigt**
+
+## Auswertung mit Power BI
+
+Für Power BI gibt es fertige Views in der Datenbank:
+
+| View | Inhalt |
+|---|---|
+| `v_mttr_maschine` | MTTR pro Maschine (Minuten und Stunden) |
+| `v_ausfallzeit_maschine` | Anzahl Störungen und Ausfallzeit pro Maschine |
+| `v_stoerungen_monat` | Störungen pro Monat, aufgeteilt nach Priorität |
+| `v_stoerung_details` | Eine Zeile pro Störung mit allen Angaben und Zeiten. Gut geeignet für eigene Filter in Power BI. |
+
+So verbindet ihr Power BI Desktop mit der Datenbank:
+
+1. Einmalig den **MySQL Connector/NET** installieren: <https://dev.mysql.com/downloads/connector/net/>.
+   Power BI benötigt ihn für MySQL/MariaDB.
+2. In Power BI auf **Daten abrufen → Weitere … → MySQL-Datenbank** klicken.
+3. Server: `localhost`, Datenbank: `instandhaltung` eintragen.
+4. Anmeldung über **Datenbank**: Benutzer `root`, Passwort leer (XAMPP-Standard).
+5. Die gewünschten Views (`v_…`) auswählen und **Laden** klicken.
+
+XAMPP mit MySQL muss dabei laufen.
 
 ## Kennzahlen: Definitionen
 

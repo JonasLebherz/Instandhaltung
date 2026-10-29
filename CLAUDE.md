@@ -8,11 +8,11 @@ Die Anwendung muss unter **XAMPP auf Windows** laufen (Apache, PHP 8, MySQL/Mari
 
 ## Stand
 
-- **Fertig:** Oberfläche mit allen fünf Seiten, Layout und Design.
-- **Offen:**
-  - `database/schema.sql` mit Tabellen, Fremdschlüsseln, Indizes und Views für Power BI
-  - `database/testdaten.sql` mit 8 Maschinen, 5 Technikern, 15 Ersatzteilen und ca. 150 Meldungen über 12 Monate, einige davon noch offen
-  - Danach alle Seiten gegen die echte Datenbank testen. Bisher sind sie nur mit `php -l` und gegen Beispieldaten geprüft.
+- **Fertig:**
+  - Oberfläche mit allen fünf Seiten
+  - `database/schema.sql` mit Tabellen, Fremdschlüsseln, Indizes, CHECK-Constraints und vier Views
+  - `database/testdaten.sql` mit 8 Maschinen, 5 Technikern, 15 Ersatzteilen und 150 Meldungen über 12 Monate, davon 12 offen
+- **Getestet** gegen MariaDB 10.11: Import beider Dateien sowie alle Seiten und Abläufe, darunter Melden, Zuweisen, Teile buchen, automatische Bestellung, Wareneingang, Abschluss und Wiedereröffnen. MySQL 8 ist nicht getestet.
 
 ## Technik & Konventionen
 
@@ -39,7 +39,7 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
 - Alle Farben sind CSS-Variablen in `assets/css/style.css`.
 - Die Seiten müssen auf dem Tablet bedienbar sein: große Touch-Ziele, Tabellenspalten werden ab `md`/`lg` ein- und ausgeblendet.
 
-## Datenmodell (Annahmen, an die sich `schema.sql` halten muss)
+## Datenmodell (siehe `database/schema.sql`)
 
 - Tabellen: `maschine`, `techniker`, `stoermeldung`, `wartungsauftrag`, `ersatzteil`, `auftrag_ersatzteil`, `bestellung`. Die Spalten stehen in der Aufgabenstellung bzw. ergeben sich aus den Queries.
 - **Zu jeder Störmeldung gibt es genau einen Wartungsauftrag.** `meldung_neu.php` legt beide in einer Transaktion an. Links auf Detailseiten verwenden die **Auftrags-ID**: `auftrag_bearbeiten.php?id=`.
@@ -53,4 +53,11 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
   - Reparaturdauer = `ende_zeit - start_zeit`
   - MTTR = Durchschnitt der Reparaturdauer über alle erledigten Aufträge
   - Ausfallzeit = `ende_zeit - stoermeldung.zeitpunkt`
-  - Die SQL-Views für Power BI sollen genau diese Definitionen verwenden.
+  - Die Views `v_mttr_maschine`, `v_ausfallzeit_maschine`, `v_stoerungen_monat` und `v_stoerung_details` verwenden genau diese Definitionen, ebenso `statistik.php`.
+
+## SQL-Dateien
+
+- Beide Dateien beginnen mit `SET NAMES utf8mb4`. Ohne diese Zeile verfälscht ein Client, der als latin1 liest, beim Import die Umlaute (doppelt kodiert), und `chk_stoermeldung_ursache` schlägt dann für „Verschleiß“ fehl.
+- Die Zeitangaben in `testdaten.sql` sind relativ zu `@jetzt` (Importzeitpunkt) geschrieben, z. B. `@jetzt - INTERVAL 90 MINUTE`.
+- Die Testdaten wurden mit einem Python-Skript mit festem Zufalls-Seed erzeugt. Das Skript liegt nicht im Repository. Kleine Änderungen direkt in der SQL-Datei vornehmen.
+- Neue Ursachen-Kategorien müssen an drei Stellen ergänzt werden: `URSACHEN_LISTE` in `includes/funktionen.php`, `chk_stoermeldung_ursache` in `schema.sql` und gegebenenfalls in den Testdaten.
