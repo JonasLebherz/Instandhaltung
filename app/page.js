@@ -304,7 +304,8 @@ export default async function Uebersicht() {
               <h2 className="abschnitt-titel">{t('Standorte')}</h2>
               <Link href="/karte">{t('Zur Karte')}</Link>
             </div>
-            <KleineKarte standorte={standorte} />
+            {/* Ansicht aus dem Konto: nur das gewählte Land bzw. Werk */}
+            <KleineKarte standorte={standorte.filter((st) => (ansicht.standortId ? st.id === ansicht.standortId : !ansicht.land || st.land === ansicht.land))} />
           </section>
         </div>
       </div>

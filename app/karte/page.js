@@ -14,7 +14,7 @@
  */
 import { benutzerPflicht } from '@/lib/auth';
 import { ansichtAusCookie } from '@/lib/ansicht';
-import { alleKartenDaten } from '@/lib/karten/daten';
+import { alleKartenDaten, nachAnsicht } from '@/lib/karten/daten';
 import KartenExplorer from '@/components/karten/KartenExplorer';
 import Kennzahl from '@/components/Kennzahl';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
@@ -48,7 +48,9 @@ export default async function KartenSeite({ searchParams }) {
   await benutzerPflicht();
   const t = await uebersetzer();
   const parameter = await searchParams;
-  const [daten, ansicht] = await Promise.all([alleKartenDaten(), ansichtAusCookie()]);
+  const [alleDaten, ansicht] = await Promise.all([alleKartenDaten(), ansichtAusCookie()]);
+  // Ansicht aus dem Konto: nur das gewählte Land bzw. Werk zeigen
+  const daten = nachAnsicht(alleDaten, ansicht);
   const { standorte } = daten;
 
   const offenGesamt = standorte.reduce((summe, st) => summe + st.offen, 0);

@@ -11,7 +11,7 @@
  */
 import { benutzerPflicht } from '@/lib/auth';
 import { fuerDatetimeInput } from '@/lib/format';
-import { standorteMitZahlen, gebaeudeMitZahlen, maschinenMitZahlen } from '@/lib/karten/daten';
+import { standorteMitZahlen, gebaeudeMitZahlen, maschinenMitZahlen, nachAnsicht } from '@/lib/karten/daten';
 import MeldeAssistent from './MeldeAssistent';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import { aktuellePerson } from '@/lib/person';
@@ -25,9 +25,11 @@ export default async function MeldenSeite({ searchParams }) {
   const t = await uebersetzer();
   const parameter = await searchParams;
   const ansicht = await ansichtAusCookie();   // Konto → Ansicht: Start im Land/Werk
-  const [standorte, gebaeude, maschinen, person] = await Promise.all([
+  const [alleStandorte, alleGebaeude, alleMaschinen, person] = await Promise.all([
     standorteMitZahlen(), gebaeudeMitZahlen(), maschinenMitZahlen(), aktuellePerson(),
   ]);
+  // Ansicht aus dem Konto: nur das gewählte Land bzw. Werk
+  const { standorte, gebaeude, maschinen } = nachAnsicht({ standorte: alleStandorte, gebaeude: alleGebaeude, maschinen: alleMaschinen }, ansicht);
   // Offene Aufträge und Techniker braucht die Karte beim Melden nicht
   const daten = { standorte, gebaeude, maschinen, offene: [], techniker: [] };
 

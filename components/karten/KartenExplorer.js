@@ -33,17 +33,16 @@ import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeSchritte from './MeldeSchritte';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
-import { WELT } from '@/lib/karten/welt';
-import { laenderAus, landKarte } from '@/lib/karten/laender';
+import { laenderAus, landKarte, weltVerhaeltnis } from '@/lib/karten/laender';
 
 const DAUER = 560;   // ms – so lange bleibt die alte Ebene während des Zooms sichtbar
 
 /** Seitenverhältnis (Breite / Höhe) des Inhalts einer Ebene – damit er in die Bühne passt */
-function seitenverhaeltnis(ebene, standort, gebaeude, karte) {
+function seitenverhaeltnis(ebene, standort, gebaeude, karte, laender) {
   if (ebene.gebaeudeId && gebaeude) return gebaeude.breite_m / gebaeude.tiefe_m;
   if (ebene.standortId && standort) return standort.gelaende_breite_m / standort.gelaende_tiefe_m;
   if (karte) return karte.breite / karte.hoehe;
-  return WELT.breite / WELT.hoehe;
+  return weltVerhaeltnis(laender);   // Weltkarte und Europakarte untereinander
 }
 
 export default function KartenExplorer({
@@ -150,7 +149,7 @@ export default function KartenExplorer({
     const st = standortVon(e);
     const g = gebaeudeVon(e);
     const karte = e.land ? landKarte(e.land, standorte) : null;
-    const verhaeltnis = seitenverhaeltnis(e, st, g, karte);
+    const verhaeltnis = seitenverhaeltnis(e, st, g, karte, laender);
     let inhalt;
     let art = 'welt';
     if (g) {
