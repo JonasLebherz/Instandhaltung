@@ -8,11 +8,15 @@
  * um dorthin zurückzugehen (onSchritt(nummer)). So sieht das Melden bewusst
  * anders aus als die Störungskarte, die nur zum Anschauen da ist.
  */
-const SCHRITTE = ['Werk', 'Gebäude', 'Maschine', 'Beschreibung'];
+import { T } from '@/lib/sprache';
+import { useT } from '@/components/SpracheKontext';
+
+const SCHRITTE = [T('Werk'), T('Gebäude|Schritt'), T('Maschine'), T('Beschreibung')];
 
 export default function MeldeSchritte({ schritt, werte = [], onSchritt }) {
+  const t = useT();
   return (
-    <ol className="melde-schritte" aria-label="Schritte zum Melden">
+    <ol className="melde-schritte" aria-label={t('Schritte zum Melden')}>
       {SCHRITTE.map((name, i) => {
         const nr = i + 1;
         const zustand = nr < schritt ? 'fertig' : nr === schritt ? 'aktiv' : 'offen';
@@ -20,7 +24,7 @@ export default function MeldeSchritte({ schritt, werte = [], onSchritt }) {
           <>
             <span className="schritt-nr" aria-hidden="true">{zustand === 'fertig' ? <i className="bi bi-check-lg" /> : nr}</span>
             <span className="schritt-text">
-              <span className="schritt-name">{name}</span>
+              <span className="schritt-name">{t(name)}</span>
               {zustand === 'fertig' && werte[i] && <span className="schritt-wert">{werte[i]}</span>}
             </span>
           </>
@@ -28,7 +32,7 @@ export default function MeldeSchritte({ schritt, werte = [], onSchritt }) {
         return (
           <li key={name} className={`schritt-${zustand}`} aria-current={zustand === 'aktiv' ? 'step' : undefined}>
             {zustand === 'fertig' && onSchritt
-              ? <button type="button" onClick={() => onSchritt(nr)} title={`Zurück zu: ${name}`}>{inhalt}</button>
+              ? <button type="button" onClick={() => onSchritt(nr)} title={t('Zurück zu: {schritt}', { schritt: t(name) })}>{inhalt}</button>
               : <div>{inhalt}</div>}
           </li>
         );

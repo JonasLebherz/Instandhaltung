@@ -7,13 +7,15 @@
  * Sekunde von 0 auf den Endwert hoch – außer, "Bewegung reduzieren" ist an.
  */
 import { useEffect, useState } from 'react';
+import { useT } from './SpracheKontext';
 
-function formatieren(wert, nachkomma) {
-  return wert.toLocaleString('de-DE', { minimumFractionDigits: nachkomma, maximumFractionDigits: nachkomma });
+function formatieren(wert, nachkomma, locale) {
+  return wert.toLocaleString(locale, { minimumFractionDigits: nachkomma, maximumFractionDigits: nachkomma });
 }
 
 export default function Zaehler({ wert, nachkomma = 0, dauer = 900 }) {
   const ziel = wert === null || wert === undefined ? null : Number(wert);
+  const { locale } = useT();
   const [anzeige, setAnzeige] = useState(ziel);
 
   useEffect(() => {
@@ -34,5 +36,5 @@ export default function Zaehler({ wert, nachkomma = 0, dauer = 900 }) {
   }, [ziel, dauer]);
 
   if (ziel === null) return '–';
-  return formatieren(anzeige ?? ziel, nachkomma);
+  return formatieren(anzeige ?? ziel, nachkomma, locale);
 }

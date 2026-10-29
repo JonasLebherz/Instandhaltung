@@ -1,26 +1,30 @@
 /**
- * app/statistik/page.js – Kennzahlen und Auswertungen
+ * app/statistik/page.js – Kennzahlen und Auswertungen mit Zoom
+ *
+ * Wie bei der Störungskarte zoomt man durch die Ebenen:
+ *   alle Standorte → Werk → Gebäude → Maschine
+ * Dafür lädt die Seite alle Störmeldungen des Zeitraums einmal vom Server.
+ * Gerechnet und gezeichnet wird dann im Browser (StatistikExplorer.js) –
+ * der Wechsel zwischen den Ebenen braucht deshalb keine Ladezeit.
  *
  * Begriffe (gleiche Definition wie in den Views für Power BI):
  *  - Reparaturdauer = ende_zeit − start_zeit des Wartungsauftrags
  *  - MTTR (Mean Time To Repair) = durchschnittliche Reparaturdauer erledigter Aufträge
  *  - Ausfallzeit = ende_zeit − Zeitpunkt der Störmeldung
  *
- * Filter über die Adresse: ?von=JJJJ-MM-TT&bis=JJJJ-MM-TT&standort=<id>
- * Ausgewertet werden alle Störmeldungen, deren Meldezeitpunkt im Zeitraum liegt
- * (und die – falls gewählt – zu Maschinen des Standorts gehören).
+ * Adresse: ?von=JJJJ-MM-TT&bis=JJJJ-MM-TT&werk=ham&halle=h2&maschine=12
+ * (älter, weiterhin gültig: ?standort=<id>)
+ * Ausgewertet werden alle Störmeldungen, deren Meldezeitpunkt im Zeitraum liegt.
  */
-import Link from 'next/link';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
-import { berlinZuDate, datum, heuteBerlin, zahl } from '@/lib/format';
-import Kennzahl from '@/components/Kennzahl';
-import Diagramme from './Diagramme';
+import { berlinZuDate, heuteBerlin, monatKurz } from '@/lib/format';
+import { uebersetzer, seitentitel } from '@/lib/sprache/server';
+import { T } from '@/lib/sprache';
+import StatistikExplorer from './StatistikExplorer';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Statistik' };
-
-const MONATSNAMEN = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+export const generateMetadata = () => seitentitel('Statistik');
 
 /** Erster Tag des Monats, der "monateZurueck" Monate vor dem aktuellen liegt, als "JJJJ-MM-01" */
 function monatsanfang(monateZurueck) {
@@ -41,8 +45,21 @@ function naechsterTag(wert) {
   return d.toISOString().slice(0, 10);
 }
 
+/** Startebene aus der Adresse (Werk-/Hallen-Kürzel, Maschinen-ID oder alte Standort-ID) */
+function startAusAdresse(parameter, orte) {
+  const maschine = orte.find((o) => String(o.id) === String(parameter?.maschine ?? ''));
+  if (maschine) return { standortId: maschine.standort_id, gebaeudeId: maschine.gebaeude_id, maschineId: maschine.id };
+  const werk = String(parameter?.werk ?? '').toUpperCase();
+  const standort = orte.find((o) => o.standort_kuerzel === werk || String(o.standort_id) === String(parameter?.standort ?? ''));
+  if (!standort) return {};
+  const halle = String(parameter?.halle ?? '').toUpperCase();
+  const gebaeude = orte.find((o) => o.standort_id === standort.standort_id && o.gebaeude_kuerzel === halle);
+  return { standortId: standort.standort_id, gebaeudeId: gebaeude?.gebaeude_id ?? null };
+}
+
 export default async function StatistikSeite({ searchParams }) {
   await benutzerPflicht();
+  const t = await uebersetzer();
   const parameter = await searchParams;
 
   /* ---------- Zeitraum bestimmen (Standard: die letzten 12 Monate) ---------- */
@@ -52,266 +69,80 @@ export default async function StatistikSeite({ searchParams }) {
   let bis = gueltigesDatum(parameter?.bis) ?? standardBis;
   let filterHinweis = '';
   if (von > bis) {
-    filterHinweis = 'Das Startdatum lag nach dem Enddatum – es wird der Standardzeitraum angezeigt.';
+    filterHinweis = t('Das Startdatum lag nach dem Enddatum – es wird der Standardzeitraum angezeigt.');
     [von, bis] = [standardVon, standardBis];
   }
-  // Standort-Filter: nur gültige IDs, sonst alle Standorte
-  const standorte = await sql`SELECT id, name FROM standort ORDER BY name`;
-  const standortId = standorte.find((st) => String(st.id) === String(parameter?.standort ?? ''))?.id ?? null;
-  const standortName = standorte.find((st) => st.id === standortId)?.name ?? null;
-  // Baustein für die Abfragen: schränkt Störmeldungen s auf Maschinen des Standorts ein
-  const nurStandort = standortId === null ? sql`TRUE`
-    : sql`s.maschine_id IN (SELECT m.id FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id WHERE g.standort_id = ${standortId})`;
-
   // Ganzer Tag in deutscher Zeit: von 00:00 Uhr bis vor 00:00 Uhr des Folgetages
   const ab = berlinZuDate(`${von}T00:00`);
   const bisVor = berlinZuDate(`${naechsterTag(bis)}T00:00`);
 
-  const schnellwahl = [
-    { text: '3 Monate', von: monatsanfang(2) },
-    { text: '6 Monate', von: monatsanfang(5) },
-    { text: '12 Monate', von: standardVon },
-    { text: 'Dieses Jahr', von: `${standardBis.slice(0, 4)}-01-01` },
-  ];
-
-  /* ---------- Abfragen ---------- */
-  const [[gesamt], proStandort, topMaschinen, monateDb, topUrsachen] = await Promise.all([
-    // Gesamt-Kennzahlen
+  /* ---------- Abfragen (4 gleichzeitig – siehe "Ladezeiten" in CLAUDE.md) ---------- */
+  const [orte, ereignisse, teile, techniker] = await Promise.all([
+    // Alle Maschinen mit Gebäude und Standort – daraus entstehen die Ebenen
     sql`
-      SELECT COUNT(*)::int                                                                  AS anzahl,
-             COUNT(*) FILTER (WHERE w.status <> 'erledigt')::int                            AS offen,
-             (AVG(EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 60)
-                FILTER (WHERE w.status = 'erledigt'))::float                                AS mttr_min,
-             COALESCE(SUM(EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60)
-                FILTER (WHERE w.status = 'erledigt'), 0)::float                             AS ausfall_min
+      SELECT m.id, m.anlagennummer, m.bezeichnung, m.typ::text AS typ, m.baujahr,
+             g.id AS gebaeude_id, g.kuerzel AS gebaeude_kuerzel, g.bezeichnung AS gebaeude,
+             st.id AS standort_id, st.kuerzel AS standort_kuerzel, st.name AS standort, st.stadt
+      FROM maschine m
+      JOIN gebaeude g  ON g.id = m.gebaeude_id
+      JOIN standort st ON st.id = g.standort_id
+      ORDER BY st.name, g.kuerzel, m.anlagennummer`,
+
+    // Jede Störmeldung des Zeitraums mit ihrem Auftrag. Monat, Wochentag und Stunde
+    // nach deutscher Zeit; Reparatur- und Ausfallzeit nur für erledigte Aufträge.
+    sql`
+      SELECT s.id AS meldung_id, w.id AS auftrag_id, s.maschine_id, s.zeitpunkt,
+             s.prioritaet::text AS prioritaet, s.ursache_kategorie::text AS ursache,
+             w.status::text AS status, w.techniker_id, left(s.beschreibung, 90) AS beschreibung,
+             to_char(s.zeitpunkt AT TIME ZONE 'Europe/Berlin', 'YYYY-MM')        AS monat,
+             EXTRACT(ISODOW FROM s.zeitpunkt AT TIME ZONE 'Europe/Berlin')::int AS wochentag,
+             EXTRACT(HOUR FROM s.zeitpunkt AT TIME ZONE 'Europe/Berlin')::int   AS stunde,
+             CASE WHEN w.status = 'erledigt'
+                  THEN EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 60 END::float AS reparatur_min,
+             CASE WHEN w.status = 'erledigt'
+                  THEN EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60 END::float   AS ausfall_min
       FROM stoermeldung s
       JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
-      WHERE s.zeitpunkt >= ${ab} AND s.zeitpunkt < ${bisVor} AND ${nurStandort}`,
+      WHERE s.zeitpunkt >= ${ab} AND s.zeitpunkt < ${bisVor}
+      ORDER BY s.zeitpunkt DESC`,
 
-    // Kennzahlen pro Standort – LEFT JOIN, damit auch Werke ohne Störung erscheinen.
-    // Die Zeitraum-Bedingung steht deshalb im JOIN und nicht im WHERE.
+    // Verbaute Ersatzteile der Aufträge im Zeitraum
     sql`
-      SELECT st.id, st.name, st.kuerzel, st.schwerpunkt,
-             COUNT(s.id)::int                                                               AS anzahl,
-             COUNT(s.id) FILTER (WHERE w.status <> 'erledigt')::int                         AS offen,
-             (AVG(EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 60)
-                FILTER (WHERE w.status = 'erledigt'))::float                                AS mttr_min,
-             COALESCE(SUM(EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60)
-                FILTER (WHERE w.status = 'erledigt'), 0)::float                             AS ausfall_min
-      FROM standort st
-      JOIN gebaeude g             ON g.standort_id = st.id
-      JOIN maschine m             ON m.gebaeude_id = g.id
-      LEFT JOIN stoermeldung s    ON s.maschine_id = m.id AND s.zeitpunkt >= ${ab} AND s.zeitpunkt < ${bisVor}
-      LEFT JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
-      WHERE ${standortId === null ? sql`TRUE` : sql`st.id = ${standortId}`}
-      GROUP BY st.id
-      ORDER BY ausfall_min DESC, st.name`,
+      SELECT ae.auftrag_id, e.bezeichnung, ae.menge
+      FROM auftrag_ersatzteil ae
+      JOIN ersatzteil e      ON e.id = ae.ersatzteil_id
+      JOIN wartungsauftrag w ON w.id = ae.auftrag_id
+      JOIN stoermeldung s    ON s.id = w.stoermeldung_id
+      WHERE s.zeitpunkt >= ${ab} AND s.zeitpunkt < ${bisVor}`,
 
-    // Die 10 Maschinen mit der höchsten Ausfallzeit
-    sql`
-      SELECT m.id, m.bezeichnung, m.anlagennummer, st.stadt, st.kuerzel AS standort_kuerzel, g.kuerzel AS gebaeude_kuerzel,
-             COUNT(s.id)::int                                                               AS anzahl,
-             (AVG(EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 60)
-                FILTER (WHERE w.status = 'erledigt'))::float                                AS mttr_min,
-             COALESCE(SUM(EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60)
-                FILTER (WHERE w.status = 'erledigt'), 0)::float                             AS ausfall_min
-      FROM stoermeldung s
-      JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
-      JOIN maschine m        ON m.id = s.maschine_id
-      JOIN gebaeude g        ON g.id = m.gebaeude_id
-      JOIN standort st       ON st.id = g.standort_id
-      WHERE s.zeitpunkt >= ${ab} AND s.zeitpunkt < ${bisVor} AND ${nurStandort}
-      GROUP BY m.id, st.stadt, st.kuerzel, g.kuerzel
-      ORDER BY ausfall_min DESC
-      LIMIT 10`,
-
-    // Störungen pro Monat (Monat nach deutscher Zeit)
-    sql`
-      SELECT to_char(s.zeitpunkt AT TIME ZONE 'Europe/Berlin', 'YYYY-MM') AS monat, COUNT(*)::int AS anzahl
-      FROM stoermeldung s
-      WHERE s.zeitpunkt >= ${ab} AND s.zeitpunkt < ${bisVor} AND ${nurStandort}
-      GROUP BY 1 ORDER BY 1`,
-
-    // Die fünf häufigsten Störursachen
-    sql`
-      SELECT s.ursache_kategorie::text AS ursache, COUNT(*)::int AS anzahl
-      FROM stoermeldung s
-      WHERE s.zeitpunkt >= ${ab} AND s.zeitpunkt < ${bisVor} AND ${nurStandort}
-      GROUP BY s.ursache_kategorie
-      ORDER BY anzahl DESC, ursache
-      LIMIT 5`,
+    sql`SELECT id, name, standort_id, qualifikation FROM techniker ORDER BY name`,
   ]);
 
   // Lückenlose Monatsliste, damit Monate ohne Störung als 0 erscheinen
-  const anzahlNachMonat = Object.fromEntries(monateDb.map((z) => [z.monat, z.anzahl]));
-  const proMonat = [];
+  const monate = [];
   let [jahr, monat] = von.split('-').map(Number);
   const [endJahr, endMonat] = bis.split('-').map(Number);
   while (jahr < endJahr || (jahr === endJahr && monat <= endMonat)) {
-    const schluessel = `${jahr}-${String(monat).padStart(2, '0')}`;
-    proMonat.push({ label: `${MONATSNAMEN[monat - 1]} ${String(jahr).slice(2)}`, anzahl: anzahlNachMonat[schluessel] ?? 0 });
+    monate.push({
+      schluessel: `${jahr}-${String(monat).padStart(2, '0')}`,
+      label: `${monatKurz(monat, t.sprache)} ${String(jahr).slice(2)}`,
+    });
     monat += 1;
     if (monat > 12) { monat = 1; jahr += 1; }
   }
 
-  const maxAusfall = Math.max(1, ...proStandort.map((z) => z.ausfall_min));
-  const maxAusfallMaschine = Math.max(1, ...topMaschinen.map((z) => z.ausfall_min));
-  // Schnellwahl-Links behalten den gewählten Standort bei
-  const standortParameter = standortId ? `&standort=${standortId}` : '';
+  // Schnellwahl für den Zeitraum
+  const schnellwahl = [
+    { text: T('3 Monate'), von: monatsanfang(2) },
+    { text: T('6 Monate'), von: monatsanfang(5) },
+    { text: T('12 Monate'), von: standardVon },
+    { text: T('Dieses Jahr'), von: `${standardBis.slice(0, 4)}-01-01` },
+  ];
 
   return (
-    <>
-      <div className="seitenkopf">
-        <h1>Statistik</h1>
-        <p>{standortName ?? 'Alle Standorte'} · {datum(ab)} bis {datum(berlinZuDate(`${bis}T12:00`))}</p>
-      </div>
-
-      {filterHinweis && (
-        <div className="hinweis hinweis-hinweis">
-          <i className="bi bi-exclamation-triangle-fill" aria-hidden="true" />
-          <span className="hinweis-text">{filterHinweis}</span>
-        </div>
-      )}
-
-      {/* Zeitraum-Filter */}
-      <form method="get" className="karte" style={{ '--i': 0 }}>
-        <div className="filterleiste">
-          <div>
-            <label htmlFor="von" className="form-label">Von</label>
-            <input type="date" id="von" name="von" className="form-control" defaultValue={von} key={`von-${von}`} />
-          </div>
-          <div>
-            <label htmlFor="bis" className="form-label">Bis</label>
-            <input type="date" id="bis" name="bis" className="form-control" defaultValue={bis} key={`bis-${bis}`} />
-          </div>
-          <div>
-            <label htmlFor="standort" className="form-label">Standort</label>
-            <select id="standort" name="standort" className="form-select" defaultValue={standortId ?? ''} key={`st-${standortId}`}>
-              <option value="">Alle Standorte</option>
-              {standorte.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-            </select>
-          </div>
-          <div className="aktionen">
-            <button type="submit" className="btn btn-primary">Anzeigen</button>
-          </div>
-        </div>
-        <div className="schnellwahl">
-          {schnellwahl.map((s) => (
-            <Link key={s.text} href={`/statistik?von=${s.von}&bis=${standardBis}${standortParameter}`}
-                  className={`btn btn-sekundaer btn-klein${s.von === von && bis === standardBis ? ' aktiv' : ''}`}>
-              {s.text}
-            </Link>
-          ))}
-        </div>
-      </form>
-
-      {/* Gesamt-Kennzahlen */}
-      <div className="row g-4 mb-2">
-        <div className="col-6 col-lg-3">
-          <Kennzahl titel="MTTR gesamt" wert={gesamt.mttr_min !== null ? gesamt.mttr_min / 60 : null} nachkomma={1}
-                    einheit="h" zusatz="Ø Reparaturdauer" symbol="bi-stopwatch" i={1} />
-        </div>
-        <div className="col-6 col-lg-3">
-          <Kennzahl titel="Ausfallzeit gesamt" wert={Math.round(gesamt.ausfall_min / 60)} einheit="h"
-                    zusatz="Meldung bis Behebung" symbol="bi-hourglass-split" art="warnung" i={2} />
-        </div>
-        <div className="col-6 col-lg-3">
-          <Kennzahl titel="Störungen" wert={gesamt.anzahl} zusatz="im Zeitraum gemeldet" symbol="bi-activity" i={3} />
-        </div>
-        <div className="col-6 col-lg-3">
-          <Kennzahl titel="Davon offen" wert={gesamt.offen} zusatz="noch nicht erledigt" symbol="bi-hourglass" i={4} />
-        </div>
-      </div>
-
-      {/* Diagramme (laufen im Browser, siehe Diagramme.js) */}
-      <Diagramme proMonat={proMonat} topUrsachen={topUrsachen} />
-
-      {/* Kennzahlen pro Standort */}
-      <section className="karte" style={{ '--i': 7 }}>
-        <div className="karte-kopf">
-          <h2 className="abschnitt-titel">Kennzahlen pro Standort</h2>
-          <span className="klein">sortiert nach Ausfallzeit</span>
-        </div>
-        <div className="tabelle-rahmen">
-          <table className="tabelle">
-            <thead>
-              <tr>
-                <th>Standort</th>
-                <th className="zahl">Störungen</th>
-                <th className="zahl d-none d-sm-table-cell">Offen</th>
-                <th className="zahl">MTTR</th>
-                <th className="zahl">Ausfallzeit</th>
-                <th className="d-none d-md-table-cell" style={{ width: '26%' }}><span className="visually-hidden">Anteil</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {proStandort.map((ps) => (
-                <tr key={ps.id} className="klickbar">
-                  <td>
-                    <Link className="zeilen-link" href={`/statistik?von=${von}&bis=${bis}&standort=${ps.id}`}>{ps.name}</Link>
-                    <div className="klein">{ps.schwerpunkt}</div>
-                  </td>
-                  <td className="zahl">{ps.anzahl}</td>
-                  <td className="zahl d-none d-sm-table-cell">{ps.offen}</td>
-                  <td className="zahl">{ps.mttr_min !== null ? `${zahl(ps.mttr_min / 60)} h` : '–'}</td>
-                  <td className="zahl">{zahl(ps.ausfall_min / 60)} h</td>
-                  <td className="d-none d-md-table-cell">
-                    <div className="mini-balken" aria-hidden="true">
-                      <span style={{ width: `${Math.round((ps.ausfall_min / maxAusfall) * 100)}%` }} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Maschinen mit der höchsten Ausfallzeit */}
-      <section className="karte" style={{ '--i': 8 }}>
-        <div className="karte-kopf">
-          <h2 className="abschnitt-titel">Top 10 Maschinen nach Ausfallzeit</h2>
-          <span className="klein">Klick zeigt die Maschine auf der Karte</span>
-        </div>
-        {topMaschinen.length === 0 ? (
-          <p className="leer">Keine Störungen im Zeitraum.</p>
-        ) : (
-          <div className="tabelle-rahmen">
-            <table className="tabelle">
-              <thead>
-                <tr>
-                  <th>Maschine</th>
-                  <th className="zahl">Störungen</th>
-                  <th className="zahl">MTTR</th>
-                  <th className="zahl">Ausfallzeit</th>
-                  <th className="d-none d-md-table-cell" style={{ width: '26%' }}><span className="visually-hidden">Anteil</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {topMaschinen.map((m) => (
-                  <tr key={m.id} className="klickbar">
-                    <td>
-                      <Link className="zeilen-link"
-                            href={`/karte?werk=${m.standort_kuerzel.toLowerCase()}&halle=${m.gebaeude_kuerzel.toLowerCase()}&maschine=${m.id}`}>
-                        {m.bezeichnung}
-                      </Link>
-                      <div className="klein">{m.anlagennummer} · {m.stadt}</div>
-                    </td>
-                    <td className="zahl">{m.anzahl}</td>
-                    <td className="zahl">{m.mttr_min !== null ? `${zahl(m.mttr_min / 60)} h` : '–'}</td>
-                    <td className="zahl">{zahl(m.ausfall_min / 60)} h</td>
-                    <td className="d-none d-md-table-cell">
-                      <div className="mini-balken" aria-hidden="true">
-                        <span style={{ width: `${Math.round((m.ausfall_min / maxAusfallMaschine) * 100)}%` }} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </>
+    <StatistikExplorer
+      daten={{ orte, ereignisse, teile, techniker, monate }}
+      zeitraum={{ von, bis, ab: ab.toISOString(), bisVor: bisVor.toISOString(), standardBis, schnellwahl, hinweis: filterHinweis }}
+      start={startAusAdresse(parameter, orte)} />
   );
 }

@@ -28,6 +28,7 @@ import { Legende, stufe, offenText } from './stufe';
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeSchritte from './MeldeSchritte';
+import { useT } from '@/components/SpracheKontext';
 import { KARTE_BREITE, KARTE_HOEHE } from '@/lib/karten/deutschland';
 
 const DAUER = 560;   // ms – so lange bleibt die alte Ebene während des Zooms sichtbar
@@ -44,6 +45,7 @@ export default function KartenExplorer({
 }) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
   const melden = modus === 'auswahl';   // Störung melden: eigenes Aussehen, keine Störungszahlen
+  const t = useT();
   const buehneRef = useRef(null);
   const neuRef = useRef(null);
   const altRef = useRef(null);
@@ -153,10 +155,10 @@ export default function KartenExplorer({
   const schluessel = `${ebene.standortId ?? 'de'}-${ebene.gebaeudeId ?? 'x'}`;
   const schrittNr = { land: 1, werk: 2, gebaeude: 3 }[stufeName];
   const ursprungStil = uebergang?.ursprung ? { transformOrigin: `${uebergang.ursprung.x}px ${uebergang.ursprung.y}px` } : undefined;
-  const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? 'Deutschland';
-  const hinweis = modus === 'auswahl'
+  const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? t('Deutschland');
+  const hinweis = t(modus === 'auswahl'
     ? { land: 'In welchem Werk?', werk: 'In welchem Gebäude?', gebaeude: 'An welcher Maschine?' }[stufeName]
-    : { land: 'Werk anklicken zum Hineinzoomen', werk: 'Gebäude anklicken für den Grundriss', gebaeude: 'Maschine anklicken für Details' }[stufeName];
+    : { land: 'Werk anklicken zum Hineinzoomen', werk: 'Gebäude anklicken für den Grundriss', gebaeude: 'Maschine anklicken für Details' }[stufeName]);
 
   const buehne = (
     <div className="explorer-buehne-rahmen">
@@ -165,9 +167,9 @@ export default function KartenExplorer({
         <MeldeSchritte schritt={schrittNr} werte={[standort?.name, aktuellesGebaeude?.bezeichnung]}
                        onSchritt={(nr) => (nr === 1 ? zuDeutschland() : zuStandort())} />
       ) : (
-      <nav className="brotkrumen explorer-pfad" aria-label="Pfad">
+      <nav className="brotkrumen explorer-pfad" aria-label={t('Pfad')}>
         <button type="button" onClick={zuDeutschland} disabled={stufeName === 'land'}>
-          <i className="bi bi-globe-europe-africa" aria-hidden="true" /> Deutschland
+          <i className="bi bi-globe-europe-africa" aria-hidden="true" /> {t('Deutschland')}
         </button>
         {standort && (
           <>
@@ -189,7 +191,7 @@ export default function KartenExplorer({
         <div className="buehne-kopf">
           {stufeName !== 'land' && (
             <button type="button" className="rund-knopf glas-knopf" onClick={stufeName === 'gebaeude' ? zuStandort : zuDeutschland}
-                    aria-label="Herauszoomen">
+                    aria-label={t('Herauszoomen')}>
               <i className="bi bi-arrow-left" />
             </button>
           )}
@@ -236,6 +238,7 @@ export default function KartenExplorer({
  * ================================================================== */
 function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell, maschineId, onWerk, onGebaeude, onMaschine, onAuswahlAufheben }) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
+  const t = useT();
 
   /* ---------- Ebene Deutschland: alle Werke ---------- */
   if (ebeneName === 'land') {
@@ -244,18 +247,18 @@ function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell,
       : [...standorte].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || a.stadt.localeCompare(b.stadt));
     return (
       <section className="karte explorer-seite" style={{ '--i': 1 }}>
-        <h2 className="abschnitt-titel">{modus === 'auswahl' ? 'Werk aus der Liste wählen' : 'Standorte'}</h2>
+        <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Werk aus der Liste wählen') : t('Standorte')}</h2>
         <ul className="ort-liste">
           {sortiert.map((st) => (
             <li key={st.id}>
               <button type="button" onClick={() => onWerk(st)} className={modus === 'auswahl' ? '' : `stufe-${stufe(st.offen, st.hoechste_prioritaet)}`}>
                 <span>
                   <span className="ort-titel">{st.name}</span>
-                  <span className="ort-unter">{st.schwerpunkt} · {st.gebaeude} Gebäude · {st.maschinen} Maschinen</span>
+                  <span className="ort-unter">{st.schwerpunkt} · {t('{n} Gebäude', { n: st.gebaeude })} · {t('{n} Maschinen', { n: st.maschinen })}</span>
                 </span>
                 {modus === 'auswahl'
                   ? <i className="bi bi-chevron-right ms-auto text-leise" aria-hidden="true" />
-                  : <span className="ort-zahl" aria-label={offenText(st.offen)}>{st.offen}</span>}
+                  : <span className="ort-zahl" aria-label={offenText(st.offen, t)}>{st.offen}</span>}
               </button>
             </li>
           ))}
@@ -268,23 +271,23 @@ function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell,
   if (ebeneName === 'werk' && standort) {
     const hallen = gebaeude.filter((g) => g.standort_id === standort.id);
     const offeneHier = offene.filter((a) => a.standort_id === standort.id);
-    const technikerHier = techniker.filter((t) => t.standort_id === standort.id);
+    const technikerHier = techniker.filter((x) => x.standort_id === standort.id);
     return (
       <>
         <section className="karte explorer-seite" style={{ '--i': 1 }}>
           {modus === 'anzeige' && <p className="klein mb-3"><i className="bi bi-geo-alt" aria-hidden="true" /> {standort.adresse}</p>}
-          <h2 className="abschnitt-titel">{modus === 'auswahl' ? 'Gebäude aus der Liste wählen' : 'Gebäude'}</h2>
+          <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Gebäude aus der Liste wählen') : t('Gebäude')}</h2>
           <ul className="ort-liste">
             {hallen.map((g) => (
               <li key={g.id}>
                 <button type="button" onClick={() => onGebaeude(g)} className={modus === 'auswahl' ? '' : `stufe-${stufe(g.offen, g.hoechste_prioritaet)}`}>
                   <span>
                     <span className="ort-titel">{g.bezeichnung}</span>
-                    <span className="ort-unter">{g.maschinen} Maschinen · {g.breite_m} × {g.tiefe_m} m</span>
+                    <span className="ort-unter">{t('{n} Maschinen', { n: g.maschinen })} · {g.breite_m} × {g.tiefe_m} m</span>
                   </span>
                   {modus === 'auswahl'
                     ? <i className="bi bi-chevron-right ms-auto text-leise" aria-hidden="true" />
-                    : <span className="ort-zahl" aria-label={offenText(g.offen)}>{g.offen}</span>}
+                    : <span className="ort-zahl" aria-label={offenText(g.offen, t)}>{g.offen}</span>}
                 </button>
               </li>
             ))}
@@ -293,19 +296,19 @@ function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell,
         {modus === 'anzeige' && (
           <>
             <section className="karte explorer-seite" style={{ '--i': 2 }}>
-              <h2 className="abschnitt-titel">Offene Störungen</h2>
+              <h2 className="abschnitt-titel">{t('Offene Störungen')}</h2>
               {offeneHier.length === 0
-                ? <p className="text-leise mb-0"><i className="bi bi-check-circle me-1" style={{ color: 'var(--gruen)' }} />Alle Anlagen laufen.</p>
+                ? <p className="text-leise mb-0"><i className="bi bi-check-circle me-1" style={{ color: 'var(--gruen)' }} />{t('Alle Anlagen laufen.')}</p>
                 : <OffeneListe auftraege={offeneHier} mitGebaeude />}
             </section>
             <section className="karte explorer-seite" style={{ '--i': 3 }}>
-              <h2 className="abschnitt-titel">Techniker vor Ort</h2>
+              <h2 className="abschnitt-titel">{t('Techniker vor Ort')}</h2>
               <ul className="ort-liste">
-                {technikerHier.map((t) => (
-                  <li key={t.id}>
+                {technikerHier.map((tech) => (
+                  <li key={tech.id}>
                     <div className="ort-zeile">
                       <i className="bi bi-person-gear fs-5 text-leise" aria-hidden="true" />
-                      <span><span className="ort-titel">{t.name}</span><span className="ort-unter">{t.qualifikation} · {t.schicht}</span></span>
+                      <span><span className="ort-titel">{tech.name}</span><span className="ort-unter">{t(tech.qualifikation)} · {t(tech.schicht)}</span></span>
                     </div>
                   </li>
                 ))}
@@ -325,7 +328,7 @@ function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell,
   if (modus === 'auswahl') {
     return (
       <section className="karte explorer-seite" style={{ '--i': 1 }}>
-        <h2 className="abschnitt-titel">Maschine aus der Liste wählen</h2>
+        <h2 className="abschnitt-titel">{t('Maschine aus der Liste wählen')}</h2>
         <ul className="ort-liste">
           {maschinenHier.map((m) => (
             <li key={m.id}>
@@ -349,23 +352,23 @@ function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell,
           <span className="detail-symbol" aria-hidden="true"><i className={`bi ${MASCHINEN_SYMBOLE[auswahl.typ] ?? 'bi-gear'}`} /></span>
           <div className="flex-grow-1">
             <h2 className="abschnitt-titel mb-0">{auswahl.bezeichnung}</h2>
-            <div className="klein">{auswahl.anlagennummer} · {auswahl.typ} · Baujahr {auswahl.baujahr}</div>
+            <div className="klein">{auswahl.anlagennummer} · {t(auswahl.typ)} · {t('Baujahr {n}', { n: auswahl.baujahr })}</div>
           </div>
-          <button type="button" className="rund-knopf" onClick={onAuswahlAufheben} aria-label="Auswahl schließen">
+          <button type="button" className="rund-knopf" onClick={onAuswahlAufheben} aria-label={t('Auswahl schließen')}>
             <i className="bi bi-x-lg" />
           </button>
         </div>
         <div className="mini-kennzahlen">
-          <div><strong>{auswahl.offen}</strong><span>offen</span></div>
-          <div><strong>{auswahl.stoerungen_12m}</strong><span>Störungen 12 Mon.</span></div>
-          <div><strong>{new Date().getFullYear() - auswahl.baujahr}</strong><span>Jahre alt</span></div>
+          <div><strong>{auswahl.offen}</strong><span>{t('offen')}</span></div>
+          <div><strong>{auswahl.stoerungen_12m}</strong><span>{t('Störungen 12 Mon.')}</span></div>
+          <div><strong>{new Date().getFullYear() - auswahl.baujahr}</strong><span>{t('Jahre alt')}</span></div>
         </div>
-        <h3 className="h6 fw-semibold mb-2">{offenText(auswahl.offen)}</h3>
+        <h3 className="h6 fw-semibold mb-2">{offenText(auswahl.offen, t)}</h3>
         {offeneDerMaschine.length === 0
-          ? <p className="text-leise"><i className="bi bi-check-circle me-1" style={{ color: 'var(--gruen)' }} />Die Maschine läuft störungsfrei.</p>
+          ? <p className="text-leise"><i className="bi bi-check-circle me-1" style={{ color: 'var(--gruen)' }} />{t('Die Maschine läuft störungsfrei.')}</p>
           : <OffeneListe auftraege={offeneDerMaschine} />}
         <Link href={`/melden?maschine=${auswahl.id}`} className="btn btn-primary w-100 mt-3">
-          <i className="bi bi-exclamation-triangle" aria-hidden="true" /> Störung an dieser Maschine melden
+          <i className="bi bi-exclamation-triangle" aria-hidden="true" /> {t('Störung an dieser Maschine melden')}
         </Link>
       </section>
     );
@@ -374,9 +377,9 @@ function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell,
   const gestoert = maschinenHier.filter((m) => m.offen > 0).sort((a, b) => b.offen - a.offen);
   return (
     <section className="karte explorer-seite" style={{ '--i': 1 }}>
-      <h2 className="abschnitt-titel">Maschinen mit Störungen</h2>
+      <h2 className="abschnitt-titel">{t('Maschinen mit Störungen')}</h2>
       {gestoert.length === 0 ? (
-        <p className="leer"><i className="bi bi-check-circle" />Alle Maschinen in diesem Gebäude laufen.</p>
+        <p className="leer"><i className="bi bi-check-circle" />{t('Alle Maschinen in diesem Gebäude laufen.')}</p>
       ) : (
         <ul className="ort-liste">
           {gestoert.map((m) => (

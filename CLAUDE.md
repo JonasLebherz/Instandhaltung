@@ -12,9 +12,9 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 ## Stand
 
 - **Live:** Die App läuft bei Vercel mit Supabase. Login funktioniert.
-- **Fertig:** alle Seiten (Übersicht mit kleiner Karte, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik, Login), Seitenleiste links, Logo, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
+- **Fertig:** alle Seiten (Übersicht mit kleiner Karte, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik mit Zoom, Datenbasis, Login), Seitenleiste links, Logo, Sprache Deutsch/Englisch, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
 - **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
-- **Getestet** gegen PostgreSQL 16 lokal: 111 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
+- **Getestet** gegen PostgreSQL 16 lokal: 138 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Statistik-Zoom gegen SQL, Datenbasis, Sprache Englisch, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
 - **Nach Schemaänderungen** muss in Supabase `schema.sql` + `testdaten.sql` erneut ausgeführt werden. Das setzt alle Daten zurück, Login-Konten bleiben erhalten.
 
 ## Team & andere KI-Assistenten
@@ -29,6 +29,7 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 npm install          # Abhängigkeiten installieren
 npm run dev          # Entwicklung auf http://localhost:3000 (braucht .env.local)
 npm run build        # Produktions-Build – vor jedem Push ausführen, muss fehlerfrei sein
+npm run texte        # fehlende englische Übersetzungen finden – muss "Alle Texte sind übersetzt." melden
 ```
 
 Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@localhost:5432/…` und `LOGIN_DEAKTIVIERT=true`.
@@ -50,13 +51,21 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
   - Pro Seite **höchstens 5 Abfragen gleichzeitig** (`max: 5` in `lib/db.js`). Bei mehr schickt postgres.js mehrere Abfragen über eine Verbindung (Pipelining), was mit dem Supabase-Pooler zu Hängern bis zum Timeout führen kann. `max_pipeline: 0` ist keine Lösung, damit scheitern Transaktionen (`UNSAFE_TRANSACTION`).
   - Die Übersicht zeigt nur eine kleine Deutschlandkarte (`components/karten/KleineKarte.js`, Klick → `/karte?werk=…`), nicht die ganze Zoom-Karte.
   - **Kein `app/loading.js`:** Damit blieben Formulare nach dem Speichern (Server-Aktion mit `redirect`) endlos hängen. Rückmeldung beim Seitenwechsel gibt stattdessen ein drehender Ring in der Seitenleiste (`useLinkStatus`).
-  - `/status` misst Login- und Datenbankzeiten und zeigt Regionen und Port (ohne Zugangsdaten). Hilfreich bei langsamen Ladezeiten.
+  - `/status` misst Login- und Datenbankzeiten und zeigt Regionen und Port (ohne Zugangsdaten). Hilfreich bei langsamen Ladezeiten. Ausführlicher und grafisch: Seite „Datenbasis“.
+- **CSS-Reihenfolge:** Bootstrap und Bootstrap Icons werden per `@import` ganz oben in `app/globals.css` geladen, nicht im Layout. Getrennte Imports hat Next.js im Build vertauscht – dann überschreibt Bootstrap unser Design (z. B. unterstrichene Links).
 - **Datenbank:** nur über `sql` aus `lib/db.js` (Bibliothek `postgres`). Werte **immer** als `${…}` im Tagged Template übergeben, nie per String-Verkettung. Dynamische Bedingungen werden aus `sql\`…\``-Bausteinen zusammengesetzt (siehe `app/auftraege/page.js`).
   - `COUNT(*)` liefert `bigint`, das kommt als String an. Deshalb immer `::int` casten. `AVG`/`ROUND` mit `::float` casten.
   - `prepare: false` wegen des Supabase-Transaction-Poolers.
 - **Zeit:** Spalten sind `TIMESTAMPTZ`. Angezeigt wird immer in Europe/Berlin über `lib/format.js`. Eingaben aus `datetime-local` gehen über `berlinZuDate()`, Werte für Eingabefelder über `fuerDatetimeInput()`. In SQL `AT TIME ZONE 'Europe/Berlin'` für Monatsgruppierungen.
 - **Hinweise nach Weiterleitung:** `flash()` (`lib/flash.js`) schreibt ein Cookie. Das Layout liest es und übergibt es an `components/FlashMeldungen.js`, das es anzeigt und löscht.
-- **Sprache:** Oberfläche, Bezeichner, Kommentare und Doku sind auf **Deutsch**. Der Code ist ausführlich kommentiert, weil er in der Projektdoku erklärt wird.
+- **Sprache:** Bezeichner, Kommentare und Doku sind auf **Deutsch**. Der Code ist ausführlich kommentiert, weil er in der Projektdoku erklärt wird.
+- **Oberfläche zweisprachig (Deutsch/Englisch):** Jeder sichtbare Text läuft über `t('Deutscher Text')`. Der deutsche Text ist der Schlüssel, die englische Fassung steht in `lib/sprache/en.js`.
+  - Server-Komponenten und Server-Aktionen: `const t = await uebersetzer()` aus `lib/sprache/server.js`. Seitentitel: `export const generateMetadata = () => seitentitel('Titel')`.
+  - Client-Komponenten: `const t = useT()` aus `components/SpracheKontext.js`.
+  - Platzhalter: `t('{n} Maschinen', { n })`. Texte in festen Listen mit `T('…')` markieren und beim Anzeigen `t(text)`. Gleiches Wort, andere Bedeutung: Zusatz nach `|`, z. B. `t('Gebäude|Schritt')`.
+  - Feste Wertelisten (Status, Priorität, Ursache, Maschinentyp, Schicht) bleiben in der Datenbank deutsch und werden bei der Anzeige mit `t(wert)` übersetzt, `gross()` macht den ersten Buchstaben groß. Freie Daten (Namen, Beschreibungen) werden nicht übersetzt.
+  - Datum und Zahlen: `datumZeit(wert, t.sprache)`, `zahl(wert, 1, t.sprache)` usw. (`lib/format.js`).
+  - Gewählt wird im Cookie `sprache` (Seitenleiste unten, Login-Seite). Nach neuen Texten `npm run texte` ausführen und fehlende Einträge in `en.js` ergänzen.
 - **Abhängigkeiten** sind exakt gepinnt (`--save-exact`). `postcss` ist per `overrides` auf eine gepatchte Version gesetzt. Nach Änderungen `npm audit --omit=dev` ausführen.
 
 ## Störungskarte
@@ -72,9 +81,22 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 - **Melden sieht bewusst anders aus als die Störungskarte:** warmer Orange-Ton, Schritt-Leiste `components/karten/MeldeSchritte.js` (1 Werk → 2 Gebäude → 3 Maschine → 4 Beschreibung) statt Pfad, und **keine Störungszahlen**: `DeutschlandKarte`, `Lageplan` und `Grundriss` bekommen `neutral` (Ortsmarken, Farbe `stufe-neutral`), Legende und Zahlen in den Listen entfallen. CSS: Abschnitt 5 in `app/globals.css` (`.explorer-melden`).
 - Melden: `app/melden/MeldeAssistent.js` (erst Karte, nach Wahl der Maschine das Formular; „Ändern“ öffnet die Karte im Gebäude der Maschine) und `MeldeFormular.js` (sendet `maschine_id` als verstecktes Feld). `?maschine=<id>` springt direkt zum Formular, `?standort=<id>` startet im Werk.
 
+## Statistik (`app/statistik/`)
+
+- `page.js` lädt die Störmeldungen des Zeitraums **einmal** (mit Monat, Wochentag, Stunde nach deutscher Zeit, Reparatur- und Ausfallminuten), dazu Maschinen mit Gebäude/Standort, verbaute Ersatzteile und Techniker (4 Abfragen).
+- `StatistikExplorer.js` rechnet im Browser je Ebene (alle Standorte → Werk → Gebäude → Maschine). Kacheln „im Vergleich“ zoomen hinein, der Pfad oben heraus. Die Adresse wird per `history.replaceState` mitgeführt (`?von&bis&werk&halle&maschine`, alt: `?standort=<id>`).
+- Definitionen wie in den Views: MTTR = Ø (ende − start) erledigter Aufträge, Ausfallzeit = Σ (ende − Meldung) erledigter Aufträge, MTBF = Zeitraum / Anzahl Störungen.
+- Diagramme: `Diagramm.js` (Chart.js, eine Reihe, eine Farbe, Tabellenansicht darunter). Nie zwei y-Achsen in einem Diagramm – Anzahl und MTTR pro Monat sind zwei Diagramme. Heatmap, Prioritäten, Schichten und Ersatzteile sind HTML/CSS.
+
+## Datenbasis (`app/datenbasis/`)
+
+- `lib/datenbasis.js` liest den Aufbau live aus `pg_catalog`/`information_schema` (Tabellen, Spalten, Schlüssel, ENUMs, Anzahl Datensätze). Neue Tabellen erscheinen automatisch; ihr Platz im Diagramm steht in `PLATZ` in `Datenmodell.js` (fehlende werden hinten angefügt).
+- `Datenmodell.js` zeichnet die Fremdschlüssel als SVG-Linien zwischen den Spalten (Positionen werden gemessen). Klick öffnet Spalten und eine Vorschau über `/api/datenbasis/<tabelle>?seite=` (nur Tabellen/Views aus `public`, Name wird gegen die Liste geprüft, Bezeichner über `sql(name)`).
+- `Verbindungen.js` zeigt den Live-Status aus `/api/verbindungen`: Datenbank (Zeit, Region, Port), Supabase-Login (`/auth/v1/health`), Vercel (Systemvariablen `VERCEL_*`), GitHub (öffentliche API, 5 Min. zwischengespeichert; privat → Stand über Vercel), Claude/Codex (Kennung in Commit-Nachrichten), Power BI (Views vorhanden). Nie Zugangsdaten ausgeben.
+
 ## Seitenleiste & Logo
 
-- `components/Seitenleiste.js` ersetzt die frühere Navigation oben. Bereiche: Überblick (Übersicht, Störungskarte), Instandhaltung (Störung melden, Aufträge mit Zahl offener Aufträge), Auswertung (Statistik). Unten Darstellung und Konto (Abmelden).
+- `components/Seitenleiste.js` ersetzt die frühere Navigation oben. Bereiche: Überblick (Übersicht, Störungskarte), Instandhaltung (Störung melden, Aufträge mit Zahl offener Aufträge), Auswertung (Statistik), System (Datenbasis). Unten Sprache, Darstellung und Konto (Abmelden).
 - Zustand in `<html data-leiste="auf|zu">`, gemerkt in `localStorage` unter `seitenleiste`. Das Start-Skript in `app/layout.js` setzt ihn vor dem ersten Anzeigen (ohne Wahl: ab 1200 px offen). Die Breite steuert `--leiste-b`, der Inhalt rückt per `.app-rahmen` daneben.
 - Eingeklappt wird der Text zur Sprechblase beim Darüberfahren. Unter 768 px gibt es oben `.mobil-kopf`, die Leiste fährt dann von links herein.
 - Neue Seiten in `BEREICHE` in `Seitenleiste.js` eintragen (mit `symbol` und gefüllter Variante `symbolAktiv`).

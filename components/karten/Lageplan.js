@@ -8,6 +8,7 @@
  * neutral: beim Melden – ohne Zahlen und Farben offener Störungen.
  */
 import { stufe, offenText } from './stufe';
+import { useT } from '@/components/SpracheKontext';
 
 /** Kleine, gleichmäßig verteilte Bäume entlang des Zauns (rein dekorativ) */
 function baeume(B, T, zufahrtY) {
@@ -18,6 +19,7 @@ function baeume(B, T, zufahrtY) {
 }
 
 export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehle, neutral = false }) {
+  const t = useT();
   const B = standort.gelaende_breite_m;
   const T = standort.gelaende_tiefe_m;
   const prozent = (wert, gesamt) => `${(wert / gesamt) * 100}%`;
@@ -59,8 +61,8 @@ export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehl
           {/* Bäume */}
           {baeume(B, T, zufahrtY).map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="3" className="plan-baum" />)}
         </svg>
-        <span className="plan-beschriftung" style={{ left: '50%', top: prozent(zufahrtY - 3, T) }}>Zufahrt · Tor</span>
-        <span className="plan-beschriftung" style={{ left: prozent(B - parkplatzBreite / 2 - 10, B), top: prozent(zufahrtY - 3, T) }}>Parkplatz</span>
+        <span className="plan-beschriftung" style={{ left: '50%', top: prozent(zufahrtY - 3, T) }}>{t('Zufahrt · Tor')}</span>
+        <span className="plan-beschriftung" style={{ left: prozent(B - parkplatzBreite / 2 - 10, B), top: prozent(zufahrtY - 3, T) }}>{t('Parkplatz')}</span>
         {gebaeude.map((g, i) => {
           const farbe = neutral ? 'neutral' : stufe(g.offen, g.hoechste_prioritaet);
           return (
@@ -70,11 +72,11 @@ export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehl
                       left: prozent(g.lage_x_m, B), top: prozent(g.lage_y_m, T),
                       width: prozent(g.breite_m, B), height: prozent(g.tiefe_m, T), '--i': i,
                     }}
-                    aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen)}`}
+                    aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen, t)}`}
                     data-ort={`g-${g.id}`}>
               <span className="gebaeude-kuerzel">{g.kuerzel}</span>
               <span className="gebaeude-name">{g.bezeichnung.split('–').pop().trim()}</span>
-              <span className="gebaeude-info">{g.maschinen} Maschinen</span>
+              <span className="gebaeude-info">{t('{n} Maschinen', { n: g.maschinen })}</span>
               {!neutral && <span className={`zaehl-marke stufe-${farbe}`}>{g.offen > 0 ? g.offen : <i className="bi bi-check-lg" />}</span>}
             </button>
           );

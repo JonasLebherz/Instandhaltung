@@ -14,9 +14,11 @@ import KartenExplorer from '@/components/karten/KartenExplorer';
 import MeldeSchritte from '@/components/karten/MeldeSchritte';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeFormular from './MeldeFormular';
+import { useT } from '@/components/SpracheKontext';
 
 export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, vorauswahlStandort }) {
   const { standorte, gebaeude, maschinen } = daten;
+  const t = useT();
   const [maschineId, setMaschineId] = useState(vorauswahlMaschine);
   // Wo die Karte beginnt: beim vorgewählten Werk oder (nach "Ändern") im Gebäude der Maschine
   const [kartenStart, setKartenStart] = useState({ standortId: vorauswahlStandort });
@@ -51,7 +53,7 @@ export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, 
             <span className="text-leise"> · {maschine.anlagennummer} · {werk.name} · {halle.bezeichnung}</span>
           </span>
           <button type="button" className="btn btn-sekundaer btn-klein ms-auto" onClick={() => aendern(3)}>
-            <i className="bi bi-pencil" aria-hidden="true" /> Ändern
+            <i className="bi bi-pencil" aria-hidden="true" /> {t('Ändern')}
           </button>
         </div>
         <MeldeFormular maschineId={maschine.id} startwerte={startwerte} jetzt={startwerte.zeitpunkt} />

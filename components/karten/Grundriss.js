@@ -12,6 +12,7 @@
  */
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import { stufe, offenText } from './stufe';
+import { useT } from '@/components/SpracheKontext';
 
 /**
  * Einrichtung der Nebenbereiche (nur gezeichnet): Regale im Material- bzw.
@@ -46,6 +47,7 @@ function Einrichtung({ bereich }) {
 }
 
 export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWaehle, neutral = false }) {
+  const t = useT();
   const B = gebaeude.breite_m;
   const T = gebaeude.tiefe_m;
   const bereiche = gebaeude.bereiche ?? [];
@@ -70,7 +72,7 @@ export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWae
             <g key={b.name}>
               <rect x={b.x} y={b.y} width={b.b} height={b.t} className="plan-bereich" />
               {b !== haupt && <Einrichtung bereich={b} />}
-              <text x={b.x + 1.4} y={b.y + 2.6} className="plan-bereich-name">{b.name.toUpperCase()}</text>
+              <text x={b.x + 1.4} y={b.y + 2.6} className="plan-bereich-name">{t(b.name).toUpperCase()}</text>
             </g>
           ))}
 
@@ -96,7 +98,7 @@ export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWae
                     onClick={(e) => onWaehle?.(m, e)}
                     data-ort={`m-${m.id}`}
                     aria-pressed={auswahlId === m.id}
-                    aria-label={neutral ? `${m.bezeichnung} (${m.anlagennummer})` : `${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen)}`}
+                    aria-label={neutral ? `${m.bezeichnung} (${m.anlagennummer})` : `${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen, t)}`}
                     title={`${m.bezeichnung} · ${m.anlagennummer}`}>
               <i className={`bi ${MASCHINEN_SYMBOLE[m.typ] ?? 'bi-gear'}`} aria-hidden="true" />
               <span className="maschine-modell">{modell}</span>

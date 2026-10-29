@@ -4,13 +4,16 @@
  * Enthält <html>, <head>, die Seitenleiste links, die Hinweise (Flash-Meldungen)
  * und die Fußzeile. Der eigentliche Seiteninhalt wird als "children" eingesetzt.
  */
-import 'bootstrap/dist/css/bootstrap.min.css';      // Raster (row/col) und Formular-Grundlagen
-import 'bootstrap-icons/font/bootstrap-icons.min.css'; // dezente Symbole
-import './globals.css';                              // eigenes Design (überschreibt Bootstrap)
+// Eigenes Design. Bootstrap (Raster, Formular-Grundlagen) und Bootstrap Icons werden
+// ganz oben in globals.css per @import geladen – so steht die Reihenfolge fest und
+// unser Design überschreibt Bootstrap immer (getrennte Imports hat Next.js teils vertauscht).
+import './globals.css';
 
 import Seitenleiste from '@/components/Seitenleiste';
 import FlashMeldungen from '@/components/FlashMeldungen';
+import { SpracheProvider } from '@/components/SpracheKontext';
 import { aktuellerBenutzer } from '@/lib/auth';
+import { aktuelleSprache, uebersetzer } from '@/lib/sprache/server';
 import { cookies } from 'next/headers';
 
 /** Hinweise aus dem Cookie "flash" lesen (siehe lib/flash.js) */
@@ -22,10 +25,14 @@ async function flashLesen() {
   }
 }
 
-export const metadata = {
-  title: { default: 'Instandhaltung', template: '%s · Instandhaltung' },
-  description: 'Instandhaltungsmanagement – Störungen melden, Aufträge bearbeiten, Kennzahlen auswerten',
-};
+// Titel und Beschreibung in der gewählten Sprache (Seitentitel: siehe generateMetadata der Seiten)
+export async function generateMetadata() {
+  const t = await uebersetzer();
+  return {
+    title: { default: t('Instandhaltung'), template: `%s · ${t('Instandhaltung')}` },
+    description: t('Instandhaltungsmanagement – Störungen melden, Aufträge bearbeiten, Kennzahlen auswerten'),
+  };
+}
 
 export const viewport = {
   width: 'device-width',
@@ -57,14 +64,18 @@ const startSkript = `
 export default async function RootLayout({ children }) {
   const benutzer = await aktuellerBenutzer();
   const flashMeldungen = await flashLesen();
+  const sprache = await aktuelleSprache();
+  const t = await uebersetzer();
 
   return (
     // suppressHydrationWarning: data-theme und data-leiste werden vom Skript oben gesetzt, nicht von React
-    <html lang="de" data-theme="light" data-bs-theme="light" suppressHydrationWarning>
+    <html lang={sprache} data-theme="light" data-bs-theme="light" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: startSkript }} />
       </head>
       <body>
+        {/* Sprache für alle Client-Komponenten (useT) */}
+        <SpracheProvider sprache={sprache}>
         {benutzer ? (
           <>
             <Seitenleiste benutzer={benutzer} />
@@ -76,7 +87,7 @@ export default async function RootLayout({ children }) {
               </main>
               <footer className="app-footer">
                 <div className="container">
-                  Instandhaltung · Hochschulprojekt „Company database“ · Digital Production
+                  {t('Instandhaltung · Hochschulprojekt „Company database“ · Digital Production')}
                 </div>
               </footer>
             </div>
@@ -84,6 +95,7 @@ export default async function RootLayout({ children }) {
         ) : (
           children /* Login-Seite: ohne Seitenleiste */
         )}
+        </SpracheProvider>
       </body>
     </html>
   );

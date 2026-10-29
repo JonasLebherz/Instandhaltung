@@ -15,12 +15,15 @@ import { benutzerPflicht } from '@/lib/auth';
 import { STATUS_WERTE, PRIORITAET_WERTE } from '@/lib/konstanten';
 import { datumZeit } from '@/lib/format';
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
+import { uebersetzer, seitentitel } from '@/lib/sprache/server';
+import { gross } from '@/lib/sprache';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Aufträge' };
+export const generateMetadata = () => seitentitel('Aufträge');
 
 export default async function AuftraegeSeite({ searchParams }) {
   await benutzerPflicht();
+  const t = await uebersetzer();
   const parameter = await searchParams;
 
   /* ---------- Filterwerte prüfen: ungültige Werte werden ignoriert ---------- */
@@ -82,39 +85,39 @@ export default async function AuftraegeSeite({ searchParams }) {
     <>
       <div className="seitenkopf d-flex justify-content-between align-items-end flex-wrap gap-3">
         <div>
-          <h1>Aufträge</h1>
-          <p>{auftraege.length} {auftraege.length === 1 ? 'Meldung' : 'Meldungen'}{filterAktiv ? ' (gefiltert)' : ''}</p>
+          <h1>{t('Aufträge')}</h1>
+          <p>{auftraege.length === 1 ? t('1 Meldung') : t('{n} Meldungen', { n: auftraege.length })}{filterAktiv ? ` ${t('(gefiltert)')}` : ''}</p>
         </div>
-        <Link href="/melden" className="btn btn-primary"><i className="bi bi-plus-lg" aria-hidden="true" /> Neue Störung melden</Link>
+        <Link href="/melden" className="btn btn-primary"><i className="bi bi-plus-lg" aria-hidden="true" /> {t('Neue Störung melden')}</Link>
       </div>
 
       {/* Filterleiste: ein normales GET-Formular – funktioniert auch ohne JavaScript */}
       <form method="get" className="karte" style={{ '--i': 0 }}>
         <div className="filterleiste">
           <div style={{ flexBasis: 240 }}>
-            <label htmlFor="f-suche" className="form-label">Suche</label>
+            <label htmlFor="f-suche" className="form-label">{t('Suche')}</label>
             <input id="f-suche" name="suche" type="search" className="form-control" defaultValue={filter.suche}
-                   placeholder="in der Beschreibung …" />
+                   placeholder={t('in der Beschreibung …')} />
           </div>
           <div>
-            <label htmlFor="f-status" className="form-label">Status</label>
+            <label htmlFor="f-status" className="form-label">{t('Status')}</label>
             <select id="f-status" name="status" className="form-select" defaultValue={filter.status}>
-              <option value="">Alle</option>
-              <option value="offen">Alle offenen</option>
-              {STATUS_WERTE.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              <option value="">{t('Alle')}</option>
+              <option value="offen">{t('Alle offenen')}</option>
+              {STATUS_WERTE.map((s) => <option key={s} value={s}>{gross(t(s))}</option>)}
             </select>
           </div>
           <div>
-            <label htmlFor="f-standort" className="form-label">Standort</label>
+            <label htmlFor="f-standort" className="form-label">{t('Standort')}</label>
             <select id="f-standort" name="standort" className="form-select" defaultValue={filter.standort}>
-              <option value="">Alle</option>
+              <option value="">{t('Alle')}</option>
               {standorte.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
             </select>
           </div>
           <div>
-            <label htmlFor="f-maschine" className="form-label">Maschine</label>
+            <label htmlFor="f-maschine" className="form-label">{t('Maschine')}</label>
             <select id="f-maschine" name="maschine" className="form-select" defaultValue={filter.maschine}>
-              <option value="">Alle</option>
+              <option value="">{t('Alle')}</option>
               {Object.entries(maschinenNachStandort).map(([standort, liste]) => (
                 <optgroup key={standort} label={standort}>
                   {liste.map((m) => <option key={m.id} value={m.id}>{m.anlagennummer} – {m.bezeichnung}</option>)}
@@ -123,15 +126,15 @@ export default async function AuftraegeSeite({ searchParams }) {
             </select>
           </div>
           <div>
-            <label htmlFor="f-prio" className="form-label">Priorität</label>
+            <label htmlFor="f-prio" className="form-label">{t('Priorität')}</label>
             <select id="f-prio" name="prioritaet" className="form-select" defaultValue={filter.prioritaet}>
-              <option value="">Alle</option>
-              {PRIORITAET_WERTE.map((p) => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+              <option value="">{t('Alle')}</option>
+              {PRIORITAET_WERTE.map((p) => <option key={p} value={p}>{gross(t(p))}</option>)}
             </select>
           </div>
           <div className="aktionen">
-            <button type="submit" className="btn btn-primary"><i className="bi bi-funnel" aria-hidden="true" /> Filtern</button>
-            {filterAktiv && <Link href="/auftraege" className="btn btn-sekundaer">Zurücksetzen</Link>}
+            <button type="submit" className="btn btn-primary"><i className="bi bi-funnel" aria-hidden="true" /> {t('Filtern')}</button>
+            {filterAktiv && <Link href="/auftraege" className="btn btn-sekundaer">{t('Zurücksetzen')}</Link>}
           </div>
         </div>
       </form>
@@ -139,19 +142,19 @@ export default async function AuftraegeSeite({ searchParams }) {
       {/* Ergebnisliste */}
       <section className="karte" style={{ '--i': 1 }}>
         {auftraege.length === 0 ? (
-          <p className="leer"><i className="bi bi-search text-leise" />Keine Meldungen gefunden. Passen Sie ggf. die Filter an.</p>
+          <p className="leer"><i className="bi bi-search text-leise" />{t('Keine Meldungen gefunden. Passen Sie ggf. die Filter an.')}</p>
         ) : (
           <div className="tabelle-rahmen">
             <table className="tabelle">
               <thead>
                 <tr>
-                  <th className="zahl">Nr.</th>
-                  <th>Maschine / Ort</th>
-                  <th className="d-none d-lg-table-cell">Ursache</th>
-                  <th>Priorität</th>
-                  <th>Status</th>
-                  <th className="d-none d-lg-table-cell">Techniker</th>
-                  <th className="d-none d-md-table-cell">Gemeldet</th>
+                  <th className="zahl">{t('Nr.')}</th>
+                  <th>{t('Maschine / Ort')}</th>
+                  <th className="d-none d-lg-table-cell">{t('Ursache')}</th>
+                  <th>{t('Priorität')}</th>
+                  <th>{t('Status')}</th>
+                  <th className="d-none d-lg-table-cell">{t('Techniker')}</th>
+                  <th className="d-none d-md-table-cell">{t('Gemeldet')}</th>
                   <th className="d-none d-md-table-cell" aria-hidden="true" />
                 </tr>
               </thead>
@@ -164,7 +167,7 @@ export default async function AuftraegeSeite({ searchParams }) {
                       <div className="klein">{a.stadt} · {a.gebaeude} · {a.anlagennummer}</div>
                       <div className="klein text-truncate beschreibung-kurz">{a.beschreibung}</div>
                     </td>
-                    <td className="d-none d-lg-table-cell klein">{a.ursache_kategorie}</td>
+                    <td className="d-none d-lg-table-cell klein">{t(a.ursache_kategorie)}</td>
                     <td><PrioritaetPill prioritaet={a.prioritaet} /></td>
                     <td>
                       <StatusPill status={a.status} />
@@ -172,7 +175,7 @@ export default async function AuftraegeSeite({ searchParams }) {
                       {a.techniker && <div className="klein mt-1 d-lg-none">{a.techniker}</div>}
                     </td>
                     <td className="d-none d-lg-table-cell klein">{a.techniker ?? '–'}</td>
-                    <td className="d-none d-md-table-cell klein">{datumZeit(a.zeitpunkt)}</td>
+                    <td className="d-none d-md-table-cell klein">{datumZeit(a.zeitpunkt, t.sprache)}</td>
                     <td className="d-none d-md-table-cell"><i className="bi bi-chevron-right zeilen-pfeil" /></td>
                   </tr>
                 ))}

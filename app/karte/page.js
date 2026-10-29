@@ -14,9 +14,10 @@ import { benutzerPflicht } from '@/lib/auth';
 import { alleKartenDaten } from '@/lib/karten/daten';
 import KartenExplorer from '@/components/karten/KartenExplorer';
 import Kennzahl from '@/components/Kennzahl';
+import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Störungskarte' };
+export const generateMetadata = () => seitentitel('Störungskarte');
 
 /**
  * Startebene aus der Adresse ermitteln. Unbekannte Werte werden ignoriert.
@@ -38,6 +39,7 @@ function startAusAdresse(parameter, daten) {
 
 export default async function KartenSeite({ searchParams }) {
   await benutzerPflicht();
+  const t = await uebersetzer();
   const parameter = await searchParams;
   const daten = await alleKartenDaten();
   const { standorte } = daten;
@@ -49,26 +51,26 @@ export default async function KartenSeite({ searchParams }) {
   return (
     <>
       <div className="seitenkopf">
-        <h1>Störungskarte</h1>
-        <p>{standorte.length} Standorte in Deutschland – Werk anklicken, um hineinzuzoomen.</p>
+        <h1>{t('Störungskarte')}</h1>
+        <p>{t('{n} Standorte in Deutschland – Werk anklicken, um hineinzuzoomen.', { n: standorte.length })}</p>
       </div>
 
       <KartenExplorer daten={daten} start={startAusAdresse(parameter, daten)} adresseMitfuehren />
 
       <div className="row g-4 mt-0">
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Offene Störungen" wert={offenGesamt} zusatz="an allen Standorten" symbol="bi-exclamation-circle"
+          <Kennzahl titel={t('Offene Störungen')} wert={offenGesamt} zusatz={t('an allen Standorten')} symbol="bi-exclamation-circle"
                     link="/auftraege?status=offen" i={2} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Priorität hoch" wert={hochGesamt} zusatz="sofort bearbeiten" symbol="bi-lightning-charge"
+          <Kennzahl titel={t('Priorität hoch')} wert={hochGesamt} zusatz={t('sofort bearbeiten')} symbol="bi-lightning-charge"
                     art={hochGesamt > 0 ? 'rot' : ''} link="/auftraege?status=offen&prioritaet=hoch" i={3} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Betroffene Werke" wert={betroffen} zusatz={`von ${standorte.length} Standorten`} symbol="bi-buildings" i={4} />
+          <Kennzahl titel={t('Betroffene Werke')} wert={betroffen} zusatz={t('von {n} Standorten', { n: standorte.length })} symbol="bi-buildings" i={4} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Ohne Störung" wert={standorte.length - betroffen} zusatz="alles läuft" symbol="bi-check2-circle" art="gruen" i={5} />
+          <Kennzahl titel={t('Ohne Störung')} wert={standorte.length - betroffen} zusatz={t('alles läuft')} symbol="bi-check2-circle" art="gruen" i={5} />
         </div>
       </div>
     </>

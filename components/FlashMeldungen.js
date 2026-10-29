@@ -9,10 +9,12 @@
  * bleiben stehen, bis man sie schließt.
  */
 import { useEffect, useState } from 'react';
+import { useT } from './SpracheKontext';
 
 const SYMBOLE = { erfolg: 'bi-check-circle-fill', hinweis: 'bi-exclamation-triangle-fill', fehler: 'bi-x-circle-fill' };
 
 export default function FlashMeldungen({ neu = [] }) {
+  const t = useT();
   const [meldungen, setMeldungen] = useState([]);
   const schluessel = JSON.stringify(neu);
 
@@ -41,7 +43,7 @@ export default function FlashMeldungen({ neu = [] }) {
     <div key={m.id} className={`hinweis hinweis-${m.typ}${m.weg ? ' verschwindet' : ''}`} role="status">
       <i className={`bi ${SYMBOLE[m.typ] ?? SYMBOLE.hinweis}`} aria-hidden="true" />
       <span className="hinweis-text">{m.text}</span>
-      <button type="button" className="schliessen" aria-label="Hinweis schließen" onClick={() => schliessen(m.id)}>
+      <button type="button" className="schliessen" aria-label={t('Hinweis schließen')} onClick={() => schliessen(m.id)}>
         <i className="bi bi-x" />
       </button>
     </div>

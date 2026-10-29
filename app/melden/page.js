@@ -11,12 +11,14 @@ import { benutzerPflicht } from '@/lib/auth';
 import { fuerDatetimeInput } from '@/lib/format';
 import { standorteMitZahlen, gebaeudeMitZahlen, maschinenMitZahlen } from '@/lib/karten/daten';
 import MeldeAssistent from './MeldeAssistent';
+import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Störung melden' };
+export const generateMetadata = () => seitentitel('Störung melden');
 
 export default async function MeldenSeite({ searchParams }) {
   const benutzer = await benutzerPflicht();
+  const t = await uebersetzer();
   const parameter = await searchParams;
   const [standorte, gebaeude, maschinen] = await Promise.all([
     standorteMitZahlen(), gebaeudeMitZahlen(), maschinenMitZahlen(),
@@ -42,8 +44,8 @@ export default async function MeldenSeite({ searchParams }) {
       <div className="seitenkopf seitenkopf-melden">
         <span className="melde-symbol" aria-hidden="true"><i className="bi bi-exclamation-triangle-fill" /></span>
         <div>
-          <h1>Störung melden</h1>
-          <p>In vier Schritten: Werk, Gebäude und Maschine antippen – dann kurz beschreiben, was passiert ist.</p>
+          <h1>{t('Störung melden')}</h1>
+          <p>{t('In vier Schritten: Werk, Gebäude und Maschine antippen – dann kurz beschreiben, was passiert ist.')}</p>
         </div>
       </div>
       <MeldeAssistent daten={daten} startwerte={startwerte}

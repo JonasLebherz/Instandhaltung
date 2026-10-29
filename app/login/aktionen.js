@@ -9,13 +9,15 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { supabaseServer } from '@/lib/supabase/server';
+import { uebersetzer } from '@/lib/sprache/server';
 
 export async function anmelden(vorherigerZustand, formular) {
+  const t = await uebersetzer();
   const email = String(formular.get('email') ?? '').trim();
   const passwort = String(formular.get('passwort') ?? '');
 
   if (!email || !passwort) {
-    return { fehler: 'Bitte E-Mail-Adresse und Passwort eingeben.', email };
+    return { fehler: t('Bitte E-Mail-Adresse und Passwort eingeben.'), email };
   }
 
   let error;
@@ -32,15 +34,15 @@ export async function anmelden(vorherigerZustand, formular) {
 
     if (error.code === 'invalid_credentials') {
       // Absichtlich ungenau: verrät nicht, ob es die E-Mail-Adresse gibt
-      return { fehler: 'E-Mail-Adresse oder Passwort ist falsch.', email };
+      return { fehler: t('E-Mail-Adresse oder Passwort ist falsch.'), email };
     }
     if (error.code === 'email_not_confirmed') {
-      return { fehler: 'Dieses Konto ist noch nicht bestätigt. In Supabase beim Anlegen „Auto Confirm User“ anhaken.', email };
+      return { fehler: t('Dieses Konto ist noch nicht bestätigt. In Supabase beim Anlegen „Auto Confirm User“ anhaken.'), email };
     }
     // Alles andere ist meist ein Einrichtungsproblem (falsche URL oder falscher Schlüssel)
     return {
-      fehler: 'Anmeldung zurzeit nicht möglich – die Verbindung zu Supabase ist fehlerhaft eingerichtet '
-        + `(SUPABASE_URL / SUPABASE_ANON_KEY prüfen). Technischer Hinweis: ${error.status ?? ''} ${error.code ?? error.message ?? ''}`.trim(),
+      fehler: `${t('Anmeldung zurzeit nicht möglich – die Verbindung zu Supabase ist fehlerhaft eingerichtet (SUPABASE_URL / SUPABASE_ANON_KEY prüfen). Technischer Hinweis:')} `
+        + `${error.status ?? ''} ${error.code ?? error.message ?? ''}`.trim(),
       email,
     };
   }

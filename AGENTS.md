@@ -13,7 +13,8 @@ Jeder Push nach GitHub wird von Vercel automatisch veröffentlicht. Deshalb vor 
 
 ## Regeln
 
-- Oberfläche, Bezeichner, Kommentare und Doku sind auf **Deutsch**. Der Code wird ausführlich kommentiert, weil er in der Projektdoku erklärt wird.
+- Bezeichner, Kommentare und Doku sind auf **Deutsch**. Der Code wird ausführlich kommentiert, weil er in der Projektdoku erklärt wird.
+- Die Oberfläche gibt es auf Deutsch und Englisch: Jeden sichtbaren Text mit `t('Deutscher Text')` ausgeben (Server: `await uebersetzer()`, Client: `useT()`), die englische Fassung in `lib/sprache/en.js` eintragen und `npm run texte` ausführen. Details in `CLAUDE.md` unter „Oberfläche zweisprachig“.
 - Datenbankzugriff nur über `sql` aus `lib/db.js`. Werte **immer** als `${…}` im Tagged Template übergeben, nie in SQL-Strings einbauen. `COUNT(*)` mit `::int` casten.
 - Seiten sind Server-Komponenten (`app/**/page.js`) und rufen zuerst `await benutzerPflicht()` auf.
 - Datenänderungen laufen nur über Server-Aktionen in `app/aktionen.js`: erst Login prüfen, dann Eingaben prüfen (`{ fehler, eingabe }` zurückgeben), dann speichern (bei mehreren Schritten in `sql.begin`), dann `flash()`, `revalidatePath('/', 'layout')` und `redirect()`.
@@ -22,5 +23,6 @@ Jeder Push nach GitHub wird von Vercel automatisch veröffentlicht. Deshalb vor 
 - Design: Farben nur über die CSS-Variablen in `app/globals.css`, jeweils hell **und** dunkel. Karten mit `.karte`, Status als Pills (`components/Pills.js`). Animationen müssen bei `prefers-reduced-motion` aus sein.
 - Störungskarte (`app/karte/`, `components/karten/`): Eine Zoom-Karte (`KartenExplorer.js`) für Deutschland → Werk → Gebäude, ohne Neuladen. Positionen kommen in Metern aus der Datenbank und werden prozentual über ein SVG gelegt. Details stehen in `CLAUDE.md` unter „Störungskarte“.
 - Navigation: Seitenleiste links (`components/Seitenleiste.js`). Neue Seiten dort in `BEREICHE` eintragen. Details in `CLAUDE.md` unter „Seitenleiste & Logo“.
+- Statistik (`app/statistik/`) und Datenbasis (`app/datenbasis/`): Aufbau in `CLAUDE.md` in den gleichnamigen Abschnitten. Pro Seite höchstens 5 Datenbankabfragen gleichzeitig.
 - Strukturänderungen an der Datenbank als Migrationsdatei `supabase/migrationen/NNN_beschreibung.sql` anlegen. Vorhandene Daten müssen erhalten bleiben, denn die Datenbank läuft produktiv. Zusätzlich `supabase/schema.sql` **und** passend `supabase/testdaten.sql` nachziehen. Neue Tabellen bekommen `ENABLE ROW LEVEL SECURITY`, neue Views `WITH (security_invoker = true)`.
 - Zugangsdaten nie in den Code oder ins Repository. Sie gehören in `.env.local` bzw. zu Vercel.

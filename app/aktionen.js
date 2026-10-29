@@ -22,6 +22,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
+import { uebersetzer } from '@/lib/sprache/server';
 import { flash } from '@/lib/flash';
 import { berlinZuDate, datumZeit } from '@/lib/format';
 import { URSACHEN_LISTE, PRIORITAET_WERTE, STATUS_WERTE } from '@/lib/konstanten';
@@ -39,6 +40,7 @@ function ganzzahl(text) {
  * ================================================================== */
 export async function meldungAnlegen(vorherigerZustand, formular) {
   await benutzerPflicht();
+  const t = await uebersetzer();   // Meldungen in der gewählten Sprache
 
   const eingabe = {
     maschine_id: feld(formular, 'maschine_id'),
@@ -53,30 +55,30 @@ export async function meldungAnlegen(vorherigerZustand, formular) {
   // Maschine: muss eine existierende Maschine sein
   const maschineId = ganzzahl(eingabe.maschine_id);
   if (eingabe.maschine_id === '') {
-    fehler.maschine_id = 'Bitte eine Maschine auswählen.';
+    fehler.maschine_id = t('Bitte eine Maschine auswählen.');
   } else {
     const [treffer] = maschineId ? await sql`SELECT id FROM maschine WHERE id = ${maschineId}` : [];
-    if (!treffer) fehler.maschine_id = 'Die gewählte Maschine existiert nicht.';
+    if (!treffer) fehler.maschine_id = t('Die gewählte Maschine existiert nicht.');
   }
 
   // Name der meldenden Person
-  if (eingabe.gemeldet_von === '') fehler.gemeldet_von = 'Bitte Ihren Namen angeben.';
-  else if (eingabe.gemeldet_von.length > 100) fehler.gemeldet_von = 'Der Name darf höchstens 100 Zeichen lang sein.';
+  if (eingabe.gemeldet_von === '') fehler.gemeldet_von = t('Bitte Ihren Namen angeben.');
+  else if (eingabe.gemeldet_von.length > 100) fehler.gemeldet_von = t('Der Name darf höchstens 100 Zeichen lang sein.');
 
   // Zeitpunkt: gültig und nicht in der Zukunft (5 Minuten Toleranz)
   const zeitpunkt = berlinZuDate(eingabe.zeitpunkt);
-  if (!zeitpunkt) fehler.zeitpunkt = 'Bitte einen gültigen Zeitpunkt angeben.';
-  else if (zeitpunkt.getTime() > Date.now() + 5 * 60000) fehler.zeitpunkt = 'Der Zeitpunkt darf nicht in der Zukunft liegen.';
+  if (!zeitpunkt) fehler.zeitpunkt = t('Bitte einen gültigen Zeitpunkt angeben.');
+  else if (zeitpunkt.getTime() > Date.now() + 5 * 60000) fehler.zeitpunkt = t('Der Zeitpunkt darf nicht in der Zukunft liegen.');
 
   // Beschreibung: aussagekräftig, aber nicht endlos
   const laenge = eingabe.beschreibung.length;
-  if (laenge === 0) fehler.beschreibung = 'Bitte die Störung beschreiben.';
-  else if (laenge < 10) fehler.beschreibung = 'Die Beschreibung ist zu kurz (mindestens 10 Zeichen).';
-  else if (laenge > 1000) fehler.beschreibung = 'Die Beschreibung darf höchstens 1000 Zeichen lang sein.';
+  if (laenge === 0) fehler.beschreibung = t('Bitte die Störung beschreiben.');
+  else if (laenge < 10) fehler.beschreibung = t('Die Beschreibung ist zu kurz (mindestens 10 Zeichen).');
+  else if (laenge > 1000) fehler.beschreibung = t('Die Beschreibung darf höchstens 1000 Zeichen lang sein.');
 
   // Ursache und Priorität: nur Werte aus den festen Listen
-  if (!URSACHEN_LISTE.includes(eingabe.ursache_kategorie)) fehler.ursache_kategorie = 'Bitte eine Ursache auswählen.';
-  if (!PRIORITAET_WERTE.includes(eingabe.prioritaet)) fehler.prioritaet = 'Bitte eine Priorität auswählen.';
+  if (!URSACHEN_LISTE.includes(eingabe.ursache_kategorie)) fehler.ursache_kategorie = t('Bitte eine Ursache auswählen.');
+  if (!PRIORITAET_WERTE.includes(eingabe.prioritaet)) fehler.prioritaet = t('Bitte eine Priorität auswählen.');
 
   if (Object.keys(fehler).length > 0) {
     return { fehler, eingabe };
@@ -98,10 +100,10 @@ export async function meldungAnlegen(vorherigerZustand, formular) {
     });
   } catch (fehlerObjekt) {
     console.error(fehlerObjekt);
-    return { fehler: { allgemein: 'Die Meldung konnte nicht gespeichert werden. Bitte erneut versuchen.' }, eingabe };
+    return { fehler: { allgemein: t('Die Meldung konnte nicht gespeichert werden. Bitte erneut versuchen.') }, eingabe };
   }
 
-  await flash('erfolg', `Störmeldung Nr. ${meldungId} wurde erfasst. Die Instandhaltung ist informiert.`);
+  await flash('erfolg', t('Störmeldung Nr. {n} wurde erfasst. Die Instandhaltung ist informiert.', { n: meldungId }));
   revalidatePath('/', 'layout');
   redirect('/');
 }
@@ -117,6 +119,7 @@ export async function meldungAnlegen(vorherigerZustand, formular) {
  * ================================================================== */
 export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
   await benutzerPflicht();
+  const t = await uebersetzer();   // Meldungen in der gewählten Sprache
 
   const eingabe = {
     techniker_id: feld(formular, 'techniker_id'),
@@ -131,7 +134,7 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
     SELECT w.id, s.zeitpunkt FROM wartungsauftrag w
     JOIN stoermeldung s ON s.id = w.stoermeldung_id
     WHERE w.id = ${auftragId}`;
-  if (!auftrag) return { fehler: { allgemein: 'Der Auftrag wurde nicht gefunden.' }, eingabe };
+  if (!auftrag) return { fehler: { allgemein: t('Der Auftrag wurde nicht gefunden.') }, eingabe };
 
   // Techniker: leer oder ein existierender Techniker
   let technikerId = null;
@@ -139,12 +142,12 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
     const id = ganzzahl(eingabe.techniker_id);
     const [treffer] = id ? await sql`SELECT id FROM techniker WHERE id = ${id}` : [];
     if (treffer) technikerId = id;
-    else fehler.techniker_id = 'Der gewählte Techniker existiert nicht.';
+    else fehler.techniker_id = t('Der gewählte Techniker existiert nicht.');
   }
 
   // Status: nur erlaubte Werte
   let status = eingabe.status;
-  if (!STATUS_WERTE.includes(status)) fehler.status = 'Ungültiger Status.';
+  if (!STATUS_WERTE.includes(status)) fehler.status = t('Ungültiger Status.');
 
   // Automatik: Techniker eingetragen, Status noch "gemeldet" → "zugewiesen"
   if (technikerId !== null && status === 'gemeldet') {
@@ -154,16 +157,16 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
 
   // Ab "zugewiesen" wird ein Techniker benötigt
   if (status !== 'gemeldet' && technikerId === null && !fehler.techniker_id) {
-    fehler.techniker_id = 'Für diesen Status muss ein Techniker zugewiesen sein.';
+    fehler.techniker_id = t('Für diesen Status muss ein Techniker zugewiesen sein.');
   }
 
   // Arbeitsbeginn
   let startZeit = null;
   if (eingabe.start_zeit !== '') {
     startZeit = berlinZuDate(eingabe.start_zeit);
-    if (!startZeit) fehler.start_zeit = 'Bitte einen gültigen Zeitpunkt angeben.';
+    if (!startZeit) fehler.start_zeit = t('Bitte einen gültigen Zeitpunkt angeben.');
     else if (startZeit < auftrag.zeitpunkt) {
-      fehler.start_zeit = `Der Arbeitsbeginn kann nicht vor der Störmeldung liegen (${datumZeit(auftrag.zeitpunkt)}).`;
+      fehler.start_zeit = t('Der Arbeitsbeginn kann nicht vor der Störmeldung liegen ({zeit}).', { zeit: datumZeit(auftrag.zeitpunkt, t.sprache) });
     }
   } else if (status === 'in Arbeit' || status === 'wartet auf Teil') {
     startZeit = new Date();   // Arbeit beginnt jetzt
@@ -172,21 +175,21 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
   // Endzeit und Maßnahme – nur beim Abschluss relevant
   let endeZeit = null;
   if (status === 'erledigt') {
-    if (startZeit === null && !fehler.start_zeit) fehler.start_zeit = 'Bitte den Arbeitsbeginn angeben.';
+    if (startZeit === null && !fehler.start_zeit) fehler.start_zeit = t('Bitte den Arbeitsbeginn angeben.');
 
     endeZeit = berlinZuDate(eingabe.ende_zeit);
-    if (eingabe.ende_zeit === '') fehler.ende_zeit = 'Bitte die Endzeit der Reparatur angeben.';
-    else if (!endeZeit) fehler.ende_zeit = 'Bitte einen gültigen Zeitpunkt angeben.';
-    else if (endeZeit.getTime() > Date.now() + 5 * 60000) fehler.ende_zeit = 'Die Endzeit darf nicht in der Zukunft liegen.';
-    else if (startZeit && endeZeit < startZeit) fehler.ende_zeit = 'Die Endzeit muss nach dem Arbeitsbeginn liegen.';
+    if (eingabe.ende_zeit === '') fehler.ende_zeit = t('Bitte die Endzeit der Reparatur angeben.');
+    else if (!endeZeit) fehler.ende_zeit = t('Bitte einen gültigen Zeitpunkt angeben.');
+    else if (endeZeit.getTime() > Date.now() + 5 * 60000) fehler.ende_zeit = t('Die Endzeit darf nicht in der Zukunft liegen.');
+    else if (startZeit && endeZeit < startZeit) fehler.ende_zeit = t('Die Endzeit muss nach dem Arbeitsbeginn liegen.');
 
     if (eingabe.massnahme.length < 5) {
-      fehler.massnahme = 'Bitte die durchgeführte Maßnahme beschreiben (mindestens 5 Zeichen).';
+      fehler.massnahme = t('Bitte die durchgeführte Maßnahme beschreiben (mindestens 5 Zeichen).');
     }
   } else {
     eingabe.ende_zeit = '';   // Auftrag (wieder) offen → keine Endzeit
   }
-  if (eingabe.massnahme.length > 2000) fehler.massnahme = 'Die Maßnahme darf höchstens 2000 Zeichen lang sein.';
+  if (eingabe.massnahme.length > 2000) fehler.massnahme = t('Die Maßnahme darf höchstens 2000 Zeichen lang sein.');
 
   if (Object.keys(fehler).length > 0) {
     return { fehler, eingabe };
@@ -201,7 +204,7 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
         massnahme    = ${eingabe.massnahme !== '' ? eingabe.massnahme : null}
     WHERE id = ${auftragId}`;
 
-  await flash('erfolg', status === 'erledigt' ? 'Auftrag abgeschlossen. Danke!' : `Änderungen gespeichert. Status: ${status}.`);
+  await flash('erfolg', status === 'erledigt' ? t('Auftrag abgeschlossen. Danke!') : t('Änderungen gespeichert. Status: {status}.', { status: t(status) }));
   revalidatePath('/', 'layout');
   redirect(`/auftraege/${auftragId}`);
 }
@@ -214,18 +217,19 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
  * ================================================================== */
 export async function teilBuchen(auftragId, vorherigerZustand, formular) {
   await benutzerPflicht();
+  const t = await uebersetzer();   // Meldungen in der gewählten Sprache
 
   const eingabe = { ersatzteil_id: feld(formular, 'ersatzteil_id'), menge: feld(formular, 'menge') };
   const fehler = {};
 
   const teilId = ganzzahl(eingabe.ersatzteil_id);
   const menge = ganzzahl(eingabe.menge);
-  if (teilId === null) fehler.ersatzteil_id = 'Bitte ein Ersatzteil auswählen.';
-  if (menge === null || menge < 1 || menge > 999) fehler.menge = 'Bitte eine Menge zwischen 1 und 999 angeben.';
+  if (teilId === null) fehler.ersatzteil_id = t('Bitte ein Ersatzteil auswählen.');
+  if (menge === null || menge < 1 || menge > 999) fehler.menge = t('Bitte eine Menge zwischen 1 und 999 angeben.');
 
   const [auftrag] = await sql`SELECT status FROM wartungsauftrag WHERE id = ${auftragId}`;
-  if (!auftrag) fehler.allgemein = 'Der Auftrag wurde nicht gefunden.';
-  else if (auftrag.status === 'erledigt') fehler.allgemein = 'Auf erledigte Aufträge können keine Teile mehr gebucht werden.';
+  if (!auftrag) fehler.allgemein = t('Der Auftrag wurde nicht gefunden.');
+  else if (auftrag.status === 'erledigt') fehler.allgemein = t('Auf erledigte Aufträge können keine Teile mehr gebucht werden.');
 
   if (Object.keys(fehler).length > 0) return { fehler, eingabe };
 
@@ -267,27 +271,27 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
     });
   } catch (fehlerObjekt) {
     console.error(fehlerObjekt);
-    return { fehler: { allgemein: 'Die Buchung konnte nicht gespeichert werden.' }, eingabe };
+    return { fehler: { allgemein: t('Die Buchung konnte nicht gespeichert werden.') }, eingabe };
   }
 
   const { teil } = ergebnis;
   switch (ergebnis.art) {
     case 'unbekannt':
-      return { fehler: { ersatzteil_id: 'Das Ersatzteil existiert nicht.' }, eingabe };
+      return { fehler: { ersatzteil_id: t('Das Ersatzteil existiert nicht.') }, eingabe };
     case 'gebucht':
-      await flash('erfolg', `${menge} × ${teil.bezeichnung} gebucht.`);
+      await flash('erfolg', t('{menge} × {teil} gebucht.', { menge, teil: teil.bezeichnung }));
       if (ergebnis.neuerBestand < teil.mindestbestand) {
-        await flash('hinweis', `Achtung: ${teil.bezeichnung} ist jetzt unter dem Mindestbestand (${ergebnis.neuerBestand} von ${teil.mindestbestand}).`);
+        await flash('hinweis', t('Achtung: {teil} ist jetzt unter dem Mindestbestand ({bestand} von {mindest}).', { teil: teil.bezeichnung, bestand: ergebnis.neuerBestand, mindest: teil.mindestbestand }));
       }
       break;
     case 'schon_bestellt':
-      await flash('hinweis', `${teil.bezeichnung} ist nicht ausreichend auf Lager (Bestand: ${teil.bestand}). `
-        + 'Es läuft bereits eine Bestellung. Der Auftrag wartet jetzt auf das Teil.');
+      await flash('hinweis', `${t('{teil} ist nicht ausreichend auf Lager (Bestand: {bestand}).', { teil: teil.bezeichnung, bestand: teil.bestand })} `
+        + t('Es läuft bereits eine Bestellung. Der Auftrag wartet jetzt auf das Teil.'));
       break;
     case 'bestellt':
-      await flash('hinweis', `${teil.bezeichnung} ist nicht ausreichend auf Lager (Bestand: ${teil.bestand}). `
-        + `Es wurde eine Bestellung über ${ergebnis.bestellmenge} Stück angelegt. `
-        + 'Der Auftrag wartet jetzt auf das Teil – bitte nach Lieferung erneut buchen.');
+      await flash('hinweis', `${t('{teil} ist nicht ausreichend auf Lager (Bestand: {bestand}).', { teil: teil.bezeichnung, bestand: teil.bestand })} `
+        + `${t('Es wurde eine Bestellung über {n} Stück angelegt.', { n: ergebnis.bestellmenge })} `
+        + t('Der Auftrag wartet jetzt auf das Teil – bitte nach Lieferung erneut buchen.'));
       break;
     default:
   }
@@ -302,10 +306,11 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
  * ================================================================== */
 export async function lieferungBuchen(formular) {
   await benutzerPflicht();
+  const t = await uebersetzer();   // Meldungen in der gewählten Sprache
 
   const bestellungId = ganzzahl(feld(formular, 'bestellung_id'));
   if (bestellungId === null) {
-    await flash('fehler', 'Ungültige Bestellung.');
+    await flash('fehler', t('Ungültige Bestellung.'));
     redirect('/');
   }
 
@@ -326,15 +331,15 @@ export async function lieferungBuchen(formular) {
     });
   } catch (fehlerObjekt) {
     console.error(fehlerObjekt);
-    await flash('fehler', 'Der Wareneingang konnte nicht gespeichert werden.');
+    await flash('fehler', t('Der Wareneingang konnte nicht gespeichert werden.'));
     redirect('/');
   }
 
   if (ergebnis) {
-    await flash('erfolg', `Wareneingang gebucht: ${ergebnis.menge} × ${ergebnis.bezeichnung}. `
-      + 'Aufträge, die auf dieses Teil warten, können fortgesetzt werden.');
+    await flash('erfolg', `${t('Wareneingang gebucht: {menge} × {teil}.', { menge: ergebnis.menge, teil: ergebnis.bezeichnung })} `
+      + t('Aufträge, die auf dieses Teil warten, können fortgesetzt werden.'));
   } else {
-    await flash('fehler', 'Diese Bestellung ist nicht (mehr) offen.');
+    await flash('fehler', t('Diese Bestellung ist nicht (mehr) offen.'));
   }
   revalidatePath('/', 'layout');
   redirect('/');

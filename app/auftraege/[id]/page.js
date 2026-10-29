@@ -15,16 +15,20 @@ import { STATUS_WERTE } from '@/lib/konstanten';
 import { datumZeit, dauer, fuerDatetimeInput } from '@/lib/format';
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import { BearbeitungsFormular, TeilBuchenFormular } from './Formulare';
+import { uebersetzer } from '@/lib/sprache/server';
+import { gross } from '@/lib/sprache';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  return { title: `Auftrag ${id}` };
+  const t = await uebersetzer();
+  return { title: t('Auftrag {n}', { n: id }) };
 }
 
 export default async function AuftragSeite({ params }) {
   await benutzerPflicht();
+  const t = await uebersetzer();
   const { id } = await params;
   if (!/^\d+$/.test(id)) notFound();
   const auftragId = Number(id);
@@ -47,7 +51,7 @@ export default async function AuftragSeite({ params }) {
     // Techniker des eigenen Standorts zuerst
     sql`
       SELECT t.id, t.name, t.qualifikation, t.schicht, (t.standort_id = ${auftrag.standort_id}) AS vor_ort,
-             COALESCE(st.name, 'ohne Standort') AS standort
+             COALESCE(st.name, ${t('ohne Standort')}) AS standort
       FROM techniker t LEFT JOIN standort st ON st.id = t.standort_id
       ORDER BY (t.standort_id = ${auftrag.standort_id}) DESC, st.name, t.name`,
     sql`SELECT id, bezeichnung, bestand, mindestbestand FROM ersatzteil ORDER BY bezeichnung`,
@@ -77,7 +81,7 @@ export default async function AuftragSeite({ params }) {
   return (
     <>
       <div className="mb-3">
-        <Link href="/auftraege"><i className="bi bi-chevron-left" aria-hidden="true" /> Alle Aufträge</Link>
+        <Link href="/auftraege"><i className="bi bi-chevron-left" aria-hidden="true" /> {t('Alle Aufträge')}</Link>
       </div>
 
       <div className="seitenkopf">
@@ -87,10 +91,10 @@ export default async function AuftragSeite({ params }) {
         </div>
         <h1>{auftrag.maschine}</h1>
         <p>
-          Störmeldung Nr. {auftrag.stoermeldung_id} · {auftrag.standort} · {auftrag.gebaeude} · {auftrag.anlagennummer}{' '}
+          {t('Störmeldung Nr. {n}', { n: auftrag.stoermeldung_id })} · {auftrag.standort} · {auftrag.gebaeude} · {auftrag.anlagennummer}{' '}
           <Link href={`/karte?werk=${auftrag.standort_kuerzel.toLowerCase()}&halle=${auftrag.gebaeude_kuerzel.toLowerCase()}&maschine=${auftrag.maschine_id}`}
                 className="ms-1 text-nowrap">
-            <i className="bi bi-geo-alt" aria-hidden="true" /> Auf der Karte zeigen
+            <i className="bi bi-geo-alt" aria-hidden="true" /> {t('Auf der Karte zeigen')}
           </Link>
         </p>
       </div>
@@ -99,27 +103,27 @@ export default async function AuftragSeite({ params }) {
         <div className="col-lg-7">
           {/* Störmeldung (nur lesend) */}
           <section className="karte" style={{ '--i': 0 }}>
-            <h2 className="abschnitt-titel">Störmeldung</h2>
+            <h2 className="abschnitt-titel">{t('Störmeldung')}</h2>
             <p className="mb-4" style={{ whiteSpace: 'pre-line' }}>{auftrag.beschreibung}</p>
             <dl className="details mb-4">
-              <dt>Gemeldet am</dt><dd>{datumZeit(auftrag.zeitpunkt)}</dd>
-              <dt>Gemeldet von</dt><dd>{auftrag.gemeldet_von}</dd>
-              <dt>Ursache</dt><dd>{auftrag.ursache_kategorie}</dd>
+              <dt>{t('Gemeldet am')}</dt><dd>{datumZeit(auftrag.zeitpunkt, t.sprache)}</dd>
+              <dt>{t('Gemeldet von')}</dt><dd>{auftrag.gemeldet_von}</dd>
+              <dt>{t('Ursache')}</dt><dd>{t(auftrag.ursache_kategorie)}</dd>
               {ausfallMinuten !== null && (
                 <>
-                  <dt>Ausfallzeit</dt><dd>{dauer(ausfallMinuten)}</dd>
-                  <dt>Reparaturdauer</dt><dd>{dauer(reparaturMinuten)}</dd>
+                  <dt>{t('Ausfallzeit')}</dt><dd>{dauer(ausfallMinuten)}</dd>
+                  <dt>{t('Reparaturdauer')}</dt><dd>{dauer(reparaturMinuten)}</dd>
                 </>
               )}
             </dl>
 
             {/* Fortschritt: gemeldet → zugewiesen → in Arbeit → wartet auf Teil → erledigt */}
-            <ol className="ablauf" aria-label="Bearbeitungsstand">
+            <ol className="ablauf" aria-label={t('Bearbeitungsstand')}>
               {STATUS_WERTE.map((schritt, i) => (
                 <li key={schritt} style={{ '--i': i }}
                     className={`${i <= aktuellerIndex ? 'erreicht' : ''}${i === aktuellerIndex ? ' aktuell' : ''}`}
                     aria-current={i === aktuellerIndex ? 'step' : undefined}>
-                  {schritt.charAt(0).toUpperCase() + schritt.slice(1)}
+                  {gross(t(schritt))}
                 </li>
               ))}
             </ol>
@@ -131,16 +135,16 @@ export default async function AuftragSeite({ params }) {
         {/* Ersatzteile */}
         <div className="col-lg-5">
           <section className="karte" style={{ '--i': 2 }}>
-            <h2 className="abschnitt-titel">Verwendete Ersatzteile</h2>
+            <h2 className="abschnitt-titel">{t('Verwendete Ersatzteile')}</h2>
 
             {gebuchteTeile.length === 0 ? (
-              <p className="text-leise">Noch keine Ersatzteile gebucht.</p>
+              <p className="text-leise">{t('Noch keine Ersatzteile gebucht.')}</p>
             ) : (
               <table className="tabelle mb-4">
-                <thead><tr><th>Ersatzteil</th><th className="zahl">Menge</th></tr></thead>
+                <thead><tr><th>{t('Ersatzteil')}</th><th className="zahl">{t('Menge')}</th></tr></thead>
                 <tbody>
-                  {gebuchteTeile.map((t) => (
-                    <tr key={t.bezeichnung}><td>{t.bezeichnung}</td><td className="zahl">{t.menge}</td></tr>
+                  {gebuchteTeile.map((teil) => (
+                    <tr key={teil.bezeichnung}><td>{teil.bezeichnung}</td><td className="zahl">{teil.menge}</td></tr>
                   ))}
                 </tbody>
               </table>

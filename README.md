@@ -28,7 +28,8 @@ aus den letzten 12 Monaten.
 | Störungskarte | `/karte` | Deutschlandkarte mit allen Werken und der Zahl offener Störungen. Ein Klick zoomt animiert in das Werk (Lageplan mit Gebäuden, offenen Störungen, Technikern vor Ort), ein weiterer in das Gebäude (Grundriss mit allen Maschinen). |
 | Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Standort, Maschine und Priorität |
 | Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen, Status ändern, Ersatzteile buchen, Auftrag abschließen |
-| Statistik | `/statistik` | MTTR, Ausfallzeit, Störungen pro Monat, Top-5-Störursachen, Kennzahlen pro Standort, Top 10 Maschinen, Filter nach Zeitraum und Standort |
+| Statistik | `/statistik` | Zum Hineinzoomen wie die Karte: alle Standorte → Werk → Gebäude → Maschine. Je Ebene MTTR, Ausfallzeit, Störungen, offene Aufträge, MTBF bzw. Störungen je Maschine, Vergleich der Unterebene, Störungen und MTTR pro Monat, Ursachen, Wochentag × Uhrzeit, Prioritäten, Schichten, Techniker, verbaute Ersatzteile. Filter nach Zeitraum. |
+| Datenbasis | `/datenbasis` | Verbindungen mit Live-Status (Claude/Codex → GitHub → Vercel → Supabase-Datenbank und -Login, Power BI), Datenmodell als Diagramm mit allen Tabellen, Spalten und Beziehungen, Views, Wertelisten und eine Vorschau der Datensätze jeder Tabelle |
 
 **Automatik beim Buchen von Ersatzteilen:** Ist ein Teil nicht in ausreichender Menge auf Lager,
 wird nichts gebucht. Der Auftrag wechselt auf **„wartet auf Teil“**, und es wird automatisch eine
@@ -45,6 +46,7 @@ Bestellung angelegt. Den Eingang der Lieferung bucht man auf der Übersicht.
 - Ruhige „Glas“-Optik mit halbtransparenten Karten auf einem weichen Hintergrund.
 - Navigation in einer Seitenleiste links: eingeklappt nur Symbole, aufgeklappt mit Text. Unten stehen Darstellung und Konto. Auf dem Handy öffnet sie sich über den Menü-Knopf.
 - Hell, Dunkel oder automatisch nach Systemeinstellung (unten in der Seitenleiste).
+- Sprache Deutsch oder Englisch (unten in der Seitenleiste bzw. auf der Login-Seite). Daten wie Maschinennamen und Beschreibungen bleiben so, wie sie eingegeben wurden.
 - Sanfte Animationen.
 - Bei „Bewegung reduzieren“ bzw. „Transparenz reduzieren“ im Betriebssystem werden Animationen und Glas-Effekt automatisch abgeschaltet.
 
@@ -133,6 +135,7 @@ Wer den Code auf dem eigenen Rechner ausprobieren möchte:
    npm run dev
    ```
 5. <http://localhost:3000> öffnen.
+6. Neue Texte in der Oberfläche? `npm run texte` zeigt, welche englischen Übersetzungen in `lib/sprache/en.js` noch fehlen.
 
 > **Achtung:** Lokal arbeitet man dann mit **derselben Datenbank** wie die Online-Version.
 > Testmeldungen sind also für alle sichtbar. Zurücksetzen geht jederzeit, indem man `supabase/testdaten.sql` erneut ausführt.
@@ -200,13 +203,17 @@ app/                         Seiten (Next.js App Router)
 ├── page.js                  Übersicht
 ├── melden/                  Störung melden
 ├── auftraege/               Auftragsübersicht und [id]/ = Auftrag bearbeiten
-├── statistik/               Statistik und Diagramme
+├── statistik/               Statistik mit Zoom (StatistikExplorer) und Diagramme
+├── datenbasis/              Verbindungen, Datenmodell und Datenvorschau
+├── api/                     Kleine Schnittstellen für die Seiten (offene Aufträge, Verbindungen, Tabellenvorschau)
 ├── karte/                   Störungskarte mit Zoom (alte Adressen /karte/ham/h2 leiten dorthin um, siehe next.config.mjs)
 └── login/                   Anmeldung
 components/                  Wiederverwendbare Bausteine (Seitenleiste, Logo, Pills, Kennzahlen …)
 components/karten/           Zoom-Karte (KartenExplorer) mit Deutschlandkarte, Lageplan, Grundriss
 lib/                         Datenbankverbindung, Login-Prüfung, Formatierung, Wertelisten
 lib/karten/                  Kartendaten (Umriss Deutschland) und Abfragen für die Karte
+lib/sprache/                 Übersetzung: index.js (t-Funktion), server.js, en.js (englische Texte)
+scripts/texte-pruefen.mjs    Findet fehlende englische Übersetzungen (npm run texte)
 middleware.js                Schickt nicht angemeldete Besucher zum Login
 supabase/                    schema.sql und testdaten.sql
 docs/                        Team-Anleitungen

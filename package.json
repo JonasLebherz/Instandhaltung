@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "texte": "node --no-warnings scripts/texte-pruefen.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -16,15 +16,17 @@ import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import Kennzahl from '@/components/Kennzahl';
 import SpeichernKnopf from '@/components/SpeichernKnopf';
 import { lieferungBuchen } from '@/app/aktionen';
+import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import { standorteMitZahlen } from '@/lib/karten/daten';
 import KleineKarte from '@/components/karten/KleineKarte';
 
 // Immer aktuelle Daten aus der Datenbank (kein Zwischenspeichern der Seite)
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Übersicht' };
+export const generateMetadata = () => seitentitel('Übersicht');
 
 export default async function Uebersicht() {
   const benutzer = await benutzerPflicht();
+  const t = await uebersetzer();
 
   // Alle Abfragen gleichzeitig starten – das ist schneller als nacheinander
   const [[kennzahlen], proStatus, offeneMeldungen, kritischeTeile, standorte] = await Promise.all([
@@ -73,39 +75,39 @@ export default async function Uebersicht() {
   // Die Balken beziehen sich nur auf die offenen Status, damit "erledigt" sie nicht winzig macht
   const maxOffen = Math.max(1, ...statusVerteilung.filter((z) => z.status !== 'erledigt').map((z) => z.anzahl));
 
-  const anzahlKritisch = new Set(kritischeTeile.filter((t) => t.bestand < t.mindestbestand).map((t) => t.id)).size;
+  const anzahlKritisch = new Set(kritischeTeile.filter((teil) => teil.bestand < teil.mindestbestand).map((teil) => teil.id)).size;
 
   return (
     <>
       <div className="seitenkopf d-flex justify-content-between align-items-end flex-wrap gap-3">
         <div>
-          <div className="eyebrow">{begruessung()}, {benutzer.anzeigename}</div>
-          <h1>Übersicht</h1>
-          <p>{datumLang()}</p>
+          <div className="eyebrow">{t(begruessung())}, {benutzer.anzeigename}</div>
+          <h1>{t('Übersicht')}</h1>
+          <p>{datumLang(new Date(), t.sprache)}</p>
         </div>
         <Link className="btn btn-primary" href="/melden">
-          <i className="bi bi-plus-lg" aria-hidden="true" /> Neue Störung melden
+          <i className="bi bi-plus-lg" aria-hidden="true" /> {t('Neue Störung melden')}
         </Link>
       </div>
 
       {/* Kennzahlen */}
       <div className="row g-4 mb-2">
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Offene Meldungen" wert={kennzahlen.offen} zusatz="noch nicht erledigt"
+          <Kennzahl titel={t('Offene Meldungen')} wert={kennzahlen.offen} zusatz={t('noch nicht erledigt')}
                     symbol="bi-exclamation-circle" link="/auftraege?status=offen" i={0} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Priorität hoch" wert={kennzahlen.dringend} zusatz="sofort bearbeiten"
+          <Kennzahl titel={t('Priorität hoch')} wert={kennzahlen.dringend} zusatz={t('sofort bearbeiten')}
                     symbol="bi-lightning-charge" link="/auftraege?status=offen&prioritaet=hoch"
                     art={kennzahlen.dringend > 0 ? 'rot' : ''} i={1} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Teile unter Mindestbestand" wert={anzahlKritisch}
-                    zusatz={anzahlKritisch > 0 ? 'Nachschub prüfen' : 'Lager in Ordnung'}
+          <Kennzahl titel={t('Teile unter Mindestbestand')} wert={anzahlKritisch}
+                    zusatz={anzahlKritisch > 0 ? t('Nachschub prüfen') : t('Lager in Ordnung')}
                     symbol="bi-box-seam" art={anzahlKritisch > 0 ? 'warnung' : 'gruen'} i={2} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel="Erledigt (30 Tage)" wert={kennzahlen.erledigt30} zusatz="abgeschlossene Aufträge"
+          <Kennzahl titel={t('Erledigt (30 Tage)')} wert={kennzahlen.erledigt30} zusatz={t('abgeschlossene Aufträge')}
                     symbol="bi-check2-circle" art="gruen" i={3} />
         </div>
       </div>
@@ -115,21 +117,21 @@ export default async function Uebersicht() {
         <div className="col-lg-8">
           <section className="karte" style={{ '--i': 4 }}>
             <div className="karte-kopf">
-              <h2 className="abschnitt-titel">Offene Störmeldungen</h2>
-              <Link href="/auftraege?status=offen">Alle anzeigen</Link>
+              <h2 className="abschnitt-titel">{t('Offene Störmeldungen')}</h2>
+              <Link href="/auftraege?status=offen">{t('Alle anzeigen')}</Link>
             </div>
 
             {offeneMeldungen.length === 0 ? (
-              <p className="leer"><i className="bi bi-check-circle" />Keine offenen Störmeldungen – alle Maschinen laufen.</p>
+              <p className="leer"><i className="bi bi-check-circle" />{t('Keine offenen Störmeldungen – alle Maschinen laufen.')}</p>
             ) : (
               <div className="tabelle-rahmen">
                 <table className="tabelle">
                   <thead>
                     <tr>
-                      <th>Maschine</th>
-                      <th>Priorität</th>
-                      <th>Status</th>
-                      <th className="d-none d-md-table-cell">Gemeldet</th>
+                      <th>{t('Maschine')}</th>
+                      <th>{t('Priorität')}</th>
+                      <th>{t('Status')}</th>
+                      <th className="d-none d-md-table-cell">{t('Gemeldet')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -144,7 +146,7 @@ export default async function Uebersicht() {
                           <StatusPill status={m.status} />
                           {m.techniker && <div className="klein mt-1">{m.techniker}</div>}
                         </td>
-                        <td className="d-none d-md-table-cell klein">{datumZeit(m.zeitpunkt)}</td>
+                        <td className="d-none d-md-table-cell klein">{datumZeit(m.zeitpunkt, t.sprache)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -157,7 +159,7 @@ export default async function Uebersicht() {
         {/* Aufträge nach Status */}
         <div className="col-lg-4">
           <section className="karte" style={{ '--i': 5 }}>
-            <h2 className="abschnitt-titel">Aufträge nach Status</h2>
+            <h2 className="abschnitt-titel">{t('Aufträge nach Status')}</h2>
             <ul className="status-liste">
               {statusVerteilung.map(({ status, anzahl }) => (
                 <li key={status}>
@@ -167,7 +169,7 @@ export default async function Uebersicht() {
                       <span style={{ width: `${Math.round((anzahl / maxOffen) * 100)}%` }} />
                     </div>
                   ) : (
-                    <div className="flex-grow-1 klein">gesamt</div>
+                    <div className="flex-grow-1 klein">{t('gesamt')}</div>
                   )}
                   <Link className="status-anzahl" href={`/auftraege?status=${encodeURIComponent(status)}`}>{anzahl}</Link>
                 </li>
@@ -178,8 +180,8 @@ export default async function Uebersicht() {
           {/* Kleine Deutschlandkarte: Klick auf ein Werk öffnet die Störungskarte dort */}
           <section className="karte" style={{ '--i': 6 }}>
             <div className="karte-kopf">
-              <h2 className="abschnitt-titel">Standorte</h2>
-              <Link href="/karte">Zur Karte</Link>
+              <h2 className="abschnitt-titel">{t('Standorte')}</h2>
+              <Link href="/karte">{t('Zur Karte')}</Link>
             </div>
             <KleineKarte standorte={standorte} />
           </section>
@@ -189,21 +191,21 @@ export default async function Uebersicht() {
       {/* Ersatzteile unter Mindestbestand & offene Bestellungen */}
       <section className="karte" style={{ '--i': 7 }}>
         <div className="karte-kopf">
-          <h2 className="abschnitt-titel">Ersatzteile unter Mindestbestand</h2>
-          <span className="klein">inkl. offener Bestellungen</span>
+          <h2 className="abschnitt-titel">{t('Ersatzteile unter Mindestbestand')}</h2>
+          <span className="klein">{t('inkl. offener Bestellungen')}</span>
         </div>
 
         {kritischeTeile.length === 0 ? (
-          <p className="leer"><i className="bi bi-box-seam" />Alle Ersatzteile sind ausreichend auf Lager, keine offenen Bestellungen.</p>
+          <p className="leer"><i className="bi bi-box-seam" />{t('Alle Ersatzteile sind ausreichend auf Lager, keine offenen Bestellungen.')}</p>
         ) : (
           <div className="tabelle-rahmen">
             <table className="tabelle">
               <thead>
                 <tr>
-                  <th>Ersatzteil</th>
-                  <th className="zahl">Bestand</th>
-                  <th className="zahl">Mindestbestand</th>
-                  <th>Nachbestellung</th>
+                  <th>{t('Ersatzteil')}</th>
+                  <th className="zahl">{t('Bestand')}</th>
+                  <th className="zahl">{t('Mindestbestand')}</th>
+                  <th>{t('Nachbestellung')}</th>
                   <th />
                 </tr>
               </thead>
@@ -220,11 +222,11 @@ export default async function Uebersicht() {
                     <td>
                       {teil.bestellung_id ? (
                         <>
-                          <span className="pill pill-orange">bestellt</span>
-                          <span className="klein ms-2">{teil.bestellmenge} Stk. am {datum(teil.bestelldatum)}</span>
+                          <span className="pill pill-orange">{t('bestellt')}</span>
+                          <span className="klein ms-2">{t('{n} Stk. am {datum}', { n: teil.bestellmenge, datum: datum(teil.bestelldatum, t.sprache) })}</span>
                         </>
                       ) : (
-                        <span className="pill pill-rot">nicht bestellt</span>
+                        <span className="pill pill-rot">{t('nicht bestellt')}</span>
                       )}
                     </td>
                     <td className="text-end">
@@ -232,8 +234,8 @@ export default async function Uebersicht() {
                         // Wareneingang buchen: erhöht den Bestand um die Bestellmenge
                         <form action={lieferungBuchen} className="d-inline">
                           <input type="hidden" name="bestellung_id" value={teil.bestellung_id} />
-                          <SpeichernKnopf className="btn btn-sekundaer btn-klein" ladeText="Buche …">
-                            <i className="bi bi-truck" aria-hidden="true" /> Lieferung eingegangen
+                          <SpeichernKnopf className="btn btn-sekundaer btn-klein" ladeText={t('Buche …')}>
+                            <i className="bi bi-truck" aria-hidden="true" /> {t('Lieferung eingegangen')}
                           </SpeichernKnopf>
                         </form>
                       )}

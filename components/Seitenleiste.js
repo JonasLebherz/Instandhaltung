@@ -9,7 +9,8 @@
  * Skript in app/layout.js setzt es schon vor dem ersten Anzeigen, damit nichts
  * springt. Ohne gespeicherte Wahl ist die Leiste auf großen Bildschirmen offen.
  *
- * Unten: Darstellung (Hell/Dunkel/Automatisch) und das Konto mit Abmelden.
+ * Unten: Sprache (Deutsch/Englisch), Darstellung (Hell/Dunkel/Automatisch)
+ * und das Konto mit Abmelden.
  * Auf dem Smartphone gibt es stattdessen oben eine schmale Leiste mit
  * Menü-Knopf, die Seitenleiste fährt dann von links herein.
  */
@@ -17,36 +18,45 @@ import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { abmelden } from '@/app/login/aktionen';
+import { SPRACHEN, T } from '@/lib/sprache';
+import { useSprache, useSpracheWechseln, useT } from './SpracheKontext';
 import Logo from './Logo';
 
 /** Seiten, nach Bereichen gruppiert. "symbolAktiv" ist die gefüllte Variante für die aktuelle Seite. */
+// Texte mit T() markiert – übersetzt werden sie beim Anzeigen mit t()
 const BEREICHE = [
   {
-    titel: 'Überblick',
+    titel: T('Überblick'),
     seiten: [
-      { pfad: '/', text: 'Übersicht', symbol: 'bi-grid-1x2', symbolAktiv: 'bi-grid-1x2-fill' },
-      { pfad: '/karte', text: 'Störungskarte', symbol: 'bi-map', symbolAktiv: 'bi-map-fill' },
+      { pfad: '/', text: T('Übersicht'), symbol: 'bi-grid-1x2', symbolAktiv: 'bi-grid-1x2-fill' },
+      { pfad: '/karte', text: T('Störungskarte'), symbol: 'bi-map', symbolAktiv: 'bi-map-fill' },
     ],
   },
   {
-    titel: 'Instandhaltung',
+    titel: T('Instandhaltung'),
     seiten: [
-      { pfad: '/melden', text: 'Störung melden', symbol: 'bi-exclamation-triangle', symbolAktiv: 'bi-exclamation-triangle-fill' },
-      { pfad: '/auftraege', text: 'Aufträge', symbol: 'bi-clipboard-check', symbolAktiv: 'bi-clipboard-check-fill', zaehler: true },
+      { pfad: '/melden', text: T('Störung melden'), symbol: 'bi-exclamation-triangle', symbolAktiv: 'bi-exclamation-triangle-fill' },
+      { pfad: '/auftraege', text: T('Aufträge'), symbol: 'bi-clipboard-check', symbolAktiv: 'bi-clipboard-check-fill', zaehler: true },
     ],
   },
   {
-    titel: 'Auswertung',
+    titel: T('Auswertung'),
     seiten: [
-      { pfad: '/statistik', text: 'Statistik', symbol: 'bi-bar-chart', symbolAktiv: 'bi-bar-chart-fill' },
+      { pfad: '/statistik', text: T('Statistik'), symbol: 'bi-bar-chart', symbolAktiv: 'bi-bar-chart-fill' },
+    ],
+  },
+  {
+    titel: T('System'),
+    seiten: [
+      { pfad: '/datenbasis', text: T('Datenbasis'), symbol: 'bi-database', symbolAktiv: 'bi-database-fill' },
     ],
   },
 ];
 
 const DARSTELLUNGEN = [
-  { wert: 'hell', text: 'Hell', symbol: 'bi-sun' },
-  { wert: 'dunkel', text: 'Dunkel', symbol: 'bi-moon-stars' },
-  { wert: 'automatisch', text: 'Automatisch', symbol: 'bi-circle-half' },
+  { wert: 'hell', text: T('Hell'), symbol: 'bi-sun' },
+  { wert: 'dunkel', text: T('Dunkel'), symbol: 'bi-moon-stars' },
+  { wert: 'automatisch', text: T('Automatisch'), symbol: 'bi-circle-half' },
 ];
 
 /** Setzt Hell/Dunkel am <html>-Element und informiert z. B. die Diagramme */
@@ -75,9 +85,12 @@ function initialen(name) {
 
 export default function Seitenleiste({ benutzer }) {
   const pfad = usePathname();
+  const t = useT();
+  const sprache = useSprache();
+  const spracheWechseln = useSpracheWechseln();
   const [aufgeklappt, setAufgeklappt] = useState(false);
   const [mobilOffen, setMobilOffen] = useState(false);
-  const [fenster, setFenster] = useState(null);           // 'darstellung' | 'konto' | null
+  const [fenster, setFenster] = useState(null);           // 'sprache' | 'darstellung' | 'konto' | null
   const [darstellung, setDarstellung] = useState('automatisch');
   const [offeneAuftraege, setOffeneAuftraege] = useState(null);   // Zahl neben "Aufträge"
   const leisteRef = useRef(null);
@@ -144,22 +157,22 @@ export default function Seitenleiste({ benutzer }) {
     <>
       {/* Nur auf dem Smartphone: schmale Leiste oben mit Menü-Knopf */}
       <header className="mobil-kopf">
-        <Link href="/" className="leiste-marke"><Logo groesse={30} /> Instandhaltung</Link>
+        <Link href="/" className="leiste-marke"><Logo groesse={30} /> {t('Instandhaltung')}</Link>
         <button type="button" className="rund-knopf" aria-controls="seitenleiste" aria-expanded={mobilOffen}
-                aria-label="Menü öffnen" onClick={() => setMobilOffen(true)}>
+                aria-label={t('Menü öffnen')} onClick={() => setMobilOffen(true)}>
           <i className="bi bi-list" />
         </button>
       </header>
       {mobilOffen && <div className="leiste-hintergrund" onClick={() => setMobilOffen(false)} aria-hidden="true" />}
 
       <aside id="seitenleiste" ref={leisteRef} className={`seitenleiste${mobilOffen ? ' mobil-offen' : ''}`}
-             aria-label="Hauptnavigation">
+             aria-label={t('Hauptnavigation')}>
         <div className="leiste-kopf">
-          <Link href="/" className="leiste-marke" aria-label="Instandhaltung – zur Übersicht">
+          <Link href="/" className="leiste-marke" aria-label={t('Instandhaltung – zur Übersicht')}>
             <Logo groesse={36} />
-            <span className="leiste-text">Instandhaltung</span>
+            <span className="leiste-text">{t('Instandhaltung')}</span>
           </Link>
-          <button type="button" className="rund-knopf leiste-schliessen" aria-label="Menü schließen"
+          <button type="button" className="rund-knopf leiste-schliessen" aria-label={t('Menü schließen')}
                   onClick={() => setMobilOffen(false)}>
             <i className="bi bi-x-lg" />
           </button>
@@ -167,15 +180,15 @@ export default function Seitenleiste({ benutzer }) {
 
         {/* Einklappen / Aufklappen – runder Knopf am rechten Rand */}
         <button type="button" className="leiste-umschalter" onClick={umschalten} aria-controls="seitenleiste"
-                aria-expanded={aufgeklappt} aria-label={aufgeklappt ? 'Seitenleiste einklappen' : 'Seitenleiste aufklappen'}
-                title={aufgeklappt ? 'Einklappen' : 'Aufklappen'}>
+                aria-expanded={aufgeklappt} aria-label={aufgeklappt ? t('Seitenleiste einklappen') : t('Seitenleiste aufklappen')}
+                title={aufgeklappt ? t('Einklappen') : t('Aufklappen')}>
           <i className="bi bi-chevron-left" />
         </button>
 
         <nav className="leiste-nav">
           {BEREICHE.map((bereich) => (
             <div key={bereich.titel} className="leiste-bereich">
-              <div className="leiste-titel"><span>{bereich.titel}</span></div>
+              <div className="leiste-titel"><span>{t(bereich.titel)}</span></div>
               <ul>
                 {bereich.seiten.map((seite) => {
                   const aktiv = istAktiv(seite);
@@ -186,14 +199,14 @@ export default function Seitenleiste({ benutzer }) {
                             onClick={() => setMobilOffen(false)}
                             aria-current={aktiv ? 'page' : undefined}
                             // Eingeklappt ist der Text unsichtbar – der Name für Screenreader steht deshalb hier
-                            aria-label={zahl ? `${seite.text} (${zahl} offen)` : seite.text}>
+                            aria-label={zahl ? t('{seite} ({n} offen)', { seite: t(seite.text), n: zahl }) : t(seite.text)}>
                         <span className="leiste-symbol">
                           <i className={`bi ${aktiv ? seite.symbolAktiv : seite.symbol}`} aria-hidden="true" />
                           <LadeRing />
                           {zahl && <span className="leiste-punkt" aria-hidden="true">{zahl}</span>}
                         </span>
                         <span className="leiste-text">
-                          {seite.text}
+                          {t(seite.text)}
                           {zahl && <span className="leiste-zahl" aria-hidden="true">{zahl}</span>}
                         </span>
                       </Link>
@@ -206,24 +219,49 @@ export default function Seitenleiste({ benutzer }) {
         </nav>
 
         <div className="leiste-fuss">
+          {/* Sprache: Deutsch / Englisch */}
+          <div className="aufklapp">
+            <button type="button" className="leiste-link" aria-haspopup="menu" aria-expanded={fenster === 'sprache'}
+                    aria-label={`${t('Sprache')}: ${SPRACHEN[sprache].name}`}
+                    onClick={() => setFenster(fenster === 'sprache' ? null : 'sprache')}>
+              <span className="leiste-symbol"><i className="bi bi-translate" aria-hidden="true" /></span>
+              <span className="leiste-text">
+                {t('Sprache')}
+                <span className="leiste-wert">{SPRACHEN[sprache].name}</span>
+              </span>
+            </button>
+            {fenster === 'sprache' && (
+              <div className="aufklapp-menue" role="menu">
+                <div className="menue-titel">{t('Sprache')}</div>
+                {Object.entries(SPRACHEN).map(([kuerzel, s]) => (
+                  <button key={kuerzel} type="button" role="menuitemradio" aria-checked={sprache === kuerzel} lang={kuerzel}
+                          onClick={() => { setFenster(null); if (kuerzel !== sprache) spracheWechseln(kuerzel); }}>
+                    <span className="sprach-kuerzel">{s.kurz}</span> {s.name}
+                    {sprache === kuerzel && <i className="bi bi-check2 haken" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Darstellung: Hell / Dunkel / Automatisch */}
           <div className="aufklapp">
             <button type="button" className="leiste-link" aria-haspopup="menu" aria-expanded={fenster === 'darstellung'}
-                    aria-label={`Darstellung: ${aktuelleDarstellung.text}`}
+                    aria-label={`${t('Darstellung')}: ${t(aktuelleDarstellung.text)}`}
                     onClick={() => setFenster(fenster === 'darstellung' ? null : 'darstellung')}>
               <span className="leiste-symbol"><i className={`bi ${aktuelleDarstellung.symbol}`} aria-hidden="true" /></span>
               <span className="leiste-text">
-                Darstellung
-                <span className="leiste-wert">{aktuelleDarstellung.text}</span>
+                {t('Darstellung')}
+                <span className="leiste-wert">{t(aktuelleDarstellung.text)}</span>
               </span>
             </button>
             {fenster === 'darstellung' && (
               <div className="aufklapp-menue" role="menu">
-                <div className="menue-titel">Darstellung</div>
+                <div className="menue-titel">{t('Darstellung')}</div>
                 {DARSTELLUNGEN.map((d) => (
                   <button key={d.wert} type="button" role="menuitemradio" aria-checked={darstellung === d.wert}
                           onClick={() => waehleDarstellung(d.wert)}>
-                    <i className={`bi ${d.symbol}`} /> {d.text}
+                    <i className={`bi ${d.symbol}`} /> {t(d.text)}
                     {darstellung === d.wert && <i className="bi bi-check2 haken" />}
                   </button>
                 ))}
@@ -234,7 +272,7 @@ export default function Seitenleiste({ benutzer }) {
           {/* Konto & Abmelden */}
           <div className="aufklapp">
             <button type="button" className="leiste-link leiste-konto" aria-haspopup="menu" aria-expanded={fenster === 'konto'}
-                    aria-label={`Konto: ${benutzer.anzeigename}`}
+                    aria-label={`${t('Konto')}: ${benutzer.anzeigename}`}
                     onClick={() => setFenster(fenster === 'konto' ? null : 'konto')}>
               <span className="leiste-symbol"><span className="leiste-avatar">{initialen(benutzer.anzeigename)}</span></span>
               <span className="leiste-text">
@@ -252,7 +290,7 @@ export default function Seitenleiste({ benutzer }) {
                   <small>{benutzer.email}</small>
                 </div>
                 <form action={abmelden}>
-                  <button type="submit" role="menuitem"><i className="bi bi-box-arrow-right" /> Abmelden</button>
+                  <button type="submit" role="menuitem"><i className="bi bi-box-arrow-right" /> {t('Abmelden')}</button>
                 </form>
               </div>
             )}
