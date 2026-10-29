@@ -12,9 +12,9 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 ## Stand
 
 - **Live:** Die App läuft bei Vercel mit Supabase. Login funktioniert.
-- **Fertig:** alle Seiten (Übersicht mit Karte oben, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik, Login), Seitenleiste links, Logo, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
+- **Fertig:** alle Seiten (Übersicht mit kleiner Karte, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik, Login), Seitenleiste links, Logo, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
 - **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
-- **Getestet** gegen PostgreSQL 16 lokal: 107 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
+- **Getestet** gegen PostgreSQL 16 lokal: 108 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
 - **Nach Schemaänderungen** muss in Supabase `schema.sql` + `testdaten.sql` erneut ausgeführt werden. Das setzt alle Daten zurück, Login-Konten bleiben erhalten.
 
 ## Team & andere KI-Assistenten
@@ -47,7 +47,8 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 - **Ladezeiten:** Jede Abfrage geht über das Internet zu Supabase. Deshalb:
   - Vercel-Funktionen laufen in Frankfurt (`vercel.json`: `"regions": ["fra1"]`), nah an der Supabase-Datenbank (eu-central-1). Liegt das Supabase-Projekt woanders, die Region anpassen.
   - Im Layout keine Datenbank-Abfragen: Es läuft bei jeder Anfrage. Die Zahl offener Aufträge holt die Seitenleiste selbst über `app/api/offene-auftraege/route.js`.
-  - Pro Seite möglichst wenige Abfragen, gleichzeitig mit `Promise.all`. Daten wiederverwenden (z. B. nutzt die Übersicht die offenen Aufträge aus `alleKartenDaten()`).
+  - Pro Seite **höchstens 5 Abfragen gleichzeitig** (`max: 5` in `lib/db.js`). Bei mehr schickt postgres.js mehrere Abfragen über eine Verbindung (Pipelining), was mit dem Supabase-Pooler zu Hängern bis zum Timeout führen kann. `max_pipeline: 0` ist keine Lösung, damit scheitern Transaktionen (`UNSAFE_TRANSACTION`).
+  - Die Übersicht zeigt nur eine kleine Deutschlandkarte (`components/karten/KleineKarte.js`, Klick → `/karte?werk=…`), nicht die ganze Zoom-Karte.
   - **Kein `app/loading.js`:** Damit blieben Formulare nach dem Speichern (Server-Aktion mit `redirect`) endlos hängen. Rückmeldung beim Seitenwechsel gibt stattdessen ein drehender Ring in der Seitenleiste (`useLinkStatus`).
   - `/status` misst Login- und Datenbankzeiten und zeigt Regionen und Port (ohne Zugangsdaten). Hilfreich bei langsamen Ladezeiten.
 - **Datenbank:** nur über `sql` aus `lib/db.js` (Bibliothek `postgres`). Werte **immer** als `${…}` im Tagged Template übergeben, nie per String-Verkettung. Dynamische Bedingungen werden aus `sql\`…\``-Bausteinen zusammengesetzt (siehe `app/auftraege/page.js`).
@@ -62,7 +63,7 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 
 - Ebenen: Deutschland → Werk (Lageplan) → Gebäude (Grundriss), alles in **einer** Client-Komponente `components/karten/KartenExplorer.js`. Sie bekommt alle Daten auf einmal (`alleKartenDaten()` in `lib/karten/daten.js`) und wechselt die Ebenen ohne Neuladen.
 - Zoom-Animation: Beim Wechsel bleibt die alte Ebene kurz stehen (`.ebene-alt`), die neue wächst aus dem angeklickten Punkt (`transform-origin` = Mitte des Elements mit `data-ort="st-<id>"` bzw. `"g-<id>"`). Beim Herauszoomen wird der Punkt in der neuen Ebene gemessen. CSS: Abschnitt „Zoom-Karte“ in `app/globals.css`.
-- Verwendet auf `/karte` (`adresseMitfuehren`: Adresse `?werk=ham&halle=h2&maschine=12`, per `history.replaceState`), auf der Übersicht (`groesse="mittel"`) und beim Melden (`modus="auswahl"`, `onMaschine`). Alte Adressen `/karte/<werk>/<halle>` leiten per `redirects()` in `next.config.mjs` auf `/karte?werk=…&halle=…` um. Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
+- Verwendet auf `/karte` (`adresseMitfuehren`: Adresse `?werk=ham&halle=h2&maschine=12`, per `history.replaceState`), und beim Melden (`modus="auswahl"`, `onMaschine`). Alte Adressen `/karte/<werk>/<halle>` leiten per `redirects()` in `next.config.mjs` auf `/karte?werk=…&halle=…` um. Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
 - Rechts neben der Karte zeigt die Info-Spalte je Ebene Standorte, Gebäude, offene Störungen, Techniker bzw. Maschinen-Details.
 - Die Zahl auf jedem Punkt ist die Anzahl offener Aufträge (Status ≠ erledigt), die Farbe kommt von der höchsten offenen Priorität (`components/karten/stufe.js`).
 - `DeutschlandKarte.js`, `Lageplan.js` und `Grundriss.js` zeichnen nur die jeweilige Ebene und rufen beim Klick `onWaehle(objekt, event)` auf.
