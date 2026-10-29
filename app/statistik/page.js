@@ -18,6 +18,7 @@
  */
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
+import { ansichtAusCookie } from '@/lib/ansicht';
 import { berlinZuDate, heuteBerlin, monatKurz } from '@/lib/format';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import { T } from '@/lib/sprache';
@@ -46,7 +47,13 @@ function naechsterTag(wert) {
 }
 
 /** Startebene aus der Adresse (Land, Werk-/Hallen-Kürzel, Maschinen-ID oder alte Standort-ID) */
-function startAusAdresse(parameter, orte) {
+function startAusAdresse(parameter, orte, ansicht) {
+  // Ohne Ebene in der Adresse: Ansicht aus dem Konto (Land/Werk)
+  if (!parameter?.maschine && !parameter?.werk && !parameter?.standort && !parameter?.land) {
+    const werk = orte.find((o) => o.standort_id === ansicht.standortId);
+    if (werk) return { land: werk.land, standortId: werk.standort_id };
+    return orte.some((o) => o.land === ansicht.land) ? { land: ansicht.land } : {};
+  }
   const maschine = orte.find((o) => String(o.id) === String(parameter?.maschine ?? ''));
   if (maschine) return { land: maschine.land, standortId: maschine.standort_id, gebaeudeId: maschine.gebaeude_id, maschineId: maschine.id };
   const werk = String(parameter?.werk ?? '').toUpperCase();
@@ -148,6 +155,6 @@ export default async function StatistikSeite({ searchParams }) {
     <StatistikExplorer
       daten={{ orte, ereignisse, teile, techniker, monate }}
       zeitraum={{ von, bis, ab: ab.toISOString(), bisVor: bisVor.toISOString(), standardBis, schnellwahl, hinweis: filterHinweis }}
-      start={startAusAdresse(parameter, orte)} />
+      start={startAusAdresse(parameter, orte, await ansichtAusCookie())} />
   );
 }

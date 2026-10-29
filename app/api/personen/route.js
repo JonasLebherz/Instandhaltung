@@ -12,7 +12,10 @@ export async function GET() {
   try {
     const personen = await sql`
       SELECT p.id, p.name, p.rolle::text AS rolle, st.stadt, st.name AS standort, t.qualifikation,
-             l.name AS land, COALESCE(l.hauptsitz, false) AS hauptsitz
+             l.name AS land, COALESCE(l.hauptsitz, false) AS hauptsitz,
+             -- Offene Aufträge, die dem Techniker der Person zugewiesen sind (nur Instandhaltung)
+             (SELECT COUNT(*)::int FROM wartungsauftrag w
+              WHERE w.techniker_id = p.techniker_id AND w.status <> 'erledigt') AS offene_auftraege
       FROM person p
       LEFT JOIN standort st  ON st.id = p.standort_id
       LEFT JOIN land l       ON l.kuerzel = st.land_kuerzel

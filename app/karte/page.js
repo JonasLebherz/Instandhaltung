@@ -13,6 +13,7 @@
  *   /karte?maschine=12            Grundriss mit ausgewählter Maschine
  */
 import { benutzerPflicht } from '@/lib/auth';
+import { ansichtAusCookie } from '@/lib/ansicht';
 import { alleKartenDaten } from '@/lib/karten/daten';
 import KartenExplorer from '@/components/karten/KartenExplorer';
 import Kennzahl from '@/components/Kennzahl';
@@ -47,7 +48,7 @@ export default async function KartenSeite({ searchParams }) {
   await benutzerPflicht();
   const t = await uebersetzer();
   const parameter = await searchParams;
-  const daten = await alleKartenDaten();
+  const [daten, ansicht] = await Promise.all([alleKartenDaten(), ansichtAusCookie()]);
   const { standorte } = daten;
 
   const offenGesamt = standorte.reduce((summe, st) => summe + st.offen, 0);
@@ -62,7 +63,9 @@ export default async function KartenSeite({ searchParams }) {
         <p>{t('{n} Werke in {m} Ländern – Land anklicken, um hineinzuzoomen.', { n: standorte.length, m: anzahlLaender })}</p>
       </div>
 
-      <KartenExplorer daten={daten} start={startAusAdresse(parameter, daten)} adresseMitfuehren />
+      <KartenExplorer daten={daten} adresseMitfuehren
+                      // Ohne Angabe in der Adresse beginnt die Karte bei der Ansicht aus dem Konto
+                      start={Object.keys(parameter ?? {}).length > 0 ? startAusAdresse(parameter, daten) : { land: ansicht.land, standortId: ansicht.standortId }} />
 
       <div className="row g-4 mt-0">
         <div className="col-6 col-lg-3">

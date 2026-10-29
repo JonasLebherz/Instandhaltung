@@ -134,6 +134,12 @@ export default function PersonWahl({ aktuelleId, onSchliessen }) {
                       <span className="person-name">{p.name}</span>
                       <RollenAbzeichen rolle={p.rolle} />
                       {p.qualifikation && <span className="person-unter">{t(p.qualifikation)}</span>}
+                      {p.rolle === 'Instandhaltung' && (
+                        <span className={`person-auftraege${p.offene_auftraege > 0 ? ' hat' : ''}`}>
+                          <i className="bi bi-clipboard-check" aria-hidden="true" />{' '}
+                          {p.offene_auftraege === 1 ? t('1 offener Auftrag') : t('{n} offene Aufträge', { n: p.offene_auftraege })}
+                        </span>
+                      )}
                     </span>
                     {p.id === aktuelleId && <i className="bi bi-check2 ms-auto text-primary" aria-hidden="true" />}
                   </button>

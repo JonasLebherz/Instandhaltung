@@ -1812,6 +1812,11 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 
 .min-w-0 { min-width: 0; }
 .konto-menue { min-width: 250px; }
+.ansicht-chip {
+    display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; padding: 1px 10px; border-radius: 999px;
+    font-size: .8rem; font-weight: 600; color: var(--akzent); background: var(--akzent-zart); vertical-align: 2px;
+}
+.ansicht-wahl { display: grid; gap: 6px; padding: 2px 10px 8px; }
 .aufklapp-menue .menue-trenner { height: 1px; margin: 4px 6px; background: var(--linie); }
 
 /* Knopf, der wie ein Link aussieht (z. B. "Mir zuweisen") */
@@ -1865,6 +1870,8 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 }
 .person-name { font-weight: 600; font-size: .9rem; }
 .person-unter { font-size: .74rem; color: var(--text-leise); }
+.person-auftraege { font-size: .74rem; color: var(--text-leise); }
+.person-auftraege.hat { color: var(--akzent); font-weight: 600; }
 
 /* ---------- Übersicht: Aufgaben der Person ---------- */
 .person-hinweis { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }

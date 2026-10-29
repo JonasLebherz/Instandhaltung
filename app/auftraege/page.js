@@ -12,6 +12,7 @@
 import Link from 'next/link';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
+import { ansichtAusCookie, ansichtBedingung } from '@/lib/ansicht';
 import { STATUS_WERTE, PRIORITAET_WERTE } from '@/lib/konstanten';
 import { datumZeit } from '@/lib/format';
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
@@ -46,7 +47,8 @@ export default async function AuftraegeSeite({ searchParams }) {
    */
   const bedingungStatus = filter.status === 'offen' ? sql`w.status <> 'erledigt'`
     : filter.status ? sql`w.status = ${filter.status}` : sql`TRUE`;
-  const bedingungStandort = filter.standort ? sql`g.standort_id = ${Number(filter.standort)}` : sql`TRUE`;
+  // Ohne eigenen Standort-Filter gilt die Ansicht aus dem Konto (Land/Werk, Standard: alle)
+  const bedingungStandort = filter.standort ? sql`g.standort_id = ${Number(filter.standort)}` : ansichtBedingung(await ansichtAusCookie());
   const bedingungMaschine = filter.maschine ? sql`s.maschine_id = ${Number(filter.maschine)}` : sql`TRUE`;
   const bedingungPrio = filter.prioritaet ? sql`s.prioritaet = ${filter.prioritaet}` : sql`TRUE`;
   // ILIKE = Groß-/Kleinschreibung egal; % und _ aus der Eingabe werden als normale Zeichen behandelt

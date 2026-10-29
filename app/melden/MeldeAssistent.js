@@ -16,12 +16,12 @@ import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeFormular from './MeldeFormular';
 import { useT } from '@/components/SpracheKontext';
 
-export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, vorauswahlStandort }) {
+export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, vorauswahlStandort, vorauswahlLand = null }) {
   const { standorte, gebaeude, maschinen } = daten;
   const t = useT();
   const [maschineId, setMaschineId] = useState(vorauswahlMaschine);
   // Wo die Karte beginnt: beim vorgewählten Werk oder (nach "Ändern") im Gebäude der Maschine
-  const [kartenStart, setKartenStart] = useState({ standortId: vorauswahlStandort });
+  const [kartenStart, setKartenStart] = useState({ land: vorauswahlLand, standortId: vorauswahlStandort });
 
   const maschine = maschinen.find((m) => m.id === maschineId) ?? null;
   const halle = maschine ? gebaeude.find((g) => g.id === maschine.gebaeude_id) : null;

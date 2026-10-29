@@ -22,6 +22,7 @@ import { T } from '@/lib/sprache';
 import { standorteMitZahlen } from '@/lib/karten/daten';
 import KleineKarte from '@/components/karten/KleineKarte';
 import { aktuellePerson } from '@/lib/person';
+import { ansichtAusCookie, ansichtBedingung, ansichtAktiv } from '@/lib/ansicht';
 import { PersonWaehlenKnopf, RollenAbzeichen } from '@/components/PersonWahl';
 
 // Immer aktuelle Daten aus der Datenbank (kein Zwischenspeichern der Seite)
@@ -64,6 +65,13 @@ const AUFGABEN_TEXTE = {
 export default async function Uebersicht() {
   const benutzer = await benutzerPflicht();
   const t = await uebersetzer();
+  // Ansicht (Konto → Ansicht): Kennzahlen und Listen nur für dieses Land/Werk
+  const ansicht = await ansichtAusCookie();
+  const imBlick = ansichtBedingung(ansicht);
+  const ortJoin = sql`
+      JOIN maschine m  ON m.id = s.maschine_id
+      JOIN gebaeude g  ON g.id = m.gebaeude_id
+      JOIN standort st ON st.id = g.standort_id`;
 
   // Alle Abfragen gleichzeitig starten – das ist schneller als nacheinander
   const [[kennzahlen], proStatus, offeneMeldungen, kritischeTeile, standorte] = await Promise.all([
@@ -74,10 +82,16 @@ export default async function Uebersicht() {
              COUNT(*) FILTER (WHERE w.status = 'erledigt'
                                 AND w.ende_zeit >= now() - interval '30 days')::int        AS erledigt30
       FROM wartungsauftrag w
-      JOIN stoermeldung s ON s.id = w.stoermeldung_id`,
+      JOIN stoermeldung s ON s.id = w.stoermeldung_id
+      ${ortJoin}
+      WHERE ${imBlick}`,
 
     // Aufträge nach Status
-    sql`SELECT status, COUNT(*)::int AS anzahl FROM wartungsauftrag GROUP BY status`,
+    sql`
+      SELECT w.status, COUNT(*)::int AS anzahl
+      FROM wartungsauftrag w JOIN stoermeldung s ON s.id = w.stoermeldung_id ${ortJoin}
+      WHERE ${imBlick}
+      GROUP BY w.status`,
 
     // Offene Störmeldungen: zuerst nach Priorität (hoch → niedrig), dann neueste zuerst
     sql`
@@ -89,7 +103,7 @@ export default async function Uebersicht() {
       JOIN gebaeude g       ON g.id = m.gebaeude_id
       JOIN standort st      ON st.id = g.standort_id
       LEFT JOIN techniker t ON t.id = w.techniker_id
-      WHERE w.status <> 'erledigt'
+      WHERE w.status <> 'erledigt' AND ${imBlick}
       ORDER BY s.prioritaet DESC, s.zeitpunkt DESC
       LIMIT 8`,
 
@@ -125,7 +139,17 @@ export default async function Uebersicht() {
         <div>
           <div className="eyebrow">{t(begruessung())}, {person?.name ?? benutzer.anzeigename}</div>
           <h1>{t('Übersicht')}</h1>
-          <p>{datumLang(new Date(), t.sprache)}</p>
+          <p>
+            {datumLang(new Date(), t.sprache)}
+            {/* Hinweis, wenn die Ansicht eingeschränkt ist (ändern: Konto unten in der Seitenleiste) */}
+            {ansichtAktiv(ansicht) && (
+              <span className="ansicht-chip">
+                <i className="bi bi-funnel-fill" aria-hidden="true" />{' '}
+                {standorte.find((st) => st.id === ansicht.standortId)?.name
+                  ?? t(standorte.find((st) => st.land === ansicht.land)?.land_name ?? ansicht.land)}
+              </span>
+            )}
+          </p>
         </div>
         <Link className="btn btn-primary" href="/melden">
           <i className="bi bi-plus-lg" aria-hidden="true" /> {t('Neue Störung melden')}

@@ -24,6 +24,7 @@ import { SPRACHEN, T } from '@/lib/sprache';
 import { useSprache, useSpracheWechseln, useT } from './SpracheKontext';
 import Logo from './Logo';
 import PersonWahl, { RollenAbzeichen, PERSON_WAEHLEN } from './PersonWahl';
+import AnsichtWahl from './AnsichtWahl';
 
 /** Seiten, nach Bereichen gruppiert. "symbolAktiv" ist die gefüllte Variante für die aktuelle Seite. */
 // Texte mit T() markiert – übersetzt werden sie beim Anzeigen mit t()
@@ -86,7 +87,7 @@ function initialen(name) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((teil) => teil[0].toUpperCase()).join('') || '?';
 }
 
-export default function Seitenleiste({ benutzer, person }) {
+export default function Seitenleiste({ benutzer, person, ansicht }) {
   const pfad = usePathname();
   const t = useT();
   const sprache = useSprache();
@@ -322,6 +323,10 @@ export default function Seitenleiste({ benutzer, person }) {
                 <button type="button" role="menuitem" onClick={() => { setFenster(null); setPersonWahl(true); }}>
                   <i className="bi bi-person-badge" /> {person ? t('Person wechseln …') : t('Person wählen …')}
                 </button>
+                <div className="menue-trenner" />
+                {/* Ansicht: nur ein Land bzw. Werk anzeigen (Standard: alles) */}
+                <div className="menue-titel">{t('Ansicht')}</div>
+                <AnsichtWahl ansicht={ansicht} />
                 <div className="menue-trenner" />
                 <form action={abmelden}>
                   <button type="submit" role="menuitem"><i className="bi bi-box-arrow-right" /> {t('Abmelden')}</button>

@@ -15,6 +15,7 @@ import { standorteMitZahlen, gebaeudeMitZahlen, maschinenMitZahlen } from '@/lib
 import MeldeAssistent from './MeldeAssistent';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import { aktuellePerson } from '@/lib/person';
+import { ansichtAusCookie } from '@/lib/ansicht';
 
 export const dynamic = 'force-dynamic';
 export const generateMetadata = () => seitentitel('Störung melden');
@@ -23,6 +24,7 @@ export default async function MeldenSeite({ searchParams }) {
   const benutzer = await benutzerPflicht();
   const t = await uebersetzer();
   const parameter = await searchParams;
+  const ansicht = await ansichtAusCookie();   // Konto → Ansicht: Start im Land/Werk
   const [standorte, gebaeude, maschinen, person] = await Promise.all([
     standorteMitZahlen(), gebaeudeMitZahlen(), maschinenMitZahlen(), aktuellePerson(),
   ]);
@@ -31,7 +33,7 @@ export default async function MeldenSeite({ searchParams }) {
 
   const vorauswahlMaschine = maschinen.find((m) => String(m.id) === String(parameter?.maschine ?? ''))?.id ?? null;
   const vorauswahlStandort = standorte.find((st) => String(st.id) === String(parameter?.standort ?? ''))?.id
-    ?? (vorauswahlMaschine ? null : person?.standort_id ?? null);
+    ?? (vorauswahlMaschine ? null : person?.standort_id ?? ansicht.standortId ?? null);
 
   // Startwerte des Formulars
   const startwerte = {
@@ -53,7 +55,8 @@ export default async function MeldenSeite({ searchParams }) {
         </div>
       </div>
       <MeldeAssistent daten={daten} startwerte={startwerte}
-                      vorauswahlMaschine={vorauswahlMaschine} vorauswahlStandort={vorauswahlStandort} />
+                      vorauswahlMaschine={vorauswahlMaschine} vorauswahlStandort={vorauswahlStandort}
+                      vorauswahlLand={vorauswahlMaschine || vorauswahlStandort ? null : ansicht.land} />
     </>
   );
 }

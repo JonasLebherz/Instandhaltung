@@ -67,8 +67,8 @@ function equalEarth(lat, lon) {
   return [l * Math.cos(th) / (M * (A1 + 3 * A2 * t2 + t6 * (7 * A3 + 9 * A4 * t2))), th * (A1 + A2 * t2 + t6 * (A3 + A4 * t2))];
 }
 const ohneAntarktis = w110.filter((f) => f.id !== '010');
-// Ausschnitt: von Nordamerika bis Japan, vom Polarkreis bis Südafrika – dort liegen alle Werke
-const minX = equalEarth(0, -128)[0], maxX = equalEarth(0, 160)[0], maxY = equalEarth(80, 0)[1], minY = equalEarth(-36, 0)[1];
+// Ganze Welt (ohne Antarktis): 84° N bis 57° S
+const minX = equalEarth(0, -180)[0], maxX = equalEarth(0, 180)[0], maxY = equalEarth(84, 0)[1], minY = equalEarth(-57, 0)[1];
 const WB = 1000, WS = WB / (maxX - minX), WH = Math.round((maxY - minY) * WS);
 const welt = { breite: WB, hoehe: WH, skala: WS, versatzX: -minX * WS, versatzY: maxY * WS };
 const weltPunkt = ([lo, la]) => { const [x, y] = equalEarth(la, lo); return [welt.versatzX + welt.skala * x, welt.versatzY - welt.skala * y]; };
@@ -122,8 +122,8 @@ let js = `/**
  * Nicht von Hand bearbeiten – die Pfade sind fertig berechnete SVG-Daten,
  * zur Laufzeit wird keine Kartenbibliothek geladen.
  *
- *  - Welt: Projektion "Equal Earth" (flächentreu, wirkt natürlich), Ausschnitt von
- *    Nordamerika bis Japan (80° N bis 36° S)
+ *  - Welt: Projektion "Equal Earth" (flächentreu, wirkt natürlich), ganze Welt
+ *    ohne Antarktis (84° N bis 57° S)
  *  - Länder: Mercator, eingepasst auf einen festen Ausschnitt je Land
  *  - Deutschland hat eine eigene, feinere Karte (lib/karten/deutschland.js)
  *

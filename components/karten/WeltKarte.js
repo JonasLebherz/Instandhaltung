@@ -22,7 +22,7 @@ import { useT } from '@/components/SpracheKontext';
 export default function WeltKarte({ laender, onWaehle, neutral = false, klein = false }) {
   const t = useT();
   const { breite, hoehe } = WELT;
-  const positionen = weltPositionen(laender, klein ? { x: 95, y: 92 } : { x: 150, y: 120 });
+  const positionen = weltPositionen(laender, klein ? { x: 110, y: 105 } : { x: 165, y: 120 });
 
   return (
     <div className={`dkarte wkarte${klein ? ' wkarte-klein' : ''}`} style={{ aspectRatio: `${breite} / ${hoehe}` }}>
