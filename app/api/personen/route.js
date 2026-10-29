@@ -9,11 +9,19 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   if (!(await aktuellerBenutzer())) return Response.json({ fehler: 'Nicht angemeldet' }, { status: 401 });
-  const personen = await sql`
-    SELECT p.id, p.name, p.rolle::text AS rolle, st.stadt, st.name AS standort, t.qualifikation
-    FROM person p
-    LEFT JOIN standort st  ON st.id = p.standort_id
-    LEFT JOIN techniker t  ON t.id = p.techniker_id
-    ORDER BY st.name NULLS LAST, p.rolle, p.name`;
-  return Response.json({ personen });
+  try {
+    const personen = await sql`
+      SELECT p.id, p.name, p.rolle::text AS rolle, st.stadt, st.name AS standort, t.qualifikation,
+             l.name AS land, COALESCE(l.hauptsitz, false) AS hauptsitz
+      FROM person p
+      LEFT JOIN standort st  ON st.id = p.standort_id
+      LEFT JOIN land l       ON l.kuerzel = st.land_kuerzel
+      LEFT JOIN techniker t  ON t.id = p.techniker_id
+      ORDER BY hauptsitz DESC, l.name NULLS LAST, st.name NULLS LAST, p.rolle, p.name`;
+    return Response.json({ personen });
+  } catch (fehler) {
+    // Häufigste Ursache: Die Migration mit der Tabelle "person" wurde in Supabase noch nicht ausgeführt
+    const fehltTabelle = fehler.code === '42P01' || fehler.code === '42703';
+    return Response.json({ fehler: fehltTabelle ? 'migration' : 'datenbank' }, { status: 500 });
+  }
 }

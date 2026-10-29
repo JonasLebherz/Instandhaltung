@@ -1,11 +1,13 @@
 /**
  * app/karte/page.js – Störungskarte
  *
- * Eine einzige Seite für alle drei Ebenen: Deutschland → Werk → Gebäude.
+ * Eine einzige Seite für alle Ebenen: Welt → Land → Werk → Gebäude.
  * Die Daten aller Standorte, Gebäude und Maschinen werden einmal geladen,
  * danach zoomt die Karte im Browser ohne Neuladen (components/karten/KartenExplorer.js).
  *
  * Die Adresse merkt sich die aktuelle Ebene, damit man Links teilen kann:
+ *   /karte                        Weltkarte mit allen Ländern
+ *   /karte?land=de                Deutschland mit seinen Werken
  *   /karte?werk=ham               Lageplan des Werks Hamburg
  *   /karte?werk=ham&halle=h2      Grundriss von Halle 2
  *   /karte?maschine=12            Grundriss mit ausgewählter Maschine
@@ -32,7 +34,11 @@ function startAusAdresse(parameter, daten) {
     return { standortId: g.standort_id, gebaeudeId: g.id, maschineId: maschine.id };
   }
   const standort = daten.standorte.find((st) => st.kuerzel === werk);
-  if (!standort) return {};
+  if (!standort) {
+    // Nur ein Land angegeben (Kürzel klein in der Adresse, groß in der Datenbank)
+    const land = String(parameter?.land ?? '').toUpperCase();
+    return daten.standorte.some((st) => st.land === land) ? { land } : {};
+  }
   const gebaeude = daten.gebaeude.find((g) => g.standort_id === standort.id && g.kuerzel === halle);
   return { standortId: standort.id, gebaeudeId: gebaeude?.id ?? null };
 }
@@ -47,12 +53,13 @@ export default async function KartenSeite({ searchParams }) {
   const offenGesamt = standorte.reduce((summe, st) => summe + st.offen, 0);
   const hochGesamt = standorte.reduce((summe, st) => summe + st.hoch, 0);
   const betroffen = standorte.filter((st) => st.offen > 0).length;
+  const anzahlLaender = new Set(standorte.map((st) => st.land)).size;
 
   return (
     <>
       <div className="seitenkopf">
         <h1>{t('Störungskarte')}</h1>
-        <p>{t('{n} Standorte in Deutschland – Werk anklicken, um hineinzuzoomen.', { n: standorte.length })}</p>
+        <p>{t('{n} Werke in {m} Ländern – Land anklicken, um hineinzuzoomen.', { n: standorte.length, m: anzahlLaender })}</p>
       </div>
 
       <KartenExplorer daten={daten} start={startAusAdresse(parameter, daten)} adresseMitfuehren />

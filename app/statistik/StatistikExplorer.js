@@ -60,22 +60,29 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
   const { orte, ereignisse, teile, techniker, monate } = daten;
   const buehneRef = useRef(null);
   const [ebene, setEbene] = useState({
-    standortId: start.standortId ?? null, gebaeudeId: start.gebaeudeId ?? null, maschineId: start.maschineId ?? null,
+    land: start.land ?? null, standortId: start.standortId ?? null, gebaeudeId: start.gebaeudeId ?? null, maschineId: start.maschineId ?? null,
   });
   const [zoom, setZoom] = useState(null);   // { richtung: 'rein'|'raus', ursprung: 'x y' }
 
   /* ---------- Nachschlagelisten aus den Maschinen ---------- */
-  const { standorte, gebaeude, maschineVon } = useMemo(() => {
+  const { laender, standorte, gebaeude, maschineVon } = useMemo(() => {
+    const la = new Map();
     const st = new Map();
     const ge = new Map();
     orte.forEach((o) => {
-      if (!st.has(o.standort_id)) st.set(o.standort_id, { id: o.standort_id, kuerzel: o.standort_kuerzel, name: o.standort, stadt: o.stadt });
+      if (!la.has(o.land)) la.set(o.land, { id: o.land, name: o.land_name, hauptsitz: o.hauptsitz, werke: new Set() });
+      la.get(o.land).werke.add(o.standort_id);
+      if (!st.has(o.standort_id)) st.set(o.standort_id, { id: o.standort_id, kuerzel: o.standort_kuerzel, name: o.standort, stadt: o.stadt, land: o.land });
       if (!ge.has(o.gebaeude_id)) ge.set(o.gebaeude_id, { id: o.gebaeude_id, standort_id: o.standort_id, kuerzel: o.gebaeude_kuerzel, bezeichnung: o.gebaeude });
     });
-    return { standorte: [...st.values()], gebaeude: [...ge.values()], maschineVon: Object.fromEntries(orte.map((o) => [o.id, o])) };
+    return {
+      laender: [...la.values()], standorte: [...st.values()], gebaeude: [...ge.values()],
+      maschineVon: Object.fromEntries(orte.map((o) => [o.id, o])),
+    };
   }, [orte]);
 
-  const stufe = ebene.maschineId ? 'maschine' : ebene.gebaeudeId ? 'gebaeude' : ebene.standortId ? 'werk' : 'alle';
+  const stufe = ebene.maschineId ? 'maschine' : ebene.gebaeudeId ? 'gebaeude' : ebene.standortId ? 'werk' : ebene.land ? 'land' : 'alle';
+  const land = laender.find((l) => l.id === ebene.land) ?? null;
   const standort = standorte.find((s) => s.id === ebene.standortId) ?? null;
   const halle = gebaeude.find((g) => g.id === ebene.gebaeudeId) ?? null;
   const maschine = maschineVon[ebene.maschineId] ?? null;
@@ -83,7 +90,8 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
   /** Gehört eine Maschine zur aktuellen Ebene? */
   const imBlick = (o) => (stufe === 'maschine' ? o.id === ebene.maschineId
     : stufe === 'gebaeude' ? o.gebaeude_id === ebene.gebaeudeId
-      : stufe === 'werk' ? o.standort_id === ebene.standortId : true);
+      : stufe === 'werk' ? o.standort_id === ebene.standortId
+        : stufe === 'land' ? o.land === ebene.land : true);
 
   /* ---------- Auswertung der aktuellen Ebene ---------- */
   const a = useMemo(() => {
@@ -131,7 +139,13 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
   const kinder = useMemo(() => {
     let liste = [];
     if (stufe === 'alle') {
-      liste = standorte.map((s) => ({ art: 'werk', id: s.id, name: s.name, unter: s.stadt, filter: (o) => o.standort_id === s.id }));
+      liste = laender.map((l) => ({
+        art: 'land', id: l.id, name: t(l.name), unter: l.werke.size === 1 ? t('1 Werk') : t('{n} Werke', { n: l.werke.size }),
+        filter: (o) => o.land === l.id,
+      }));
+    } else if (stufe === 'land') {
+      liste = standorte.filter((s) => s.land === ebene.land)
+        .map((s) => ({ art: 'werk', id: s.id, name: s.name, unter: s.stadt, filter: (o) => o.standort_id === s.id }));
     } else if (stufe === 'werk') {
       liste = gebaeude.filter((g) => g.standort_id === ebene.standortId)
         .map((g) => ({ art: 'gebaeude', id: g.id, name: g.bezeichnung, unter: g.kuerzel, filter: (o) => o.gebaeude_id === g.id }));
@@ -143,7 +157,8 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
       const ids = new Set(orte.filter(k.filter).map((o) => o.id));
       return { ...k, maschinen: ids.size, ...auswerten(ereignisse.filter((e) => ids.has(e.maschine_id))) };
     }).sort((x, y) => y.ausfall_min - x.ausfall_min || y.anzahl - x.anzahl);
-  }, [stufe, ebene, standorte, gebaeude, orte, ereignisse]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stufe, ebene, laender, standorte, gebaeude, orte, ereignisse]);
 
   /* ---------- Zoomen ---------- */
   function zoomen(neu, richtung, element = null) {
@@ -158,11 +173,13 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     // Liegt der Anfang der Statistik oberhalb des Bildschirms, sanft dorthin scrollen
     if (box && box.top < 0) window.scrollTo({ top: window.scrollY + box.top - 90, behavior: 'smooth' });
   }
-  const zuAllen = () => zoomen({ standortId: null, gebaeudeId: null, maschineId: null }, 'raus');
-  const zuWerk = () => zoomen({ standortId: ebene.standortId, gebaeudeId: null, maschineId: null }, 'raus');
+  const zuAllen = () => zoomen({ land: null, standortId: null, gebaeudeId: null, maschineId: null }, 'raus');
+  const zuLand = () => zoomen({ land: ebene.land, standortId: null, gebaeudeId: null, maschineId: null }, 'raus');
+  const zuWerk = () => zoomen({ land: ebene.land, standortId: ebene.standortId, gebaeudeId: null, maschineId: null }, 'raus');
   const zuHalle = () => zoomen({ ...ebene, maschineId: null }, 'raus');
   function kachelGeklickt(k, e) {
-    const neu = k.art === 'werk' ? { standortId: k.id, gebaeudeId: null, maschineId: null }
+    const neu = k.art === 'land' ? { land: k.id, standortId: null, gebaeudeId: null, maschineId: null }
+      : k.art === 'werk' ? { land: ebene.land, standortId: k.id, gebaeudeId: null, maschineId: null }
       : k.art === 'gebaeude' ? { ...ebene, gebaeudeId: k.id, maschineId: null }
         : { ...ebene, maschineId: k.id };
     zoomen(neu, 'rein', e.currentTarget);
@@ -173,29 +190,33 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
   useEffect(() => {
     if (ersteAnzeige.current) { ersteAnzeige.current = false; return; }
     const p = new URLSearchParams({ von: zeitraum.von, bis: zeitraum.bis });
+    if (land && !standort) p.set('land', land.id.toLowerCase());
     if (standort) p.set('werk', standort.kuerzel.toLowerCase());
     if (halle) p.set('halle', halle.kuerzel.toLowerCase());
     if (maschine) p.set('maschine', String(maschine.id));
     window.history.replaceState(window.history.state, '', `${window.location.pathname}?${p}`);
-  }, [ebene, standort, halle, maschine, zeitraum.von, zeitraum.bis]);
+  }, [ebene, land, standort, halle, maschine, zeitraum.von, zeitraum.bis]);
 
   /* ---------- Anzeige ---------- */
   const k = a.kennzahlen;
   const s = t.sprache;
   const stunden = (min) => (min === null ? null : min / 60);
   const zeitraumTage = (new Date(zeitraum.bisVor) - new Date(zeitraum.ab)) / 86400000;
-  const titel = maschine?.bezeichnung ?? halle?.bezeichnung ?? standort?.name ?? t('Statistik');
+  const titel = maschine?.bezeichnung ?? halle?.bezeichnung ?? standort?.name ?? (land ? t(land.name) : t('Statistik'));
   const karteLink = maschine ? `/karte?werk=${maschine.standort_kuerzel.toLowerCase()}&halle=${maschine.gebaeude_kuerzel.toLowerCase()}&maschine=${maschine.id}`
     : halle ? `/karte?werk=${standort.kuerzel.toLowerCase()}&halle=${halle.kuerzel.toLowerCase()}`
-      : standort ? `/karte?werk=${standort.kuerzel.toLowerCase()}` : null;
-  const ebenenParameter = { werk: standort?.kuerzel.toLowerCase(), halle: halle?.kuerzel.toLowerCase(), maschine: maschine?.id };
+      : standort ? `/karte?werk=${standort.kuerzel.toLowerCase()}`
+        : land ? `/karte?land=${land.id.toLowerCase()}` : null;
+  const ebenenParameter = { land: standort ? undefined : land?.id.toLowerCase(), werk: standort?.kuerzel.toLowerCase(), halle: halle?.kuerzel.toLowerCase(), maschine: maschine?.id };
   const schnellLink = (von) => {
     const p = new URLSearchParams({ von, bis: zeitraum.standardBis });
     Object.entries(ebenenParameter).forEach(([n, w]) => w && p.set(n, String(w)));
     return `/statistik?${p}`;
   };
   const maxAusfallKind = Math.max(1, ...kinder.map((x) => x.ausfall_min));
-  const kinderTitel = { alle: t('Standorte im Vergleich'), werk: t('Gebäude im Vergleich'), gebaeude: t('Maschinen im Vergleich') }[stufe];
+  const kinderTitel = {
+    alle: t('Länder im Vergleich'), land: t('Standorte im Vergleich'), werk: t('Gebäude im Vergleich'), gebaeude: t('Maschinen im Vergleich'),
+  }[stufe];
 
   return (
     <>
@@ -204,8 +225,10 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
         <div>
           <nav className="brotkrumen stat-pfad" aria-label={t('Pfad')}>
             <button type="button" onClick={zuAllen} disabled={stufe === 'alle'}>
-              <i className="bi bi-buildings" aria-hidden="true" /> {t('Alle Standorte')}
+              <i className="bi bi-globe2" aria-hidden="true" /> {t('Weltweit')}
             </button>
+            {land && <><i className="bi bi-chevron-right" aria-hidden="true" />
+              <button type="button" onClick={zuLand} disabled={stufe === 'land'}>{t(land.name)}</button></>}
             {standort && <><i className="bi bi-chevron-right" aria-hidden="true" />
               <button type="button" onClick={zuWerk} disabled={stufe === 'werk'}>{standort.name}</button></>}
             {halle && <><i className="bi bi-chevron-right" aria-hidden="true" />

@@ -12,9 +12,10 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 ## Stand
 
 - **Live:** Die App läuft bei Vercel mit Supabase. Login funktioniert.
-- **Fertig:** alle Seiten (Übersicht mit kleiner Karte, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik mit Zoom, Datenbasis, Login), Seitenleiste links, Logo, Sprache Deutsch/Englisch, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
-- **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 40 Personen (je Werk 2 Instandhaltung, 1 Schichtleitung, 1 Produktion), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
-- **Getestet** gegen PostgreSQL 16 lokal: 150 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Personenwahl und Rollen, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Statistik-Zoom gegen SQL, Datenbasis, Sprache Englisch, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
+- **Fertig:** alle Seiten (Übersicht mit kleiner Karte, Melden über die Karte, Störungskarte mit Zoom Welt/Land/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik mit Zoom, Datenbasis, Login), Seitenleiste links, Logo, Sprache Deutsch/Englisch, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
+- **Beispielunternehmen:** international, Hauptsitz Deutschland. 8 Länder, 19 Standorte (10 in Deutschland; USA 2, China 2, Mexiko, Indien, Frankreich, Russland, Polen je 1), 52 Gebäude, 207 Maschinen, 38 Techniker (2 pro Standort), 76 Personen (je Werk 2 Instandhaltung, 1 Schichtleitung, 1 Produktion), 20 Ersatzteile, ca. 1.000 Meldungen über 12 Monate, davon gut 60 offen. Berlin hat bewusst keine offenen Störungen.
+- Auslandswerke (Migration `002_laender_und_auslandswerke.sql`, gleicher Teil am Ende von `testdaten.sql`) übernehmen Gelände, Gebäude und Maschinen eines deutschen Vorbilds mit gleichem Schwerpunkt; ihre Störungen sind eine per `hashtext` (statt Zufall, also bei jedem Lauf gleich) ausgewählte und zeitlich verschobene Teilmenge der Störungen des Vorbilds. Zeiten werden weiter in deutscher Zeit angezeigt.
+- **Getestet** gegen PostgreSQL 16 lokal: 166 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Personenwahl und Rollen, Welt-/Länderkarte, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Statistik-Zoom gegen SQL, Datenbasis, Sprache Englisch, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
 - **Nach Schemaänderungen** wird in Supabase nur die neue Migrationsdatei aus `supabase/migrationen/` ausgeführt (Daten bleiben erhalten, siehe „SQL-Dateien“). `schema.sql` + `testdaten.sql` nur für eine Neuinstallation – das setzt alle Daten zurück, Login-Konten bleiben erhalten.
 
 ## Team & andere KI-Assistenten
@@ -49,7 +50,7 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
   - Vercel-Funktionen laufen in Frankfurt (`vercel.json`: `"regions": ["fra1"]`), nah an der Supabase-Datenbank (eu-central-1). Liegt das Supabase-Projekt woanders, die Region anpassen.
   - Im Layout keine Datenbank-Abfragen: Es läuft bei jeder Anfrage. Die Zahl offener Aufträge holt die Seitenleiste selbst über `app/api/offene-auftraege/route.js`.
   - Pro Seite **höchstens 5 Abfragen gleichzeitig** (`max: 5` in `lib/db.js`). Bei mehr schickt postgres.js mehrere Abfragen über eine Verbindung (Pipelining), was mit dem Supabase-Pooler zu Hängern bis zum Timeout führen kann. `max_pipeline: 0` ist keine Lösung, damit scheitern Transaktionen (`UNSAFE_TRANSACTION`).
-  - Die Übersicht zeigt nur eine kleine Deutschlandkarte (`components/karten/KleineKarte.js`, Klick → `/karte?werk=…`), nicht die ganze Zoom-Karte.
+  - Die Übersicht zeigt nur eine kleine Weltkarte (`components/karten/KleineKarte.js`, Klick → `/karte?land=…`), nicht die ganze Zoom-Karte.
   - **Kein `app/loading.js`:** Damit blieben Formulare nach dem Speichern (Server-Aktion mit `redirect`) endlos hängen. Rückmeldung beim Seitenwechsel gibt stattdessen ein drehender Ring in der Seitenleiste (`useLinkStatus`).
   - `/status` misst Login- und Datenbankzeiten und zeigt Regionen und Port (ohne Zugangsdaten). Hilfreich bei langsamen Ladezeiten. Ausführlicher und grafisch: Seite „Datenbasis“.
 - **CSS-Reihenfolge:** Bootstrap und Bootstrap Icons werden per `@import` ganz oben in `app/globals.css` geladen, nicht im Layout. Getrennte Imports hat Next.js im Build vertauscht – dann überschreibt Bootstrap unser Design (z. B. unterstrichene Links).
@@ -70,21 +71,26 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 
 ## Störungskarte
 
-- Ebenen: Deutschland → Werk (Lageplan) → Gebäude (Grundriss), alles in **einer** Client-Komponente `components/karten/KartenExplorer.js`. Sie bekommt alle Daten auf einmal (`alleKartenDaten()` in `lib/karten/daten.js`) und wechselt die Ebenen ohne Neuladen.
-- Zoom-Animation: Beim Wechsel bleibt die alte Ebene kurz stehen (`.ebene-alt`), die neue wächst aus dem angeklickten Punkt (`transform-origin` = Mitte des Elements mit `data-ort="st-<id>"` bzw. `"g-<id>"`). Beim Herauszoomen wird der Punkt in der neuen Ebene gemessen. CSS: Abschnitt „Zoom-Karte“ in `app/globals.css`.
-- Verwendet auf `/karte` (`adresseMitfuehren`: Adresse `?werk=ham&halle=h2&maschine=12`, per `history.replaceState`), und beim Melden (`modus="auswahl"`, `onMaschine`). Alte Adressen `/karte/<werk>/<halle>` leiten per `redirects()` in `next.config.mjs` auf `/karte?werk=…&halle=…` um. Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
-- Rechts neben der Karte zeigt die Info-Spalte je Ebene Standorte, Gebäude, offene Störungen, Techniker bzw. Maschinen-Details.
+- Ebenen: Welt → Land → Werk (Lageplan) → Gebäude (Grundriss), alles in **einer** Client-Komponente `components/karten/KartenExplorer.js`. Sie bekommt alle Daten auf einmal (`alleKartenDaten()` in `lib/karten/daten.js`) und wechselt die Ebenen ohne Neuladen.
+- Zoom-Animation: Beim Wechsel bleibt die alte Ebene kurz stehen (`.ebene-alt`), die neue wächst aus dem angeklickten Punkt (`transform-origin` = Mitte des Elements mit `data-ort="land-<KÜRZEL>"`, `"st-<id>"` bzw. `"g-<id>"`). Beim Herauszoomen wird der Punkt in der neuen Ebene gemessen. CSS: Abschnitt „Zoom-Karte“ in `app/globals.css`.
+- Ebene im Zustand: `{ land, standortId, gebaeudeId }`. Ein Werk legt sein Land mit fest.
+- Verwendet auf `/karte` (`adresseMitfuehren`: Adresse `?land=us` bzw. `?werk=ham&halle=h2&maschine=12`, per `history.replaceState`), und beim Melden (`modus="auswahl"`, `onMaschine`). Alte Adressen `/karte/<werk>/<halle>` leiten per `redirects()` in `next.config.mjs` auf `/karte?werk=…&halle=…` um. Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
+- Rechts neben der Karte zeigt die Info-Spalte je Ebene Länder, Standorte, Gebäude, offene Störungen, Techniker bzw. Maschinen-Details.
 - Die Zahl auf jedem Punkt ist die Anzahl offener Aufträge (Status ≠ erledigt), die Farbe kommt von der höchsten offenen Priorität (`components/karten/stufe.js`).
-- `DeutschlandKarte.js`, `Lageplan.js` und `Grundriss.js` zeichnen nur die jeweilige Ebene und rufen beim Klick `onWaehle(objekt, event)` auf.
+- `WeltKarte.js`, `LandKarte.js`, `Lageplan.js` und `Grundriss.js` zeichnen nur die jeweilige Ebene und rufen beim Klick `onWaehle(objekt, event)` auf.
 - Aufbau: SVG für Hintergrund (Umriss, Gelände, Wände, Bereiche), darüber absolut positionierte HTML-Elemente in Prozent der Größe in Metern. Container haben `aspect-ratio` = Breite/Tiefe.
-- Deutschland-Umriss: vorab berechnete SVG-Pfade in `lib/karten/deutschland.js` (Natural Earth über `world-atlas`, Mercator). `projizieren(breite, länge)` nutzt dieselbe Formel. Zur Laufzeit werden keine Kartenbibliotheken geladen.
-- **Melden sieht bewusst anders aus als die Störungskarte:** warmer Orange-Ton, Schritt-Leiste `components/karten/MeldeSchritte.js` (1 Werk → 2 Gebäude → 3 Maschine → 4 Beschreibung) statt Pfad, und **keine Störungszahlen**: `DeutschlandKarte`, `Lageplan` und `Grundriss` bekommen `neutral` (Ortsmarken, Farbe `stufe-neutral`), Legende und Zahlen in den Listen entfallen. CSS: Abschnitt 5 in `app/globals.css` (`.explorer-melden`).
+- Umrisse: vorab berechnete SVG-Pfade (Natural Earth über `world-atlas`). Zur Laufzeit werden keine Kartenbibliotheken geladen.
+  - Deutschland: `lib/karten/deutschland.js` (fein, Mercator, `projizieren`).
+  - Welt und übrige Länder: `lib/karten/welt.js`, **erzeugt** mit `scripts/weltkarte-erzeugen.cjs` (Anleitung im Kopf der Datei). Welt in Equal Earth (Ausschnitt 80° N bis 36° S, `weltPunkt`, `WELT_MITTEN` = Markierung je Land), Länder in Mercator auf festem Ausschnitt (`LAENDER_KARTEN`, `landPunkt`). Ganzzahlige, relative Pfade, Datumsgrenze behandelt.
+  - `lib/karten/laender.js`: `laenderAus(standorte)` (Länder aus den Werken, Hauptsitz zuerst), `landKarte(kuerzel)` (Deutschland, fertige Karte oder Ausschnitt um die Werke ohne Umriss), `weltPositionen()` (schiebt nahe Markierungen auseinander, z. B. Deutschland/Frankreich/Polen; feine Linie zur echten Lage).
+  - Neues Land: Zeile in `land` (Migration) und für einen Umriss ISO-Nummer + Ausschnitt in `scripts/weltkarte-erzeugen.cjs` ergänzen, Skript ausführen, Ländernamen in `en.js`.
+- **Melden sieht bewusst anders aus als die Störungskarte:** warmer Orange-Ton, Schritt-Leiste `components/karten/MeldeSchritte.js` (1 Land → 2 Werk → 3 Gebäude → 4 Maschine → 5 Beschreibung) statt Pfad, und **keine Störungszahlen**: `WeltKarte`, `LandKarte`, `Lageplan` und `Grundriss` bekommen `neutral` (Ortsmarken, Farbe `stufe-neutral`), Legende und Zahlen in den Listen entfallen. CSS: Abschnitt 5 in `app/globals.css` (`.explorer-melden`).
 - Melden: `app/melden/MeldeAssistent.js` (erst Karte, nach Wahl der Maschine das Formular; „Ändern“ öffnet die Karte im Gebäude der Maschine) und `MeldeFormular.js` (sendet `maschine_id` als verstecktes Feld). `?maschine=<id>` springt direkt zum Formular, `?standort=<id>` startet im Werk.
 
 ## Statistik (`app/statistik/`)
 
 - `page.js` lädt die Störmeldungen des Zeitraums **einmal** (mit Monat, Wochentag, Stunde nach deutscher Zeit, Reparatur- und Ausfallminuten), dazu Maschinen mit Gebäude/Standort, verbaute Ersatzteile und Techniker (4 Abfragen).
-- `StatistikExplorer.js` rechnet im Browser je Ebene (alle Standorte → Werk → Gebäude → Maschine). Kacheln „im Vergleich“ zoomen hinein, der Pfad oben heraus. Die Adresse wird per `history.replaceState` mitgeführt (`?von&bis&werk&halle&maschine`, alt: `?standort=<id>`).
+- `StatistikExplorer.js` rechnet im Browser je Ebene (weltweit → Land → Werk → Gebäude → Maschine). Kacheln „im Vergleich“ zoomen hinein, der Pfad oben heraus. Die Adresse wird per `history.replaceState` mitgeführt (`?von&bis&land` bzw. `&werk&halle&maschine`, alt: `?standort=<id>`).
 - Definitionen wie in den Views: MTTR = Ø (ende − start) erledigter Aufträge, Ausfallzeit = Σ (ende − Meldung) erledigter Aufträge, MTBF = Zeitraum / Anzahl Störungen.
 - Diagramme: `Diagramm.js` (Chart.js, eine Reihe, eine Farbe, Tabellenansicht darunter). Nie zwei y-Achsen in einem Diagramm – Anzahl und MTTR pro Monat sind zwei Diagramme. Heatmap, Prioritäten, Schichten und Ersatzteile sind HTML/CSS.
 
@@ -128,8 +134,8 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
 
 ## Datenmodell (siehe `supabase/schema.sql`)
 
-- Tabellen: `standort`, `gebaeude`, `maschine`, `techniker`, `person`, `stoermeldung`, `wartungsauftrag`, `ersatzteil`, `auftrag_ersatzteil`, `bestellung`, `auftrag_verlauf`.
-- `standort` (GPS-Position, Geländegröße) 1:n `gebaeude` (Lage auf dem Gelände, `bereiche` als JSONB) 1:n `maschine` (`anlagennummer` eindeutig, `typ` vom ENUM `maschinentyp`, Position und Stellfläche in Metern). Techniker gehören zu einem Standort, Ersatzteile liegen zentral.
+- Tabellen: `land`, `standort`, `gebaeude`, `maschine`, `techniker`, `person`, `stoermeldung`, `wartungsauftrag`, `ersatzteil`, `auftrag_ersatzteil`, `bestellung`, `auftrag_verlauf`.
+- `land` (`kuerzel` = ISO 3166-1 als Primärschlüssel, `hauptsitz` höchstens einmal wahr) 1:n `standort` (`land_kuerzel`, Standard `'DE'`; GPS-Position, Geländegröße) 1:n `gebaeude` (Lage auf dem Gelände, `bereiche` als JSONB) 1:n `maschine` (`anlagennummer` eindeutig, `typ` vom ENUM `maschinentyp`, Position und Stellfläche in Metern). Techniker gehören zu einem Standort, Ersatzteile liegen zentral.
 - Wertelisten als ENUM-Typen: `auftragsstatus`, `prioritaet` (Reihenfolge niedrig < mittel < hoch, deshalb gehen `ORDER BY prioritaet DESC` und `MAX(prioritaet)`), `schicht`, `bestellstatus`, `ursache`, `maschinentyp`, `rolle`. Gespiegelt in `lib/konstanten.js` (inkl. `MASCHINEN_SYMBOLE`).
 - **Zu jeder Störmeldung gibt es genau einen Wartungsauftrag.** Links auf Detailseiten verwenden die **Auftrags-ID**: `/auftraege/<id>`.
 - `auftrag_ersatzteil` hat den Primärschlüssel `(auftrag_id, ersatzteil_id)`. Mehrfachbuchungen laufen über `ON CONFLICT … DO UPDATE`.

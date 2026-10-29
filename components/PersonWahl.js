@@ -53,6 +53,7 @@ export default function PersonWahl({ aktuelleId, onSchliessen }) {
   const t = useT();
   const router = useRouter();
   const [personen, setPersonen] = useState(null);
+  const [ladeFehler, setLadeFehler] = useState(null);   // 'migration' | 'datenbank' | null
   const [rolle, setRolle] = useState('');
   const [suche, setSuche] = useState('');
   const sucheRef = useRef(null);
@@ -61,7 +62,10 @@ export default function PersonWahl({ aktuelleId, onSchliessen }) {
   schliessenRef.current = onSchliessen;
 
   useEffect(() => {
-    fetch('/api/personen', { cache: 'no-store' }).then((a) => a.json()).then((d) => setPersonen(d.personen ?? [])).catch(() => setPersonen([]));
+    fetch('/api/personen', { cache: 'no-store' })
+      .then((a) => a.json())
+      .then((d) => { setPersonen(d.personen ?? []); if (d.fehler) setLadeFehler(d.fehler); })
+      .catch(() => { setPersonen([]); setLadeFehler('datenbank'); });
     sucheRef.current?.focus();
     const taste = (e) => { if (e.key === 'Escape') schliessenRef.current(); };
     document.addEventListener('keydown', taste);
@@ -75,10 +79,14 @@ export default function PersonWahl({ aktuelleId, onSchliessen }) {
   }
 
   const gefiltert = (personen ?? []).filter((p) => (!rolle || p.rolle === rolle)
-    && (!suche || `${p.name} ${p.stadt ?? ''}`.toLowerCase().includes(suche.toLowerCase())));
+    && (!suche || `${p.name} ${p.stadt ?? ''} ${p.land ? t(p.land) : ''}`.toLowerCase().includes(suche.toLowerCase())));
   // Nach Werk gruppieren
   const gruppen = {};
-  gefiltert.forEach((p) => { (gruppen[p.standort ?? t('ohne Standort')] ??= []).push(p); });
+  // Überschrift je Werk mit Land, z. B. "Werk Detroit · USA"
+  gefiltert.forEach((p) => {
+    const werk = p.standort ? `${p.standort}${p.land ? ` · ${t(p.land)}` : ''}` : t('ohne Standort');
+    (gruppen[werk] ??= []).push(p);
+  });
 
   return createPortal(
     <div className="dialog-hintergrund" onMouseDown={(e) => { if (e.target === e.currentTarget) onSchliessen(); }}>
@@ -92,7 +100,7 @@ export default function PersonWahl({ aktuelleId, onSchliessen }) {
         </div>
 
         <div className="person-filter">
-          <input ref={sucheRef} type="search" className="form-control" placeholder={t('Name oder Stadt suchen …')}
+          <input ref={sucheRef} type="search" className="form-control" placeholder={t('Name, Stadt oder Land suchen …')}
                  value={suche} onChange={(e) => setSuche(e.target.value)} aria-label={t('Suche')} />
           <div className="sprach-schalter rollen-filter" role="group" aria-label={t('Rolle')}>
             <button type="button" aria-pressed={rolle === ''} onClick={() => setRolle('')}>{t('Alle')}</button>
@@ -104,6 +112,17 @@ export default function PersonWahl({ aktuelleId, onSchliessen }) {
 
         <div className="person-liste">
           {personen === null && <p className="text-leise">{t('Wird geladen …')}</p>}
+          {ladeFehler && (
+            <div className="hinweis hinweis-fehler" role="alert">
+              <i className="bi bi-x-circle-fill" aria-hidden="true" />
+              <span className="hinweis-text">
+                {ladeFehler === 'migration'
+                  ? t('Die Personen fehlen in der Datenbank. Bitte die Migrationsdateien aus supabase/migrationen im Supabase SQL Editor ausführen.')
+                  : t('Die Personen konnten nicht geladen werden.')}
+              </span>
+            </div>
+          )}
+          {personen !== null && gefiltert.length === 0 && !ladeFehler && <p className="text-leise">{t('Keine Personen gefunden.')}</p>}
           {Object.entries(gruppen).map(([werk, liste]) => (
             <section key={werk}>
               <h3 className="person-werk">{werk}</h3>

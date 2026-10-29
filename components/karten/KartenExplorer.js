@@ -2,8 +2,8 @@
 /**
  * components/karten/KartenExplorer.js – Störungskarte mit Zoom
  *
- * Drei Ebenen in einer "Bühne": Deutschland → Werk (Lageplan) → Gebäude (Grundriss).
- * Ein Klick auf ein Werk oder Gebäude zoomt animiert genau an diese Stelle hinein,
+ * Vier Ebenen in einer "Bühne": Welt → Land → Werk (Lageplan) → Gebäude (Grundriss).
+ * Ein Klick auf ein Land, Werk oder Gebäude zoomt animiert genau an diese Stelle hinein,
  * der Pfad oben zoomt wieder heraus. Alle Daten werden einmal vom Server geladen
  * (lib/karten/daten.js → alleKartenDaten), danach läuft alles ohne Wartezeit
  * im Browser.
@@ -17,11 +17,14 @@
  * So funktioniert die Animation:
  *  Beim Ebenenwechsel bleibt die alte Ebene kurz sichtbar ("uebergang") und wird
  *  vergrößert ausgeblendet, während die neue aus demselben Punkt herauswächst.
- *  Der Punkt (transform-origin) ist die Mitte des angeklickten Werks/Gebäudes.
+ *  Der Punkt (transform-origin) ist die Mitte des angeklickten Landes/Werks/Gebäudes.
+ *
+ * Ebene im Zustand: { land: 'DE' | null, standortId, gebaeudeId }.
  */
 import Link from 'next/link';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import DeutschlandKarte from './DeutschlandKarte';
+import WeltKarte from './WeltKarte';
+import LandKarte from './LandKarte';
 import Lageplan from './Lageplan';
 import Grundriss from './Grundriss';
 import { Legende, stufe, offenText } from './stufe';
@@ -29,15 +32,18 @@ import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeSchritte from './MeldeSchritte';
 import { useT } from '@/components/SpracheKontext';
-import { KARTE_BREITE, KARTE_HOEHE } from '@/lib/karten/deutschland';
+import { T } from '@/lib/sprache';
+import { WELT } from '@/lib/karten/welt';
+import { laenderAus, landKarte } from '@/lib/karten/laender';
 
 const DAUER = 560;   // ms – so lange bleibt die alte Ebene während des Zooms sichtbar
 
 /** Seitenverhältnis (Breite / Höhe) des Inhalts einer Ebene – damit er in die Bühne passt */
-function seitenverhaeltnis(ebene, standort, gebaeude) {
+function seitenverhaeltnis(ebene, standort, gebaeude, karte) {
   if (ebene.gebaeudeId && gebaeude) return gebaeude.breite_m / gebaeude.tiefe_m;
   if (ebene.standortId && standort) return standort.gelaende_breite_m / standort.gelaende_tiefe_m;
-  return KARTE_BREITE / KARTE_HOEHE;
+  if (karte) return karte.breite / karte.hoehe;
+  return WELT.breite / WELT.hoehe;
 }
 
 export default function KartenExplorer({
@@ -50,15 +56,20 @@ export default function KartenExplorer({
   const neuRef = useRef(null);
   const altRef = useRef(null);
 
-  const [ebene, setEbene] = useState({ standortId: start.standortId ?? null, gebaeudeId: start.gebaeudeId ?? null });
+  const laender = laenderAus(standorte);
+  // Start: ein Werk legt das Land mit fest
+  const startLand = standorte.find((st) => st.id === start.standortId)?.land ?? start.land ?? null;
+  const [ebene, setEbene] = useState({ land: startLand, standortId: start.standortId ?? null, gebaeudeId: start.gebaeudeId ?? null });
   const [maschineId, setMaschineId] = useState(start.maschineId ?? null);
   const [uebergang, setUebergang] = useState(null);   // { von, richtung: 'rein'|'raus', ursprung: {x,y}|null }
 
   const standortVon = (e) => standorte.find((st) => st.id === e.standortId) ?? null;
   const gebaeudeVon = (e) => gebaeude.find((g) => g.id === e.gebaeudeId) ?? null;
+  const landVon = (e) => laender.find((l) => l.kuerzel === e.land) ?? null;
   const standort = standortVon(ebene);
   const aktuellesGebaeude = gebaeudeVon(ebene);
-  const stufeName = ebene.gebaeudeId ? 'gebaeude' : ebene.standortId ? 'werk' : 'land';
+  const land = landVon(ebene);
+  const stufeName = ebene.gebaeudeId ? 'gebaeude' : ebene.standortId ? 'werk' : ebene.land ? 'land' : 'welt';
 
   /* ---------- Wechsel zwischen den Ebenen ---------- */
 
@@ -76,12 +87,17 @@ export default function KartenExplorer({
     setMaschineId(null);
   }
 
-  const zuWerk = (st) => wechsle({ standortId: st.id, gebaeudeId: null }, 'rein',
+  const zuLand = (l) => wechsle({ land: l.kuerzel, standortId: null, gebaeudeId: null }, 'rein',
+    buehneRef.current?.querySelector(`[data-ort="land-${l.kuerzel}"]`));
+  const zuWerk = (st) => wechsle({ land: st.land, standortId: st.id, gebaeudeId: null }, 'rein',
     buehneRef.current?.querySelector(`[data-ort="st-${st.id}"]`));
-  const zuGebaeude = (g) => wechsle({ standortId: g.standort_id, gebaeudeId: g.id }, 'rein',
+  const zuGebaeude = (g) => wechsle({ land: ebene.land, standortId: g.standort_id, gebaeudeId: g.id }, 'rein',
     buehneRef.current?.querySelector(`[data-ort="g-${g.id}"]`));
-  const zuDeutschland = () => wechsle({ standortId: null, gebaeudeId: null }, 'raus');
-  const zuStandort = () => wechsle({ standortId: ebene.standortId, gebaeudeId: null }, 'raus');
+  const zuWelt = () => wechsle({ land: null, standortId: null, gebaeudeId: null }, 'raus');
+  const zuLandRaus = () => wechsle({ land: ebene.land, standortId: null, gebaeudeId: null }, 'raus');
+  const zuStandort = () => wechsle({ land: ebene.land, standortId: ebene.standortId, gebaeudeId: null }, 'raus');
+  // Eine Ebene höher (Zurück-Knopf)
+  const zurueck = { gebaeude: zuStandort, werk: zuLandRaus, land: zuWelt }[stufeName];
 
   function maschineGeklickt(m) {
     if (modus === 'auswahl') onMaschine?.(m);
@@ -94,7 +110,8 @@ export default function KartenExplorer({
   // vergrößerte Ebene gemessen (sie startet danach ganz normal von vorn).
   useLayoutEffect(() => {
     if (!uebergang || uebergang.richtung !== 'raus' || !neuRef.current) return;
-    const kennung = uebergang.von.gebaeudeId ? `g-${uebergang.von.gebaeudeId}` : `st-${uebergang.von.standortId}`;
+    const { von } = uebergang;
+    const kennung = von.gebaeudeId ? `g-${von.gebaeudeId}` : von.standortId ? `st-${von.standortId}` : `land-${von.land}`;
     neuRef.current.classList.add('messen');
     const punkt = mitteVon(neuRef.current.querySelector(`[data-ort="${kennung}"]`));
     neuRef.current.classList.remove('messen');
@@ -119,21 +136,23 @@ export default function KartenExplorer({
     if (ersteAnzeige.current) { ersteAnzeige.current = false; return; }
     if (!adresseMitfuehren) return;
     const p = new URLSearchParams();
+    if (land && !standort) p.set('land', land.kuerzel.toLowerCase());
     if (standort) p.set('werk', standort.kuerzel.toLowerCase());
     if (aktuellesGebaeude) p.set('halle', aktuellesGebaeude.kuerzel.toLowerCase());
     if (maschineId) p.set('maschine', String(maschineId));
     const ziel = `${window.location.pathname}${p.toString() ? `?${p}` : ''}`;
     window.history.replaceState(window.history.state, '', ziel);
-  }, [adresseMitfuehren, standort, aktuellesGebaeude, maschineId]);
+  }, [adresseMitfuehren, land, standort, aktuellesGebaeude, maschineId]);
 
   /* ---------- Darstellung einer Ebene ---------- */
 
   function ebeneZeichnen(e, aktiv) {
     const st = standortVon(e);
     const g = gebaeudeVon(e);
-    const verhaeltnis = seitenverhaeltnis(e, st, g);
+    const karte = e.land ? landKarte(e.land, standorte) : null;
+    const verhaeltnis = seitenverhaeltnis(e, st, g, karte);
     let inhalt;
-    let art = 'land';
+    let art = 'welt';
     if (g) {
       art = 'gebaeude';
       inhalt = (
@@ -146,31 +165,46 @@ export default function KartenExplorer({
         <Lageplan standort={st} gebaeude={gebaeude.filter((x) => x.standort_id === st.id)} neutral={melden}
                   onWaehle={aktiv ? zuGebaeude : undefined} />
       );
+    } else if (karte) {
+      art = 'land';
+      inhalt = <LandKarte karte={karte} standorte={standorte.filter((x) => x.land === e.land)} neutral={melden}
+                          onWaehle={aktiv ? zuWerk : undefined} />;
     } else {
-      inhalt = <DeutschlandKarte standorte={standorte} neutral={melden} onWaehle={aktiv ? zuWerk : undefined} />;
+      inhalt = <WeltKarte laender={laender} neutral={melden} onWaehle={aktiv ? zuLand : undefined} />;
     }
-    return <div className={`ebene-inhalt ebene-${art}`} style={{ '--verhaeltnis': verhaeltnis }}>{inhalt}</div>;
+    // Hochkant-Karten (z. B. Deutschland) dürfen bis unter den Titel reichen
+    const hochkant = art === 'land' && verhaeltnis < 1 ? ' ebene-hochkant' : '';
+    return <div className={`ebene-inhalt ebene-${art}${hochkant}`} style={{ '--verhaeltnis': verhaeltnis }}>{inhalt}</div>;
   }
 
-  const schluessel = `${ebene.standortId ?? 'de'}-${ebene.gebaeudeId ?? 'x'}`;
-  const schrittNr = { land: 1, werk: 2, gebaeude: 3 }[stufeName];
+  const schluessel = `${ebene.land ?? 'welt'}-${ebene.standortId ?? 'x'}-${ebene.gebaeudeId ?? 'x'}`;
+  const schrittNr = { welt: 1, land: 2, werk: 3, gebaeude: 4 }[stufeName];
   const ursprungStil = uebergang?.ursprung ? { transformOrigin: `${uebergang.ursprung.x}px ${uebergang.ursprung.y}px` } : undefined;
-  const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? t('Deutschland');
+  const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? (land ? t(land.name) : t('Weltweit'));
   const hinweis = t(modus === 'auswahl'
-    ? { land: 'In welchem Werk?', werk: 'In welchem Gebäude?', gebaeude: 'An welcher Maschine?' }[stufeName]
-    : { land: 'Werk anklicken zum Hineinzoomen', werk: 'Gebäude anklicken für den Grundriss', gebaeude: 'Maschine anklicken für Details' }[stufeName]);
+    ? { welt: T('In welchem Land?'), land: T('In welchem Werk?'), werk: T('In welchem Gebäude?'), gebaeude: T('An welcher Maschine?') }[stufeName]
+    : {
+      welt: T('Land anklicken zum Hineinzoomen'), land: T('Werk anklicken zum Hineinzoomen'),
+      werk: T('Gebäude anklicken für den Grundriss'), gebaeude: T('Maschine anklicken für Details'),
+    }[stufeName]);
 
   const buehne = (
     <div className="explorer-buehne-rahmen">
-      {/* Beim Melden: Schritt-Leiste. Sonst: Pfad Deutschland › Werk › Gebäude (zoomt beim Anklicken heraus) */}
+      {/* Beim Melden: Schritt-Leiste. Sonst: Pfad Welt › Land › Werk › Gebäude (zoomt beim Anklicken heraus) */}
       {melden ? (
-        <MeldeSchritte schritt={schrittNr} werte={[standort?.name, aktuellesGebaeude?.bezeichnung]}
-                       onSchritt={(nr) => (nr === 1 ? zuDeutschland() : zuStandort())} />
+        <MeldeSchritte schritt={schrittNr} werte={[land && t(land.name), standort?.name, aktuellesGebaeude?.bezeichnung]}
+                       onSchritt={(nr) => [zuWelt, zuLandRaus, zuStandort][nr - 1]?.()} />
       ) : (
       <nav className="brotkrumen explorer-pfad" aria-label={t('Pfad')}>
-        <button type="button" onClick={zuDeutschland} disabled={stufeName === 'land'}>
-          <i className="bi bi-globe-europe-africa" aria-hidden="true" /> {t('Deutschland')}
+        <button type="button" onClick={zuWelt} disabled={stufeName === 'welt'}>
+          <i className="bi bi-globe2" aria-hidden="true" /> {t('Weltweit')}
         </button>
+        {land && (
+          <>
+            <i className="bi bi-chevron-right" aria-hidden="true" />
+            <button type="button" onClick={zuLandRaus} disabled={stufeName === 'land'}>{t(land.name)}</button>
+          </>
+        )}
         {standort && (
           <>
             <i className="bi bi-chevron-right" aria-hidden="true" />
@@ -189,9 +223,8 @@ export default function KartenExplorer({
       <div className={`explorer-buehne buehne-${groesse}`} ref={buehneRef}>
         {/* Kopf über der Karte: Zurück und Titel */}
         <div className="buehne-kopf">
-          {stufeName !== 'land' && (
-            <button type="button" className="rund-knopf glas-knopf" onClick={stufeName === 'gebaeude' ? zuStandort : zuDeutschland}
-                    aria-label={t('Herauszoomen')}>
+          {zurueck && (
+            <button type="button" className="rund-knopf glas-knopf" onClick={zurueck} aria-label={t('Herauszoomen')}>
               <i className="bi bi-arrow-left" />
             </button>
           )}
@@ -224,8 +257,9 @@ export default function KartenExplorer({
       <div className="col-xl-4 explorer-info-spalte">
         <div className="explorer-info">
           <InfoSpalte key={`${schluessel}-${maschineId ?? ''}`} stufe={stufeName} modus={modus} daten={daten}
+                      laender={laender} land={land}
                       standort={standort} gebaeudeAktuell={aktuellesGebaeude} maschineId={maschineId}
-                      onWerk={zuWerk} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt}
+                      onLand={zuLand} onWerk={zuWerk} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt}
                       onAuswahlAufheben={() => setMaschineId(null)} />
         </div>
       </div>
@@ -236,15 +270,51 @@ export default function KartenExplorer({
 /* =====================================================================
  * Info-Spalte rechts neben der Karte – Inhalt passend zur Ebene
  * ================================================================== */
-function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell, maschineId, onWerk, onGebaeude, onMaschine, onAuswahlAufheben }) {
+function InfoSpalte({
+  stufe: ebeneName, modus, daten, laender, land, standort, gebaeudeAktuell, maschineId,
+  onLand, onWerk, onGebaeude, onMaschine, onAuswahlAufheben,
+}) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
   const t = useT();
 
-  /* ---------- Ebene Deutschland: alle Werke ---------- */
-  if (ebeneName === 'land') {
+  /* ---------- Ebene Welt: alle Länder ---------- */
+  if (ebeneName === 'welt') {
     const sortiert = modus === 'auswahl'
-      ? [...standorte].sort((a, b) => a.stadt.localeCompare(b.stadt))
-      : [...standorte].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || a.stadt.localeCompare(b.stadt));
+      ? laender
+      : [...laender].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || Number(b.hauptsitz) - Number(a.hauptsitz));
+    return (
+      <section className="karte explorer-seite" style={{ '--i': 1 }}>
+        <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Land aus der Liste wählen') : t('Länder')}</h2>
+        <ul className="ort-liste">
+          {sortiert.map((l) => (
+            <li key={l.kuerzel}>
+              <button type="button" onClick={() => onLand(l)} className={modus === 'auswahl' ? '' : `stufe-${stufe(l.offen, l.hoechste_prioritaet)}`}>
+                <span>
+                  <span className="ort-titel">
+                    {t(l.name)}
+                    {l.hauptsitz && <span className="hauptsitz-abzeichen"><i className="bi bi-star-fill" aria-hidden="true" /> {t('Hauptsitz')}</span>}
+                  </span>
+                  <span className="ort-unter">
+                    {l.werke === 1 ? t('1 Werk') : t('{n} Werke', { n: l.werke })} · {t('{n} Maschinen', { n: l.maschinen })}
+                  </span>
+                </span>
+                {modus === 'auswahl'
+                  ? <i className="bi bi-chevron-right ms-auto text-leise" aria-hidden="true" />
+                  : <span className="ort-zahl" aria-label={offenText(l.offen, t)}>{l.offen}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
+  /* ---------- Ebene Land: Werke des Landes ---------- */
+  if (ebeneName === 'land' && land) {
+    const werkeHier = standorte.filter((st) => st.land === land.kuerzel);
+    const sortiert = modus === 'auswahl'
+      ? [...werkeHier].sort((a, b) => a.stadt.localeCompare(b.stadt))
+      : [...werkeHier].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || a.stadt.localeCompare(b.stadt));
     return (
       <section className="karte explorer-seite" style={{ '--i': 1 }}>
         <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Werk aus der Liste wählen') : t('Standorte')}</h2>
@@ -254,7 +324,7 @@ function InfoSpalte({ stufe: ebeneName, modus, daten, standort, gebaeudeAktuell,
               <button type="button" onClick={() => onWerk(st)} className={modus === 'auswahl' ? '' : `stufe-${stufe(st.offen, st.hoechste_prioritaet)}`}>
                 <span>
                   <span className="ort-titel">{st.name}</span>
-                  <span className="ort-unter">{st.schwerpunkt} · {t('{n} Gebäude', { n: st.gebaeude })} · {t('{n} Maschinen', { n: st.maschinen })}</span>
+                  <span className="ort-unter">{t(st.schwerpunkt)} · {t('{n} Gebäude', { n: st.gebaeude })} · {t('{n} Maschinen', { n: st.maschinen })}</span>
                 </span>
                 {modus === 'auswahl'
                   ? <i className="bi bi-chevron-right ms-auto text-leise" aria-hidden="true" />

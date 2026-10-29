@@ -1001,6 +1001,28 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .dkarte-nachbar { fill: var(--nachbar); stroke: var(--linie); stroke-width: .8; }
 .dkarte-rasterpunkt, .plan-rasterpunkt { fill: var(--text-leise); opacity: .18; }
 
+/* ---------- Weltkarte (components/karten/WeltKarte.js) ---------- */
+.wkarte { max-width: none; }
+.welt-land { fill: var(--land); stroke: var(--land-rand); stroke-width: .45; stroke-linejoin: round; }
+/* Länder mit Werken: getönt in der Farbe der dringendsten offenen Störung */
+.welt-firma {
+    fill: color-mix(in srgb, var(--stufe) 26%, var(--land));
+    stroke: color-mix(in srgb, var(--stufe) 70%, var(--land-rand)); stroke-width: .7; stroke-linejoin: round;
+    cursor: pointer; transition: fill var(--uebergang);
+}
+.welt-firma:hover { fill: color-mix(in srgb, var(--stufe) 45%, var(--land)); }
+.welt-fuehrung line { stroke: var(--text-leise); stroke-width: .8; stroke-dasharray: 2 2; opacity: .7; }
+.welt-fuehrung circle { fill: var(--text); opacity: .65; }
+.hauptsitz-stern { font-size: .62rem; color: var(--orange); }
+.hauptsitz-abzeichen {
+    display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 7px; border-radius: 999px;
+    font-size: .7rem; font-weight: 600; color: var(--orange); background: var(--orange-bg); vertical-align: 1px;
+}
+/* Kompakt auf der Übersicht: kleinere Markierungen, Name nur im Tooltip */
+.wkarte-klein .karten-punkt { --anker: translate(-50%, -12px); }
+.wkarte-klein .punkt-blase { min-width: 24px; height: 24px; padding: 0 6px; font-size: .76rem; }
+.wkarte-klein .punkt-info { min-width: 150px; }
+
 .karten-punkt {
     /* Anker: die Mitte des runden Punkts (34 px hoch) liegt genau auf der Position des Werks */
     --anker: translate(-50%, -17px);
@@ -1331,8 +1353,8 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .explorer-ebene .lageplan-rahmen, .explorer-ebene .grundriss-rahmen { overflow: visible; margin: 0; padding: 0; }
 .explorer-ebene .lageplan, .explorer-ebene .grundriss { min-width: 0; }
 .explorer-ebene .dkarte { max-width: none; }
-/* Die Deutschlandkarte ist hochkant: Sie darf bis unter den Titel reichen (dort liegt nur Meer) */
-.explorer-ebene:has(> .ebene-land) { --kopf-h: 18px; }
+/* Hochkant-Länder (z. B. Deutschland) dürfen bis unter den Titel reichen (dort liegt nur Meer) */
+.explorer-ebene:has(> .ebene-hochkant) { --kopf-h: 18px; }
 
 /* Info-Spalte neben der Karte: auf breiten Bildschirmen genau so hoch wie die Karte, mit eigenem Scrollen */
 @media (min-width: 1200px) {
@@ -1416,7 +1438,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 /* Schritt-Leiste: 1 Werk → 2 Gebäude → 3 Maschine → 4 Beschreibung */
 .melde-schritte {
     list-style: none; margin: 0 0 16px; padding: 6px;
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
     border-radius: 18px;
     background: var(--orange-bg);
     counter-reset: schritt;
@@ -1477,7 +1499,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     .seitenkopf-melden { gap: 14px; }
     .melde-symbol { width: 46px; height: 46px; flex-basis: 46px; font-size: 1.25rem; border-radius: 14px; }
     /* Auf dem Handy: nur Nummern, der aktuelle Schritt mit Namen */
-    .melde-schritte { grid-template-columns: auto auto auto auto; justify-content: start; }
+    .melde-schritte { grid-template-columns: repeat(5, auto); justify-content: start; }
     .melde-schritte li:not(.schritt-aktiv) .schritt-text { display: none; }
 }
 

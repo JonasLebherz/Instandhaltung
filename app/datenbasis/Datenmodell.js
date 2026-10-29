@@ -24,7 +24,7 @@ import { datumZeit } from '@/lib/format';
 // Neue Tabellen, die hier fehlen, werden automatisch hinten angefügt.
 const PLATZ = {
   standort: [0, 0], gebaeude: [1, 0], maschine: [2, 0], stoermeldung: [3, 0],
-  techniker: [0, 1], person: [1, 1], wartungsauftrag: [3, 1],
+  land: [0, 1], techniker: [1, 1], person: [2, 1], wartungsauftrag: [3, 1],
   bestellung: [0, 2], ersatzteil: [1, 2], auftrag_ersatzteil: [2, 2], auftrag_verlauf: [3, 2],
 };
 

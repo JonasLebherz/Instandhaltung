@@ -13,7 +13,7 @@
 --     gesperrt. Zugriff nur über die Webanwendung (Server) und Power BI.
 --
 -- Aufbau des Unternehmens (für die Störungskarte):
---   standort (Werk) 1 ── n gebaeude 1 ── n maschine 1 ── n stoermeldung 1 ── 1 wartungsauftrag
+--   land 1 ── n standort (Werk) 1 ── n gebaeude 1 ── n maschine 1 ── n stoermeldung 1 ── 1 wartungsauftrag
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -22,7 +22,7 @@
 DROP VIEW IF EXISTS v_stoerung_details, v_stoerungen_monat, v_ausfallzeit_maschine, v_mttr_maschine,
                     v_kennzahlen_standort;
 DROP TABLE IF EXISTS auftrag_verlauf, bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
-                     stoermeldung, person, techniker, maschine, gebaeude, standort CASCADE;
+                     stoermeldung, person, techniker, maschine, gebaeude, standort, land CASCADE;
 DROP TYPE IF EXISTS auftragsstatus, prioritaet, schicht, bestellstatus, ursache, maschinentyp, rolle;
 
 
@@ -48,6 +48,18 @@ CREATE TYPE maschinentyp   AS ENUM ('Fräsen', 'Drehen', 'Spritzguss', 'Lasersch
 -- =====================================================================
 
 -- Standorte (Werke) des Unternehmens – mit GPS-Position für die Deutschlandkarte
+-- Länder mit Werken – Hauptsitz ist Deutschland
+CREATE TABLE land (
+    kuerzel    CHAR(2)     PRIMARY KEY,               -- ISO 3166-1, z. B. 'DE'
+    name       VARCHAR(60) NOT NULL UNIQUE,           -- deutscher Name, z. B. 'Deutschland'
+    hauptsitz  BOOLEAN     NOT NULL DEFAULT false     -- Land des Hauptsitzes (genau eines)
+);
+COMMENT ON TABLE land IS 'Länder, in denen das Unternehmen Werke hat';
+-- Höchstens ein Land ist Hauptsitz
+CREATE UNIQUE INDEX idx_land_ein_hauptsitz ON land (hauptsitz) WHERE hauptsitz;
+-- Deutschland gibt es immer: Es ist der Standardwert für neue Werke
+INSERT INTO land (kuerzel, name, hauptsitz) VALUES ('DE', 'Deutschland', true);
+
 CREATE TABLE standort (
     id                 INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     kuerzel            VARCHAR(5)   NOT NULL UNIQUE,      -- z. B. 'HAM'
@@ -59,9 +71,11 @@ CREATE TABLE standort (
     laengengrad        DOUBLE PRECISION NOT NULL CHECK (laengengrad BETWEEN -180 AND 180),
     -- Größe des Werksgeländes in Metern (für den Lageplan)
     gelaende_breite_m  REAL NOT NULL CHECK (gelaende_breite_m > 0),
-    gelaende_tiefe_m   REAL NOT NULL CHECK (gelaende_tiefe_m > 0)
+    gelaende_tiefe_m   REAL NOT NULL CHECK (gelaende_tiefe_m > 0),
+    land_kuerzel       CHAR(2) NOT NULL DEFAULT 'DE' REFERENCES land (kuerzel) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 COMMENT ON TABLE standort IS 'Werke des Unternehmens';
+CREATE INDEX idx_standort_land ON standort (land_kuerzel);
 
 -- Gebäude eines Standorts – mit Lage auf dem Werksgelände und Raumaufteilung
 CREATE TABLE gebaeude (
@@ -230,6 +244,7 @@ CREATE INDEX idx_bestellung_teil_status ON bestellung (ersatzteil_id, status);
 -- Die Webanwendung greift serverseitig direkt auf die Datenbank zu und
 -- ist davon nicht betroffen, ebenso Power BI.
 -- =====================================================================
+ALTER TABLE land               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE standort           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gebaeude           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE maschine           ENABLE ROW LEVEL SECURITY;
@@ -313,13 +328,15 @@ SELECT
     ROUND((AVG(EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 3600)
           FILTER (WHERE w.status = 'erledigt'))::numeric, 2)                            AS mttr_stunden,
     ROUND(COALESCE(SUM(EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 3600)
-          FILTER (WHERE w.status = 'erledigt'), 0)::numeric, 1)                         AS ausfallzeit_stunden
+          FILTER (WHERE w.status = 'erledigt'), 0)::numeric, 1)                         AS ausfallzeit_stunden,
+    l.name                                      AS land
 FROM standort st
+JOIN land l                 ON l.kuerzel = st.land_kuerzel
 LEFT JOIN gebaeude g        ON g.standort_id = st.id
 LEFT JOIN maschine m        ON m.gebaeude_id = g.id
 LEFT JOIN stoermeldung s    ON s.maschine_id = m.id
 LEFT JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
-GROUP BY st.id, st.kuerzel, st.name, st.stadt, st.breitengrad, st.laengengrad;
+GROUP BY st.id, st.kuerzel, st.name, st.stadt, st.breitengrad, st.laengengrad, l.name;
 
 -- Anzahl der Störungen pro Monat (gesamt und nach Priorität), Monate nach deutscher Zeit
 CREATE VIEW v_stoerungen_monat WITH (security_invoker = true) AS
@@ -360,10 +377,12 @@ SELECT
     w.ende_zeit  AT TIME ZONE 'Europe/Berlin'                    AS ende_zeit,
     ROUND((EXTRACT(EPOCH FROM (w.start_zeit - s.zeitpunkt)) / 60)::numeric)  AS reaktionszeit_minuten,
     ROUND((EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 60)::numeric)  AS reparaturdauer_minuten,
-    ROUND((EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60)::numeric)   AS ausfallzeit_minuten
+    ROUND((EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60)::numeric)   AS ausfallzeit_minuten,
+    l.name                                                       AS land
 FROM stoermeldung s
 JOIN maschine m             ON m.id = s.maschine_id
 JOIN gebaeude g             ON g.id = m.gebaeude_id
 JOIN standort st            ON st.id = g.standort_id
+JOIN land l                 ON l.kuerzel = st.land_kuerzel
 LEFT JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
 LEFT JOIN techniker t       ON t.id = w.techniker_id;

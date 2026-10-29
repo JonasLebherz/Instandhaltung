@@ -2,7 +2,7 @@
 /**
  * app/melden/MeldeAssistent.js – Störung melden in zwei Teilen
  *
- *   1. Maschine auf der Zoom-Karte suchen: Werk → Gebäude → Maschine
+ *   1. Maschine auf der Zoom-Karte suchen: Land → Werk → Gebäude → Maschine
  *      (components/karten/KartenExplorer.js im Modus "auswahl")
  *   2. Störung beschreiben (MeldeFormular.js)
  *
@@ -33,8 +33,8 @@ export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, 
   }
 
   /** Zurück zur Karte – im Gebäude der Maschine oder (über die Schritt-Leiste) weiter oben */
-  function aendern(schritt = 3) {
-    setKartenStart(schritt === 1 ? {} : schritt === 2 ? { standortId: werk.id } : { standortId: werk.id, gebaeudeId: halle.id });
+  function aendern(schritt = 4) {
+    setKartenStart([{}, { land: werk.land }, { standortId: werk.id }, { standortId: werk.id, gebaeudeId: halle.id }][schritt - 1] ?? {});
     setMaschineId(null);
   }
 
@@ -45,14 +45,14 @@ export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, 
   return (
     <div className="row justify-content-center explorer-melden">
       <div className="col-lg-9 col-xl-8">
-        <MeldeSchritte schritt={4} werte={[werk.name, halle.bezeichnung, maschine.anlagennummer]} onSchritt={aendern} />
+        <MeldeSchritte schritt={5} werte={[t(werk.land_name), werk.name, halle.bezeichnung, maschine.anlagennummer]} onSchritt={aendern} />
         <div className="auswahl-chip">
           <i className={`bi ${MASCHINEN_SYMBOLE[maschine.typ] ?? 'bi-gear'}`} aria-hidden="true" />
           <span>
             <strong>{maschine.bezeichnung}</strong>
             <span className="text-leise"> · {maschine.anlagennummer} · {werk.name} · {halle.bezeichnung}</span>
           </span>
-          <button type="button" className="btn btn-sekundaer btn-klein ms-auto" onClick={() => aendern(3)}>
+          <button type="button" className="btn btn-sekundaer btn-klein ms-auto" onClick={() => aendern(4)}>
             <i className="bi bi-pencil" aria-hidden="true" /> {t('Ändern')}
           </button>
         </div>

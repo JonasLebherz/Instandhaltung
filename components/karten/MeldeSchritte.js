@@ -2,7 +2,7 @@
 /**
  * components/karten/MeldeSchritte.js – Schritt-Leiste beim Störung melden
  *
- *   1 Werk → 2 Gebäude → 3 Maschine → 4 Beschreibung
+ *   1 Land → 2 Werk → 3 Gebäude → 4 Maschine → 5 Beschreibung
  *
  * Erledigte Schritte zeigen die getroffene Wahl und lassen sich anklicken,
  * um dorthin zurückzugehen (onSchritt(nummer)). So sieht das Melden bewusst
@@ -11,7 +11,7 @@
 import { T } from '@/lib/sprache';
 import { useT } from '@/components/SpracheKontext';
 
-const SCHRITTE = [T('Werk'), T('Gebäude|Schritt'), T('Maschine'), T('Beschreibung')];
+const SCHRITTE = [T('Land'), T('Werk'), T('Gebäude|Schritt'), T('Maschine'), T('Beschreibung')];
 
 export default function MeldeSchritte({ schritt, werte = [], onSchritt }) {
   const t = useT();

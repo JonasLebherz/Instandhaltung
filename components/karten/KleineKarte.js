@@ -1,17 +1,18 @@
 'use client';
 /**
- * components/karten/KleineKarte.js – kleine Deutschlandkarte für die Übersicht
+ * components/karten/KleineKarte.js – kleine Weltkarte für die Übersicht
  *
- * Zeigt alle Werke mit der Zahl offener Störungen. Ein Klick auf ein Werk
- * öffnet die Störungskarte direkt in diesem Werk (/karte?werk=ham).
+ * Zeigt alle Länder mit Werken und der Zahl offener Störungen. Ein Klick auf ein
+ * Land öffnet die Störungskarte direkt in diesem Land (/karte?land=de).
  */
 import { useRouter } from 'next/navigation';
-import DeutschlandKarte from './DeutschlandKarte';
+import WeltKarte from './WeltKarte';
+import { laenderAus } from '@/lib/karten/laender';
 
 export default function KleineKarte({ standorte }) {
   const router = useRouter();
   return (
-    <DeutschlandKarte standorte={standorte}
-                      onWaehle={(st) => router.push(`/karte?werk=${st.kuerzel.toLowerCase()}`)} />
+    <WeltKarte laender={laenderAus(standorte)} klein
+               onWaehle={(land) => router.push(`/karte?land=${land.kuerzel.toLowerCase()}`)} />
   );
 }

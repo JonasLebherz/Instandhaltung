@@ -12,8 +12,9 @@ Zielgruppe:
 Die Anwendung läuft online: Die Webseite liegt bei **Vercel**, die Datenbank bei **Supabase** (PostgreSQL).
 Alle im Team arbeiten mit denselben Daten und brauchen nur einen Browser.
 
-**Beispielunternehmen:** Ein fiktives Industrieunternehmen mit Stammwerk in Albstadt und insgesamt
-**10 Standorten** in Deutschland, **27 Gebäuden** und **107 Maschinen**. Dazu kommen rund 600 Störmeldungen
+**Beispielunternehmen:** Ein fiktives, international tätiges Industrieunternehmen mit Hauptsitz in Deutschland
+(Stammwerk Albstadt). **19 Werke in 8 Ländern**: 10 in Deutschland, dazu USA (2), China (2), Mexiko, Indien,
+Frankreich, Russland und Polen – zusammen gut 50 Gebäude und **207 Maschinen**. Dazu kommen rund 1.000 Störmeldungen
 aus den letzten 12 Monaten.
 
 > Die frühere Version mit PHP, MySQL und XAMPP liegt im Branch [`php-xampp`](https://github.com/JonasLebherz/Instandhaltung/tree/php-xampp).
@@ -23,9 +24,9 @@ aus den letzten 12 Monaten.
 | Seite | Adresse | Inhalt |
 |---|---|---|
 | Anmelden | `/login` | Login mit E-Mail und Passwort, nur für angelegte Team-Konten |
-| Übersicht | `/` | Aufgaben der gewählten Person („Dir zugewiesene Aufgaben“), Kennzahlen, offene Meldungen, Aufträge nach Status, kleine Deutschlandkarte (Klick öffnet die Störungskarte im Werk), Ersatzteile unter Mindestbestand, Wareneingang buchen |
+| Übersicht | `/` | Aufgaben der gewählten Person („Dir zugewiesene Aufgaben“), Kennzahlen, offene Meldungen, Aufträge nach Status, kleine Weltkarte (Klick öffnet die Störungskarte im Land), Ersatzteile unter Mindestbestand, Wareneingang buchen |
 | Störung melden | `/melden` | In vier Schritten mit eigener Schritt-Leiste: Werk → Gebäude → Maschine auf der Karte antippen (ohne Störungszahlen), dann Beschreibung, Ursache und Priorität angeben (mit Eingabeprüfung) |
-| Störungskarte | `/karte` | Deutschlandkarte mit allen Werken und der Zahl offener Störungen. Ein Klick zoomt animiert in das Werk (Lageplan mit Gebäuden, offenen Störungen, Technikern vor Ort), ein weiterer in das Gebäude (Grundriss mit allen Maschinen). |
+| Störungskarte | `/karte` | Weltkarte mit allen Ländern und der Zahl offener Störungen. Ein Klick zoomt animiert in das Land (Karte mit seinen Werken), dann in das Werk (Lageplan mit Gebäuden, offenen Störungen, Technikern vor Ort) und in das Gebäude (Grundriss mit allen Maschinen). |
 | Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Standort, Maschine und Priorität |
 | Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen („Mir zuweisen“), Status ändern, Ersatzteile buchen, Auftrag abschließen; Verlauf zeigt, wer wann gemeldet, zugewiesen und bearbeitet hat |
 | Statistik | `/statistik` | Zum Hineinzoomen wie die Karte: alle Standorte → Werk → Gebäude → Maschine. Je Ebene MTTR, Ausfallzeit, Störungen, offene Aufträge, MTBF bzw. Störungen je Maschine, Vergleich der Unterebene, Störungen und MTTR pro Monat, Ursachen, Wochentag × Uhrzeit, Prioritäten, Schichten, Techniker, verbaute Ersatzteile. Filter nach Zeitraum. |
@@ -124,8 +125,15 @@ Ab jetzt baut Vercel die Seite **bei jedem Push nach GitHub automatisch neu**. N
 
 ### Datenbank aktualisieren
 
-Änderungen am Datenbankschema kommen als **Migrationsdatei** in `supabase/migrationen/` (z. B. `001_personen_und_verlauf.sql`).
-Die Datei im SQL Editor öffnen und einmal ausführen. Vorhandene Daten bleiben erhalten, mehrfaches Ausführen schadet nicht.
+Änderungen am Datenbankschema kommen als **Migrationsdatei** in `supabase/migrationen/`, durchnummeriert:
+
+| Datei | Inhalt |
+|---|---|
+| `001_personen_und_verlauf.sql` | Personen mit Rollen, „zugewiesen von“, Verlauf der Aufträge |
+| `002_laender_und_auslandswerke.sql` | Länder, 9 Werke im Ausland mit Gebäuden, Maschinen, Personen und Störungen |
+
+Jede Datei im SQL Editor öffnen und **in der Reihenfolge der Nummern** einmal ausführen. Vorhandene Daten bleiben erhalten,
+mehrfaches Ausführen schadet nicht.
 
 Nur für einen kompletten Neuanfang: erst `schema.sql` und danach `testdaten.sql` ausführen.
 **Achtung:** Dabei werden alle Daten auf den Stand der Testdaten zurückgesetzt. Die Team-Konten (Login) bleiben erhalten.
@@ -183,12 +191,13 @@ So verbindet ihr Power BI Desktop mit der Datenbank:
 ## Datenmodell
 
 ```
-standort (Werk) 1 ── n gebaeude 1 ── n maschine 1 ── n stoermeldung 1 ── 1 wartungsauftrag
+land 1 ── n standort (Werk) 1 ── n gebaeude 1 ── n maschine 1 ── n stoermeldung 1 ── 1 wartungsauftrag
 ```
 
 | Tabelle | Inhalt |
 |---|---|
-| `standort` | Werke mit Adresse, Schwerpunkt, GPS-Position (Breiten-/Längengrad) und Größe des Geländes |
+| `land` | Länder mit Werken (ISO-Kürzel, Name, Hauptsitz) |
+| `standort` | Werke mit Land, Adresse, Schwerpunkt, GPS-Position (Breiten-/Längengrad) und Größe des Geländes |
 | `gebaeude` | Gebäude eines Werks mit Lage auf dem Werksgelände und Raumaufteilung (`bereiche`, JSON) |
 | `maschine` | Maschinen mit Anlagennummer, Typ, Baujahr und Position bzw. Stellfläche im Grundriss (Meter) |
 | `techniker` | Techniker mit Standort, Qualifikation und Schicht |
@@ -225,7 +234,7 @@ app/                         Seiten (Next.js App Router)
 ├── karte/                   Störungskarte mit Zoom (alte Adressen /karte/ham/h2 leiten dorthin um, siehe next.config.mjs)
 └── login/                   Anmeldung
 components/                  Wiederverwendbare Bausteine (Seitenleiste, Logo, Pills, Kennzahlen …)
-components/karten/           Zoom-Karte (KartenExplorer) mit Deutschlandkarte, Lageplan, Grundriss
+components/karten/           Zoom-Karte (KartenExplorer) mit Weltkarte, Länderkarte, Lageplan, Grundriss
 lib/                         Datenbankverbindung, Login-Prüfung, Formatierung, Wertelisten
 lib/karten/                  Kartendaten (Umriss Deutschland) und Abfragen für die Karte
 lib/sprache/                 Übersetzung: index.js (t-Funktion), server.js, en.js (englische Texte)

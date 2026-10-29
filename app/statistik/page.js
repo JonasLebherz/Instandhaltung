@@ -2,7 +2,7 @@
  * app/statistik/page.js – Kennzahlen und Auswertungen mit Zoom
  *
  * Wie bei der Störungskarte zoomt man durch die Ebenen:
- *   alle Standorte → Werk → Gebäude → Maschine
+ *   weltweit → Land → Werk → Gebäude → Maschine
  * Dafür lädt die Seite alle Störmeldungen des Zeitraums einmal vom Server.
  * Gerechnet und gezeichnet wird dann im Browser (StatistikExplorer.js) –
  * der Wechsel zwischen den Ebenen braucht deshalb keine Ladezeit.
@@ -12,7 +12,7 @@
  *  - MTTR (Mean Time To Repair) = durchschnittliche Reparaturdauer erledigter Aufträge
  *  - Ausfallzeit = ende_zeit − Zeitpunkt der Störmeldung
  *
- * Adresse: ?von=JJJJ-MM-TT&bis=JJJJ-MM-TT&werk=ham&halle=h2&maschine=12
+ * Adresse: ?von=JJJJ-MM-TT&bis=JJJJ-MM-TT&land=de bzw. &werk=ham&halle=h2&maschine=12
  * (älter, weiterhin gültig: ?standort=<id>)
  * Ausgewertet werden alle Störmeldungen, deren Meldezeitpunkt im Zeitraum liegt.
  */
@@ -45,16 +45,19 @@ function naechsterTag(wert) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Startebene aus der Adresse (Werk-/Hallen-Kürzel, Maschinen-ID oder alte Standort-ID) */
+/** Startebene aus der Adresse (Land, Werk-/Hallen-Kürzel, Maschinen-ID oder alte Standort-ID) */
 function startAusAdresse(parameter, orte) {
   const maschine = orte.find((o) => String(o.id) === String(parameter?.maschine ?? ''));
-  if (maschine) return { standortId: maschine.standort_id, gebaeudeId: maschine.gebaeude_id, maschineId: maschine.id };
+  if (maschine) return { land: maschine.land, standortId: maschine.standort_id, gebaeudeId: maschine.gebaeude_id, maschineId: maschine.id };
   const werk = String(parameter?.werk ?? '').toUpperCase();
   const standort = orte.find((o) => o.standort_kuerzel === werk || String(o.standort_id) === String(parameter?.standort ?? ''));
-  if (!standort) return {};
+  if (!standort) {
+    const land = String(parameter?.land ?? '').toUpperCase();
+    return orte.some((o) => o.land === land) ? { land } : {};
+  }
   const halle = String(parameter?.halle ?? '').toUpperCase();
   const gebaeude = orte.find((o) => o.standort_id === standort.standort_id && o.gebaeude_kuerzel === halle);
-  return { standortId: standort.standort_id, gebaeudeId: gebaeude?.gebaeude_id ?? null };
+  return { land: standort.land, standortId: standort.standort_id, gebaeudeId: gebaeude?.gebaeude_id ?? null };
 }
 
 export default async function StatistikSeite({ searchParams }) {
@@ -82,11 +85,13 @@ export default async function StatistikSeite({ searchParams }) {
     sql`
       SELECT m.id, m.anlagennummer, m.bezeichnung, m.typ::text AS typ, m.baujahr,
              g.id AS gebaeude_id, g.kuerzel AS gebaeude_kuerzel, g.bezeichnung AS gebaeude,
-             st.id AS standort_id, st.kuerzel AS standort_kuerzel, st.name AS standort, st.stadt
+             st.id AS standort_id, st.kuerzel AS standort_kuerzel, st.name AS standort, st.stadt,
+             l.kuerzel AS land, l.name AS land_name, l.hauptsitz
       FROM maschine m
       JOIN gebaeude g  ON g.id = m.gebaeude_id
       JOIN standort st ON st.id = g.standort_id
-      ORDER BY st.name, g.kuerzel, m.anlagennummer`,
+      JOIN land l      ON l.kuerzel = st.land_kuerzel
+      ORDER BY l.hauptsitz DESC, l.name, st.name, g.kuerzel, m.anlagennummer`,
 
     // Jede Störmeldung des Zeitraums mit ihrem Auftrag. Monat, Wochentag und Stunde
     // nach deutscher Zeit; Reparatur- und Ausfallzeit nur für erledigte Aufträge.
