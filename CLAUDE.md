@@ -14,6 +14,11 @@ Die Anwendung muss unter **XAMPP auf Windows** laufen (Apache, PHP 8, MySQL/Mari
   - `database/testdaten.sql` mit 8 Maschinen, 5 Technikern, 15 Ersatzteilen und 150 Meldungen über 12 Monate, davon 12 offen
 - **Getestet** gegen MariaDB 10.11: Import beider Dateien sowie alle Seiten und Abläufe, darunter Melden, Zuweisen, Teile buchen, automatische Bestellung, Wareneingang, Abschluss und Wiedereröffnen. MySQL 8 ist nicht getestet.
 
+## Team & andere KI-Assistenten
+
+- Im Team arbeitet mindestens eine Person mit OpenAI Codex. Codex liest `AGENTS.md`, nicht diese Datei.
+- `AGENTS.md` verweist auf `CLAUDE.md` und fasst die wichtigsten Regeln zusammen. Bei neuen Konventionen **beide Dateien** aktualisieren.
+
 ## Technik & Konventionen
 
 - PHP 8 **ohne Framework**. Jede Seite ist eine eigene `.php`-Datei im Hauptordner.
