@@ -286,7 +286,7 @@ require __DIR__ . '/includes/header.php';
 </section>
 
 <!-- Chart.js per CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <script>
     // Daten aus PHP an JavaScript übergeben (json_encode wandelt Arrays sicher um)
     const monatsDaten   = <?= json_encode($proMonat, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;

@@ -434,5 +434,12 @@ a.karte:hover {
     .app-nav .navbar-collapse { padding: 8px 0; }
 }
 
+/* Smartphone: Kennzahlen und Listen noch etwas kompakter */
+@media (max-width: 575.98px) {
+    .kennzahl-wert { font-size: 2rem; }
+    .kennzahl-label { font-size: .85rem; }
+    .beschreibung-kurz { max-width: 150px; }
+}
+
 /* Hervorgehobene Zahl (z. B. Bestand unter Mindestbestand) */
 .text-orange { color: var(--orange); }
