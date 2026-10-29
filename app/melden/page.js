@@ -39,9 +39,12 @@ export default async function MeldenSeite({ searchParams }) {
 
   return (
     <>
-      <div className="seitenkopf">
-        <h1>Störung melden</h1>
-        <p>Werk, Gebäude und Maschine auf der Karte antippen – dann kurz beschreiben, was passiert ist.</p>
+      <div className="seitenkopf seitenkopf-melden">
+        <span className="melde-symbol" aria-hidden="true"><i className="bi bi-exclamation-triangle-fill" /></span>
+        <div>
+          <h1>Störung melden</h1>
+          <p>In vier Schritten: Werk, Gebäude und Maschine antippen – dann kurz beschreiben, was passiert ist.</p>
+        </div>
       </div>
       <MeldeAssistent daten={daten} startwerte={startwerte}
                       vorauswahlMaschine={vorauswahlMaschine} vorauswahlStandort={vorauswahlStandort} />

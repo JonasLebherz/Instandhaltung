@@ -8,6 +8,7 @@
  * Maschinen mit offenen Störungen zeigen eine Zahl und sind farbig markiert.
  *
  * Klick auf eine Maschine ruft onWaehle(maschine) auf.
+ * neutral: beim Melden – ohne Zahlen und Farben offener Störungen.
  */
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import { stufe, offenText } from './stufe';
@@ -44,7 +45,7 @@ function Einrichtung({ bereich }) {
   );
 }
 
-export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWaehle }) {
+export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWaehle, neutral = false }) {
   const B = gebaeude.breite_m;
   const T = gebaeude.tiefe_m;
   const bereiche = gebaeude.bereiche ?? [];
@@ -83,7 +84,7 @@ export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWae
         </svg>
 
         {maschinen.map((m, i) => {
-          const farbe = stufe(m.offen, m.hoechste_prioritaet);
+          const farbe = neutral ? 'neutral' : stufe(m.offen, m.hoechste_prioritaet);
           const modell = m.bezeichnung.split(' ').pop();
           return (
             <button key={m.id} type="button"
@@ -95,11 +96,11 @@ export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWae
                     onClick={(e) => onWaehle?.(m, e)}
                     data-ort={`m-${m.id}`}
                     aria-pressed={auswahlId === m.id}
-                    aria-label={`${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen)}`}
+                    aria-label={neutral ? `${m.bezeichnung} (${m.anlagennummer})` : `${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen)}`}
                     title={`${m.bezeichnung} · ${m.anlagennummer}`}>
               <i className={`bi ${MASCHINEN_SYMBOLE[m.typ] ?? 'bi-gear'}`} aria-hidden="true" />
               <span className="maschine-modell">{modell}</span>
-              {m.offen > 0 && <span className={`zaehl-marke stufe-${farbe}`}>{m.offen}</span>}
+              {!neutral && m.offen > 0 && <span className={`zaehl-marke stufe-${farbe}`}>{m.offen}</span>}
             </button>
           );
         })}

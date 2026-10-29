@@ -5,6 +5,7 @@
  * Gelände, Zufahrt und Parkplatz werden als SVG gezeichnet, die Gebäude liegen
  * als anklickbare Flächen darüber (Position und Größe aus der Datenbank, in Metern).
  * Ein Klick ruft onWaehle(gebaeude) auf – die Zoom-Karte zoomt in das Gebäude.
+ * neutral: beim Melden – ohne Zahlen und Farben offener Störungen.
  */
 import { stufe, offenText } from './stufe';
 
@@ -16,7 +17,7 @@ function baeume(B, T, zufahrtY) {
   return liste;
 }
 
-export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehle }) {
+export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehle, neutral = false }) {
   const B = standort.gelaende_breite_m;
   const T = standort.gelaende_tiefe_m;
   const prozent = (wert, gesamt) => `${(wert / gesamt) * 100}%`;
@@ -61,7 +62,7 @@ export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehl
         <span className="plan-beschriftung" style={{ left: '50%', top: prozent(zufahrtY - 3, T) }}>Zufahrt · Tor</span>
         <span className="plan-beschriftung" style={{ left: prozent(B - parkplatzBreite / 2 - 10, B), top: prozent(zufahrtY - 3, T) }}>Parkplatz</span>
         {gebaeude.map((g, i) => {
-          const farbe = stufe(g.offen, g.hoechste_prioritaet);
+          const farbe = neutral ? 'neutral' : stufe(g.offen, g.hoechste_prioritaet);
           return (
             <button key={g.id} type="button" onClick={(e) => onWaehle?.(g, e)}
                     className={`plan-gebaeude stufe-${farbe}${auswahlId === g.id ? ' gewaehlt' : ''}`}
@@ -69,12 +70,12 @@ export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehl
                       left: prozent(g.lage_x_m, B), top: prozent(g.lage_y_m, T),
                       width: prozent(g.breite_m, B), height: prozent(g.tiefe_m, T), '--i': i,
                     }}
-                    aria-label={`${g.bezeichnung}: ${offenText(g.offen)}`}
+                    aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen)}`}
                     data-ort={`g-${g.id}`}>
               <span className="gebaeude-kuerzel">{g.kuerzel}</span>
               <span className="gebaeude-name">{g.bezeichnung.split('–').pop().trim()}</span>
               <span className="gebaeude-info">{g.maschinen} Maschinen</span>
-              <span className={`zaehl-marke stufe-${farbe}`}>{g.offen > 0 ? g.offen : <i className="bi bi-check-lg" />}</span>
+              {!neutral && <span className={`zaehl-marke stufe-${farbe}`}>{g.offen > 0 ? g.offen : <i className="bi bi-check-lg" />}</span>}
             </button>
           );
         })}

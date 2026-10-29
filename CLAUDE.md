@@ -14,7 +14,7 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 - **Live:** Die App läuft bei Vercel mit Supabase. Login funktioniert.
 - **Fertig:** alle Seiten (Übersicht mit kleiner Karte, Melden über die Karte, Störungskarte mit Zoom Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik, Login), Seitenleiste links, Logo, Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
 - **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
-- **Getestet** gegen PostgreSQL 16 lokal: 108 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
+- **Getestet** gegen PostgreSQL 16 lokal: 111 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melden über die Karte, Zoom ohne Neuladen, Adressen der Karte, Seitenleiste, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
 - **Nach Schemaänderungen** muss in Supabase `schema.sql` + `testdaten.sql` erneut ausgeführt werden. Das setzt alle Daten zurück, Login-Konten bleiben erhalten.
 
 ## Team & andere KI-Assistenten
@@ -69,6 +69,7 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 - `DeutschlandKarte.js`, `Lageplan.js` und `Grundriss.js` zeichnen nur die jeweilige Ebene und rufen beim Klick `onWaehle(objekt, event)` auf.
 - Aufbau: SVG für Hintergrund (Umriss, Gelände, Wände, Bereiche), darüber absolut positionierte HTML-Elemente in Prozent der Größe in Metern. Container haben `aspect-ratio` = Breite/Tiefe.
 - Deutschland-Umriss: vorab berechnete SVG-Pfade in `lib/karten/deutschland.js` (Natural Earth über `world-atlas`, Mercator). `projizieren(breite, länge)` nutzt dieselbe Formel. Zur Laufzeit werden keine Kartenbibliotheken geladen.
+- **Melden sieht bewusst anders aus als die Störungskarte:** warmer Orange-Ton, Schritt-Leiste `components/karten/MeldeSchritte.js` (1 Werk → 2 Gebäude → 3 Maschine → 4 Beschreibung) statt Pfad, und **keine Störungszahlen**: `DeutschlandKarte`, `Lageplan` und `Grundriss` bekommen `neutral` (Ortsmarken, Farbe `stufe-neutral`), Legende und Zahlen in den Listen entfallen. CSS: Abschnitt 5 in `app/globals.css` (`.explorer-melden`).
 - Melden: `app/melden/MeldeAssistent.js` (erst Karte, nach Wahl der Maschine das Formular; „Ändern“ öffnet die Karte im Gebäude der Maschine) und `MeldeFormular.js` (sendet `maschine_id` als verstecktes Feld). `?maschine=<id>` springt direkt zum Formular, `?standort=<id>` startet im Werk.
 
 ## Seitenleiste & Logo

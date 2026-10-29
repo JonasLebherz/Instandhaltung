@@ -1390,3 +1390,87 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     pointer-events: none;
 }
 .leiste-laden.aktiv { opacity: 1; animation: drehen .7s linear infinite; transition: opacity .2s ease .15s; }
+
+/* =====================================================================
+ * 5. Störung melden – bewusst anders als die Störungskarte
+ *    (warmer Orange-Ton, Schritt-Leiste, keine Störungszahlen)
+ * ================================================================== */
+
+.seitenkopf-melden { display: flex; align-items: center; gap: 18px; }
+.melde-symbol {
+    width: 58px; height: 58px; flex: 0 0 58px;
+    border-radius: 18px;
+    display: grid; place-items: center;
+    font-size: 1.6rem;
+    color: #fff;
+    background: linear-gradient(155deg, color-mix(in srgb, var(--orange) 65%, #fff), var(--orange));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 6px 18px color-mix(in srgb, var(--orange) 35%, transparent);
+}
+
+/* Schritt-Leiste: 1 Werk → 2 Gebäude → 3 Maschine → 4 Beschreibung */
+.melde-schritte {
+    list-style: none; margin: 0 0 16px; padding: 6px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    border-radius: 18px;
+    background: var(--orange-bg);
+    counter-reset: schritt;
+}
+.melde-schritte li > div, .melde-schritte li > button {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    border: 0; border-radius: 13px;
+    background: transparent;
+    color: var(--text-leise);
+    text-align: left;
+    transition: background-color var(--uebergang);
+}
+.melde-schritte li > button:hover { background: var(--karte-erhoeht); }
+.melde-schritte .schritt-aktiv > div { background: var(--karte-solid); color: var(--text); box-shadow: 0 2px 8px rgba(31, 38, 64, .1); }
+.schritt-nr {
+    width: 28px; height: 28px; flex: 0 0 28px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: .85rem;
+    background: var(--fuellung-hover); color: var(--text-leise);
+}
+.schritt-aktiv .schritt-nr { background: var(--orange); color: #fff; }
+.schritt-fertig .schritt-nr { background: var(--gruen); color: #fff; }
+.schritt-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.schritt-name { font-weight: 600; font-size: .9rem; }
+.schritt-fertig .schritt-name { color: var(--text); }
+.schritt-wert { font-size: .75rem; color: var(--text-leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Karte beim Melden: warmer Hintergrund, Ortsmarken statt Störungszahlen */
+.stufe-neutral { --stufe: var(--orange); --stufe-bg: var(--orange-bg); }
+.explorer-melden .explorer-buehne {
+    background:
+        radial-gradient(120% 90% at 50% 0%, var(--orange-bg), transparent 75%),
+        var(--fuellung);
+    border-color: color-mix(in srgb, var(--orange) 22%, var(--linie));
+}
+.explorer-melden .explorer-karte { border-color: color-mix(in srgb, var(--orange) 25%, var(--glas-rand)); }
+.explorer-melden .plan-maschine.stufe-neutral { border-color: var(--glas-rand); }
+.explorer-melden .plan-maschine:hover, .explorer-melden .plan-maschine:focus-visible {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 25%, transparent), 0 8px 20px rgba(31, 38, 64, .18);
+}
+.explorer-melden .plan-maschine:hover i { color: var(--orange); }
+.explorer-melden .plan-gebaeude:hover, .explorer-melden .plan-gebaeude:focus-visible { border-color: var(--orange); }
+.explorer-melden .ort-liste button:hover { background: var(--orange-bg); }
+.buehne-schritt {
+    width: 34px; height: 34px; flex: 0 0 34px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-weight: 700;
+    color: #fff; background: var(--orange);
+}
+.explorer-melden .auswahl-chip { background: var(--orange-bg); }
+
+@media (max-width: 767.98px) {
+    .seitenkopf-melden { gap: 14px; }
+    .melde-symbol { width: 46px; height: 46px; flex-basis: 46px; font-size: 1.25rem; border-radius: 14px; }
+    /* Auf dem Handy: nur Nummern, der aktuelle Schritt mit Namen */
+    .melde-schritte { grid-template-columns: auto auto auto auto; justify-content: start; }
+    .melde-schritte li:not(.schritt-aktiv) .schritt-text { display: none; }
+}

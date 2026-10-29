@@ -24,7 +24,7 @@ aus den letzten 12 Monaten.
 |---|---|---|
 | Anmelden | `/login` | Login mit E-Mail und Passwort, nur für angelegte Team-Konten |
 | Übersicht | `/` | Kennzahlen, offene Meldungen, Aufträge nach Status, kleine Deutschlandkarte (Klick öffnet die Störungskarte im Werk), Ersatzteile unter Mindestbestand, Wareneingang buchen |
-| Störung melden | `/melden` | Maschine auf der Karte suchen (Werk → Gebäude → Maschine), dann Beschreibung, Ursache und Priorität angeben (mit Eingabeprüfung) |
+| Störung melden | `/melden` | In vier Schritten mit eigener Schritt-Leiste: Werk → Gebäude → Maschine auf der Karte antippen (ohne Störungszahlen), dann Beschreibung, Ursache und Priorität angeben (mit Eingabeprüfung) |
 | Störungskarte | `/karte` | Deutschlandkarte mit allen Werken und der Zahl offener Störungen. Ein Klick zoomt animiert in das Werk (Lageplan mit Gebäuden, offenen Störungen, Technikern vor Ort), ein weiterer in das Gebäude (Grundriss mit allen Maschinen). |
 | Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Standort, Maschine und Priorität |
 | Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen, Status ändern, Ersatzteile buchen, Auftrag abschließen |

@@ -1,0 +1,38 @@
+'use client';
+/**
+ * components/karten/MeldeSchritte.js – Schritt-Leiste beim Störung melden
+ *
+ *   1 Werk → 2 Gebäude → 3 Maschine → 4 Beschreibung
+ *
+ * Erledigte Schritte zeigen die getroffene Wahl und lassen sich anklicken,
+ * um dorthin zurückzugehen (onSchritt(nummer)). So sieht das Melden bewusst
+ * anders aus als die Störungskarte, die nur zum Anschauen da ist.
+ */
+const SCHRITTE = ['Werk', 'Gebäude', 'Maschine', 'Beschreibung'];
+
+export default function MeldeSchritte({ schritt, werte = [], onSchritt }) {
+  return (
+    <ol className="melde-schritte" aria-label="Schritte zum Melden">
+      {SCHRITTE.map((name, i) => {
+        const nr = i + 1;
+        const zustand = nr < schritt ? 'fertig' : nr === schritt ? 'aktiv' : 'offen';
+        const inhalt = (
+          <>
+            <span className="schritt-nr" aria-hidden="true">{zustand === 'fertig' ? <i className="bi bi-check-lg" /> : nr}</span>
+            <span className="schritt-text">
+              <span className="schritt-name">{name}</span>
+              {zustand === 'fertig' && werte[i] && <span className="schritt-wert">{werte[i]}</span>}
+            </span>
+          </>
+        );
+        return (
+          <li key={name} className={`schritt-${zustand}`} aria-current={zustand === 'aktiv' ? 'step' : undefined}>
+            {zustand === 'fertig' && onSchritt
+              ? <button type="button" onClick={() => onSchritt(nr)} title={`Zurück zu: ${name}`}>{inhalt}</button>
+              : <div>{inhalt}</div>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}

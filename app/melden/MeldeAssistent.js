@@ -11,6 +11,7 @@
  */
 import { useState } from 'react';
 import KartenExplorer from '@/components/karten/KartenExplorer';
+import MeldeSchritte from '@/components/karten/MeldeSchritte';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeFormular from './MeldeFormular';
 
@@ -29,8 +30,9 @@ export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function aendern() {
-    setKartenStart({ standortId: werk.id, gebaeudeId: halle.id });
+  /** Zurück zur Karte – im Gebäude der Maschine oder (über die Schritt-Leiste) weiter oben */
+  function aendern(schritt = 3) {
+    setKartenStart(schritt === 1 ? {} : schritt === 2 ? { standortId: werk.id } : { standortId: werk.id, gebaeudeId: halle.id });
     setMaschineId(null);
   }
 
@@ -39,15 +41,16 @@ export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, 
   }
 
   return (
-    <div className="row justify-content-center">
+    <div className="row justify-content-center explorer-melden">
       <div className="col-lg-9 col-xl-8">
+        <MeldeSchritte schritt={4} werte={[werk.name, halle.bezeichnung, maschine.anlagennummer]} onSchritt={aendern} />
         <div className="auswahl-chip">
           <i className={`bi ${MASCHINEN_SYMBOLE[maschine.typ] ?? 'bi-gear'}`} aria-hidden="true" />
           <span>
             <strong>{maschine.bezeichnung}</strong>
             <span className="text-leise"> · {maschine.anlagennummer} · {werk.name} · {halle.bezeichnung}</span>
           </span>
-          <button type="button" className="btn btn-sekundaer btn-klein ms-auto" onClick={aendern}>
+          <button type="button" className="btn btn-sekundaer btn-klein ms-auto" onClick={() => aendern(3)}>
             <i className="bi bi-pencil" aria-hidden="true" /> Ändern
           </button>
         </div>

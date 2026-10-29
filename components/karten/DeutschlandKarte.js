@@ -6,6 +6,8 @@
  * Ein Klick ruft onWaehle(standort) auf – die Zoom-Karte (KartenExplorer.js)
  * zoomt daraufhin in das Werk hinein.
  *
+ * neutral: beim Melden – keine Zahlen und Farben offener Störungen, nur Ortsmarken.
+ *
  * Die Punkte werden per Mercator-Projektion aus Breiten-/Längengrad berechnet
  * und prozentual über die SVG-Karte gelegt – so passt alles zu jeder Größe.
  */
@@ -20,7 +22,7 @@ function beschriftungOben(punkt, allePunkte) {
   return allePunkte.some((p) => p !== punkt && Math.abs(p.x - punkt.x) < 55 && p.y > punkt.y && p.y - punkt.y < 75);
 }
 
-export default function DeutschlandKarte({ standorte, auswahlId = null, onWaehle }) {
+export default function DeutschlandKarte({ standorte, auswahlId = null, onWaehle, neutral = false }) {
   const punkte = standorte.map((st) => ({ st, ...projizieren(st.breitengrad, st.laengengrad) }));
 
   return (
@@ -39,21 +41,23 @@ export default function DeutschlandKarte({ standorte, auswahlId = null, onWaehle
       {punkte.map((punkt, i) => {
         const { st, x, y } = punkt;
         const oben = beschriftungOben(punkt, punkte);
-        const farbe = stufe(st.offen, st.hoechste_prioritaet);
+        const farbe = neutral ? 'neutral' : stufe(st.offen, st.hoechste_prioritaet);
         return (
           <button key={st.id} type="button" onClick={(e) => onWaehle?.(st, e)}
                   // Tooltips am linken/rechten Kartenrand nach innen ausrichten, damit nichts übersteht
                   className={`karten-punkt stufe-${farbe}${oben ? ' name-oben' : ''}${x > KARTE_BREITE * 0.68 ? ' info-links' : ''}`
                     + `${x < KARTE_BREITE * 0.32 ? ' info-rechts' : ''}${auswahlId === st.id ? ' gewaehlt' : ''}`}
                   style={{ left: `${(x / KARTE_BREITE) * 100}%`, top: `${(y / KARTE_HOEHE) * 100}%`, '--i': i }}
-                  aria-label={`${st.name}: ${offenText(st.offen)}`}
+                  aria-label={neutral ? st.name : `${st.name}: ${offenText(st.offen)}`}
                   // data-ort: Daran findet die Zoom-Karte den Punkt, von dem aus sie zoomt
                   data-ort={`st-${st.id}`}>
-            <span className="punkt-blase">{st.offen > 0 ? st.offen : <i className="bi bi-check-lg" />}</span>
+            <span className="punkt-blase">
+              {neutral ? <i className="bi bi-geo-alt-fill" /> : st.offen > 0 ? st.offen : <i className="bi bi-check-lg" />}
+            </span>
             <span className="punkt-name">{st.stadt}</span>
             <span className="punkt-info" role="tooltip">
               <strong>{st.name}</strong>
-              {offenText(st.offen)}{st.hoch > 0 ? `, davon ${st.hoch} hoch` : ''}
+              {neutral ? st.schwerpunkt : `${offenText(st.offen)}${st.hoch > 0 ? `, davon ${st.hoch} hoch` : ''}`}
             </span>
           </button>
         );
