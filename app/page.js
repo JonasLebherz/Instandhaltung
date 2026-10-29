@@ -16,6 +16,8 @@ import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import Kennzahl from '@/components/Kennzahl';
 import SpeichernKnopf from '@/components/SpeichernKnopf';
 import { lieferungBuchen } from '@/app/aktionen';
+import { standorteMitZahlen } from '@/lib/karten/daten';
+import DeutschlandKarte from '@/components/karten/DeutschlandKarte';
 
 // Immer aktuelle Daten aus der Datenbank (kein Zwischenspeichern der Seite)
 export const dynamic = 'force-dynamic';
@@ -25,7 +27,7 @@ export default async function Uebersicht() {
   const benutzer = await benutzerPflicht();
 
   // Alle Abfragen gleichzeitig starten – das ist schneller als nacheinander
-  const [[kennzahlen], proStatus, offeneMeldungen, kritischeTeile] = await Promise.all([
+  const [[kennzahlen], proStatus, offeneMeldungen, kritischeTeile, standorte] = await Promise.all([
     // Anzahl offener Aufträge, davon "hoch", und in den letzten 30 Tagen erledigte
     sql`
       SELECT COUNT(*) FILTER (WHERE w.status <> 'erledigt')::int                          AS offen,
@@ -41,10 +43,12 @@ export default async function Uebersicht() {
     // Offene Störmeldungen: zuerst nach Priorität (hoch → niedrig), dann neueste zuerst
     sql`
       SELECT w.id AS auftrag_id, w.status, s.zeitpunkt, s.beschreibung, s.prioritaet,
-             m.bezeichnung AS maschine, t.name AS techniker
+             m.bezeichnung AS maschine, st.stadt, g.kuerzel AS gebaeude, t.name AS techniker
       FROM wartungsauftrag w
       JOIN stoermeldung s   ON s.id = w.stoermeldung_id
       JOIN maschine m       ON m.id = s.maschine_id
+      JOIN gebaeude g       ON g.id = m.gebaeude_id
+      JOIN standort st      ON st.id = g.standort_id
       LEFT JOIN techniker t ON t.id = w.techniker_id
       WHERE w.status IN ${sql(OFFENE_STATUS)}
       ORDER BY s.prioritaet DESC, s.zeitpunkt DESC
@@ -58,6 +62,9 @@ export default async function Uebersicht() {
       LEFT JOIN bestellung b ON b.ersatzteil_id = e.id AND b.status = 'bestellt'
       WHERE e.bestand < e.mindestbestand OR b.id IS NOT NULL
       ORDER BY (e.bestand < e.mindestbestand) DESC, e.bestand::float / NULLIF(e.mindestbestand, 0), e.bezeichnung`,
+
+    // Standorte mit offenen Störungen für die kleine Deutschlandkarte
+    standorteMitZahlen(),
   ]);
 
   // Alle Status in fester Reihenfolge, auch wenn es 0 Aufträge gibt
@@ -125,7 +132,7 @@ export default async function Uebersicht() {
                       <tr key={m.auftrag_id} className="klickbar">
                         <td>
                           <Link className="zeilen-link" href={`/auftraege/${m.auftrag_id}`}>{m.maschine}</Link>
-                          <div className="klein text-truncate beschreibung-kurz">{m.beschreibung}</div>
+                          <div className="klein text-truncate beschreibung-kurz">{m.stadt} · {m.gebaeude} – {m.beschreibung}</div>
                         </td>
                         <td><PrioritaetPill prioritaet={m.prioritaet} /></td>
                         <td>
@@ -163,14 +170,23 @@ export default async function Uebersicht() {
             </ul>
           </section>
 
-          <Link className="btn btn-primary w-100 btn-gross" href="/melden">
+          <Link className="btn btn-primary w-100 btn-gross mb-4" href="/melden">
             <i className="bi bi-plus-lg" aria-hidden="true" /> Neue Störung melden
           </Link>
+
+          {/* Kleine Deutschlandkarte: Klick auf ein Werk öffnet dessen Lageplan */}
+          <section className="karte" style={{ '--i': 6 }}>
+            <div className="karte-kopf">
+              <h2 className="abschnitt-titel">Standorte</h2>
+              <Link href="/karte">Zur Karte</Link>
+            </div>
+            <DeutschlandKarte standorte={standorte} />
+          </section>
         </div>
       </div>
 
       {/* Ersatzteile unter Mindestbestand & offene Bestellungen */}
-      <section className="karte mt-4" style={{ '--i': 6 }}>
+      <section className="karte mt-4" style={{ '--i': 7 }}>
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">Ersatzteile unter Mindestbestand</h2>
           <span className="klein">inkl. offener Bestellungen</span>

@@ -12,6 +12,10 @@ Zielgruppe:
 Die Anwendung läuft online: Die Webseite liegt bei **Vercel**, die Datenbank bei **Supabase** (PostgreSQL).
 Alle im Team arbeiten mit denselben Daten und brauchen nur einen Browser.
 
+**Beispielunternehmen:** Ein fiktives Industrieunternehmen mit Stammwerk in Albstadt und insgesamt
+**10 Standorten** in Deutschland, **27 Gebäuden** und **107 Maschinen**. Dazu kommen rund 600 Störmeldungen
+aus den letzten 12 Monaten.
+
 > Die frühere Version mit PHP, MySQL und XAMPP liegt im Branch [`php-xampp`](https://github.com/JonasLebherz/Instandhaltung/tree/php-xampp).
 
 ## Funktionen
@@ -20,17 +24,25 @@ Alle im Team arbeiten mit denselben Daten und brauchen nur einen Browser.
 |---|---|---|
 | Anmelden | `/login` | Login mit E-Mail und Passwort, nur für angelegte Team-Konten |
 | Übersicht | `/` | Kennzahlen, offene Meldungen, Aufträge nach Status, Ersatzteile unter Mindestbestand, Wareneingang buchen |
-| Störung melden | `/melden` | Formular mit Maschine, Beschreibung, Ursache und Priorität, mit Eingabeprüfung |
-| Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Maschine und Priorität |
+| Störung melden | `/melden` | In 4 Schritten: Werk auf der Karte → Gebäude im Lageplan → Maschine im Grundriss → Beschreibung, Ursache und Priorität (mit Eingabeprüfung) |
+| Störungskarte | `/karte` | Deutschlandkarte mit allen Werken und der Zahl offener Störungen |
+| Werk | `/karte/ham` | Lageplan des Werksgeländes mit den Gebäuden, offene Störungen, Techniker vor Ort |
+| Gebäude | `/karte/ham/h2` | Grundriss mit allen Maschinen. Klick auf eine Maschine zeigt ihre Störungen und „Störung melden“. |
+| Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Standort, Maschine und Priorität |
 | Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen, Status ändern, Ersatzteile buchen, Auftrag abschließen |
-| Statistik | `/statistik` | MTTR, Ausfallzeit pro Maschine, Störungen pro Monat, Top-5-Störursachen, Zeitraumfilter |
+| Statistik | `/statistik` | MTTR, Ausfallzeit, Störungen pro Monat, Top-5-Störursachen, Kennzahlen pro Standort, Top 10 Maschinen, Filter nach Zeitraum und Standort |
 
 **Automatik beim Buchen von Ersatzteilen:** Ist ein Teil nicht in ausreichender Menge auf Lager,
 wird nichts gebucht. Der Auftrag wechselt auf **„wartet auf Teil“**, und es wird automatisch eine
 Bestellung angelegt. Den Eingang der Lieferung bucht man auf der Übersicht.
 
-**Darstellung:** Hell, Dunkel oder automatisch nach Systemeinstellung (Symbol oben rechts).
-Sanfte Animationen, die bei „Bewegung reduzieren“ im Betriebssystem automatisch abgeschaltet werden.
+**Direktlinks:** `/melden?maschine=12` springt direkt zur Beschreibung. Das eignet sich z. B. für einen QR-Code an der Maschine.
+
+**Darstellung:**
+- Ruhige „Glas“-Optik mit halbtransparenten Karten auf einem weichen Hintergrund.
+- Hell, Dunkel oder automatisch nach Systemeinstellung (Symbol oben rechts).
+- Sanfte Animationen.
+- Bei „Bewegung reduzieren“ bzw. „Transparenz reduzieren“ im Betriebssystem werden Animationen und Glas-Effekt automatisch abgeschaltet.
 
 ## Technik
 
@@ -60,7 +72,7 @@ Diese Schritte macht **eine Person** (Projektleitung). Danach arbeitet das ganze
 4. Den kompletten Inhalt von [`supabase/schema.sql`](supabase/schema.sql) einfügen und **Run** klicken.
    Supabase warnt eventuell vor „destructive operations“. Das liegt an den `DROP`-Befehlen am Anfang, also mit **Run this query** bestätigen.
 5. Eine neue Abfrage öffnen, den Inhalt von [`supabase/testdaten.sql`](supabase/testdaten.sql) einfügen und **Run** klicken.
-6. Zur Kontrolle links **Table Editor** öffnen. Dort stehen 7 Tabellen, z. B. `stoermeldung` mit 150 Einträgen.
+6. Zur Kontrolle links **Table Editor** öffnen. Dort stehen 9 Tabellen, z. B. `standort` mit 10 und `maschine` mit 107 Einträgen.
 
 ### 2. Supabase: Team-Konten anlegen
 
@@ -93,6 +105,11 @@ Oben im Supabase-Projekt auf **Connect** klicken:
 
 Ab jetzt baut Vercel die Seite **bei jedem Push nach GitHub automatisch neu**. Niemand muss etwas hochladen.
 
+### Datenbank aktualisieren
+
+Ändert sich das Datenbankschema (z. B. durch neue Tabellen), im SQL Editor erst `schema.sql` und danach `testdaten.sql` erneut ausführen.
+**Achtung:** Dabei werden alle Daten auf den Stand der Testdaten zurückgesetzt. Die Team-Konten (Login) bleiben erhalten.
+
 ## Mitarbeit im Team
 
 - **Nur benutzen:** Link öffnen und anmelden. Mehr braucht es nicht.
@@ -124,8 +141,9 @@ Für Power BI gibt es fertige Views in der Datenbank:
 |---|---|
 | `v_mttr_maschine` | MTTR pro Maschine (Minuten und Stunden) |
 | `v_ausfallzeit_maschine` | Anzahl Störungen und Ausfallzeit pro Maschine |
+| `v_kennzahlen_standort` | Pro Werk: Gebäude, Maschinen, Störungen, offene Aufträge, MTTR, Ausfallzeit, GPS-Position (für eine Kartenansicht in Power BI) |
 | `v_stoerungen_monat` | Störungen pro Monat, aufgeteilt nach Priorität |
-| `v_stoerung_details` | Eine Zeile pro Störung mit allen Angaben und Zeiten. Gut geeignet für eigene Filter. |
+| `v_stoerung_details` | Eine Zeile pro Störung mit allen Angaben und Zeiten, inkl. Standort und Gebäude. Gut geeignet für eigene Filter. |
 
 So verbindet ihr Power BI Desktop mit der Datenbank:
 
@@ -143,10 +161,16 @@ So verbindet ihr Power BI Desktop mit der Datenbank:
 
 ## Datenmodell
 
+```
+standort (Werk) 1 ── n gebaeude 1 ── n maschine 1 ── n stoermeldung 1 ── 1 wartungsauftrag
+```
+
 | Tabelle | Inhalt |
 |---|---|
-| `maschine` | Maschinen mit Standort und Baujahr |
-| `techniker` | Techniker mit Qualifikation und Schicht |
+| `standort` | Werke mit Adresse, Schwerpunkt, GPS-Position (Breiten-/Längengrad) und Größe des Geländes |
+| `gebaeude` | Gebäude eines Werks mit Lage auf dem Werksgelände und Raumaufteilung (`bereiche`, JSON) |
+| `maschine` | Maschinen mit Anlagennummer, Typ, Baujahr und Position bzw. Stellfläche im Grundriss (Meter) |
+| `techniker` | Techniker mit Standort, Qualifikation und Schicht |
 | `stoermeldung` | Gemeldete Störungen (Maschine, Zeitpunkt, Beschreibung, Ursache, Priorität) |
 | `wartungsauftrag` | Bearbeitung einer Störung: genau ein Auftrag pro Meldung (Techniker, Status, Start, Ende, Maßnahme) |
 | `ersatzteil` | Lagerbestand und Mindestbestand |
@@ -173,9 +197,12 @@ app/                         Seiten (Next.js App Router)
 ├── melden/                  Störung melden
 ├── auftraege/               Auftragsübersicht und [id]/ = Auftrag bearbeiten
 ├── statistik/               Statistik und Diagramme
+├── karte/                   Störungskarte: Deutschland → [standort]/ → [gebaeude]/
 └── login/                   Anmeldung
 components/                  Wiederverwendbare Bausteine (Navigation, Pills, Kennzahlen …)
+components/karten/           Deutschlandkarte, Lageplan, Grundriss
 lib/                         Datenbankverbindung, Login-Prüfung, Formatierung, Wertelisten
+lib/karten/                  Kartendaten (Umriss Deutschland) und Abfragen für die Karte
 middleware.js                Schickt nicht angemeldete Besucher zum Login
 supabase/                    schema.sql und testdaten.sql
 docs/                        Team-Anleitungen
@@ -189,3 +216,10 @@ docs/                        Team-Anleitungen
 | „Login nicht eingerichtet“ | `SUPABASE_URL` und `SUPABASE_ANON_KEY` fehlen bei Vercel. Eintragen und unter **Deployments** → **Redeploy** neu bauen. |
 | Anmeldung schlägt fehl | Im Supabase-Dashboard prüfen, ob das Konto existiert und bestätigt ist („Auto Confirm User“). |
 | Änderungen erscheinen nicht online | Bei Vercel unter **Deployments** prüfen, ob der letzte Build erfolgreich war (grün). |
+
+## Quellen
+
+- Umriss von Deutschland: [Natural Earth](https://www.naturalearthdata.com) (gemeinfrei), Maßstab 1:50 Mio.,
+  über das npm-Paket `world-atlas`. Daraus wurde einmalig mit einer Mercator-Projektion die Datei
+  `lib/karten/deutschland.js` erzeugt.
+- Die Unternehmensdaten sind frei erfunden. Die Koordinaten der Standorte liegen in den jeweiligen Städten.

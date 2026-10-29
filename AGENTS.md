@@ -20,5 +20,6 @@ Jeder Push nach GitHub wird von Vercel automatisch veröffentlicht. Deshalb vor 
 - Formulare sind Client-Komponenten mit `useActionState`, `noValidate` und Fehleranzeige über `components/Feldfehler.js`.
 - Zeiten: In der Datenbank als `TIMESTAMPTZ`, angezeigt in Europe/Berlin über `lib/format.js`.
 - Design: Farben nur über die CSS-Variablen in `app/globals.css`, jeweils hell **und** dunkel. Karten mit `.karte`, Status als Pills (`components/Pills.js`). Animationen müssen bei `prefers-reduced-motion` aus sein.
+- Störungskarte (`app/karte/`, `components/karten/`): Positionen kommen in Metern aus der Datenbank und werden prozentual über ein SVG gelegt. Details stehen in `CLAUDE.md` unter „Störungskarte“.
 - Änderungen an der Datenbank immer in `supabase/schema.sql` **und** passend in `supabase/testdaten.sql` nachziehen. Neue Tabellen bekommen `ENABLE ROW LEVEL SECURITY`, neue Views `WITH (security_invoker = true)`.
 - Zugangsdaten nie in den Code oder ins Repository. Sie gehören in `.env.local` bzw. zu Vercel.

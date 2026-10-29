@@ -1,9 +1,12 @@
 /*
  * app/globals.css – Eigenes Design der Anwendung
  *
- * Gestaltung angelehnt an eine ruhige, reduzierte Designsprache:
- * viel Weißraum, hellgrauer Hintergrund, weiße Karten mit großem Eckenradius,
- * eine einzige Akzentfarbe und dezente Status-Farben.
+ * Gestaltung angelehnt an eine ruhige, reduzierte Designsprache mit
+ * "Glas"-Optik: ein ganz leicht farbiger, weicher Hintergrund, darüber
+ * halbtransparente Karten mit Unschärfe (backdrop-filter) und einer feinen
+ * Lichtkante oben. Eine einzige Akzentfarbe, dezente Status-Farben.
+ * Wer im Betriebssystem "Transparenz reduzieren" eingestellt hat, bekommt
+ * automatisch feste Flächen.
  *
  * Aufbau:
  *  1. Farben als CSS-Variablen – je ein Satz für Hell und Dunkel
@@ -19,18 +22,29 @@
  * ================================================================== */
 
 :root {
-    --hintergrund: #f5f5f7;
-    --karte: #ffffff;
-    --karte-erhoeht: #ffffff;       /* Menüs, Popups */
+    --hintergrund: #eef0f4;
+    --karte-solid: #ffffff;          /* feste Fläche, z. B. für Diagramm-Punkte */
     --text: #1d1d1f;
     --text-leise: #6e6e73;
-    --linie: #e5e5ea;
-    --feld-rand: #d2d2d7;
-    --feld-bg: #ffffff;
-    --zeile-hover: #f9f9fb;
-    --fuellung: #f0f0f3;            /* Balken-Hintergrund, Sekundär-Buttons */
-    --fuellung-hover: #e6e6eb;
-    --nav-bg: rgba(255, 255, 255, .78);
+    --linie: rgba(60, 60, 67, .12);
+    --feld-rand: rgba(60, 60, 67, .18);
+    --feld-bg: rgba(255, 255, 255, .72);
+    --zeile-hover: rgba(255, 255, 255, .55);
+    --fuellung: rgba(118, 118, 128, .10);   /* Balken-Hintergrund, Sekundär-Buttons */
+    --fuellung-hover: rgba(118, 118, 128, .17);
+
+    /* Glas: halbtransparente Flächen mit Unschärfe und Lichtkante */
+    --karte: rgba(255, 255, 255, .62);
+    --karte-erhoeht: rgba(255, 255, 255, .82);   /* Menüs, Navigation */
+    --glas-rand: rgba(255, 255, 255, .7);
+    --glas-kante: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 -1px 0 rgba(255, 255, 255, .25);
+    --glas-unschaerfe: blur(22px) saturate(175%);
+    --glas-linse: rgba(255, 255, 255, .92);      /* aktiver Navigationspunkt */
+
+    /* Weicher Hintergrund: drei sehr blasse Farbflächen */
+    --umgebung-1: rgba(0, 113, 227, .13);
+    --umgebung-2: rgba(175, 82, 222, .10);
+    --umgebung-3: rgba(48, 176, 199, .10);
 
     --akzent: #0071e3;
     --akzent-hover: #0077ed;
@@ -46,10 +60,10 @@
     --grau-bg: #ececf0;    --grau: #515154;
 
     /* Formen & Bewegung */
-    --radius-karte: 18px;
-    --radius-feld: 11px;
-    --schatten: 0 1px 2px rgba(0, 0, 0, .04), 0 6px 24px rgba(0, 0, 0, .05);
-    --schatten-hover: 0 2px 6px rgba(0, 0, 0, .06), 0 14px 36px rgba(0, 0, 0, .09);
+    --radius-karte: 22px;
+    --radius-feld: 12px;
+    --schatten: 0 1px 2px rgba(0, 0, 0, .03), 0 8px 32px rgba(31, 38, 64, .07);
+    --schatten-hover: 0 2px 6px rgba(0, 0, 0, .05), 0 18px 44px rgba(31, 38, 64, .12);
     --uebergang: .25s cubic-bezier(.2, .8, .2, 1);
     --weich: cubic-bezier(.2, .8, .2, 1);
 
@@ -58,18 +72,26 @@
 
 /* Dunkelmodus: dieselben Variablen, andere Werte */
 :root[data-theme="dark"] {
-    --hintergrund: #000000;
-    --karte: #1c1c1e;
-    --karte-erhoeht: #2c2c2e;
+    --hintergrund: #050507;
+    --karte-solid: #1c1c1e;
     --text: #f5f5f7;
     --text-leise: #98989d;
-    --linie: #38383a;
-    --feld-rand: #48484a;
-    --feld-bg: #2c2c2e;
-    --zeile-hover: #242426;
-    --fuellung: #2c2c2e;
-    --fuellung-hover: #3a3a3c;
-    --nav-bg: rgba(22, 22, 23, .78);
+    --linie: rgba(255, 255, 255, .1);
+    --feld-rand: rgba(255, 255, 255, .14);
+    --feld-bg: rgba(255, 255, 255, .06);
+    --zeile-hover: rgba(255, 255, 255, .04);
+    --fuellung: rgba(255, 255, 255, .08);
+    --fuellung-hover: rgba(255, 255, 255, .13);
+
+    --karte: rgba(30, 30, 34, .55);
+    --karte-erhoeht: rgba(40, 40, 44, .82);
+    --glas-rand: rgba(255, 255, 255, .09);
+    --glas-kante: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 -1px 0 rgba(255, 255, 255, .02);
+    --glas-linse: rgba(255, 255, 255, .13);
+
+    --umgebung-1: rgba(41, 151, 255, .16);
+    --umgebung-2: rgba(191, 90, 242, .12);
+    --umgebung-3: rgba(48, 176, 199, .08);
 
     --akzent: #2997ff;
     --akzent-hover: #47a6ff;
@@ -83,10 +105,16 @@
     --lila-bg: rgba(191, 90, 242, .18);   --lila: #d08cff;
     --grau-bg: rgba(142, 142, 147, .2);   --grau: #c7c7cc;
 
-    --schatten: 0 0 0 1px rgba(255, 255, 255, .04), 0 8px 28px rgba(0, 0, 0, .5);
-    --schatten-hover: 0 0 0 1px rgba(255, 255, 255, .08), 0 14px 40px rgba(0, 0, 0, .6);
+    --schatten: 0 8px 32px rgba(0, 0, 0, .45);
+    --schatten-hover: 0 16px 44px rgba(0, 0, 0, .6);
 
     color-scheme: dark;
+}
+
+/* Wer "Transparenz reduzieren" eingestellt hat, bekommt feste Flächen */
+@media (prefers-reduced-transparency: reduce) {
+    :root { --karte: #ffffff; --karte-erhoeht: #ffffff; --glas-unschaerfe: none; --umgebung-1: transparent; --umgebung-2: transparent; --umgebung-3: transparent; }
+    :root[data-theme="dark"] { --karte: #1c1c1e; --karte-erhoeht: #2c2c2e; }
 }
 
 /* =====================================================================
@@ -103,6 +131,21 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+}
+
+/* Weicher, ruhiger Hintergrund hinter allem: drei unscharfe Farbflächen.
+   Erst dadurch wirkt das Glas der Karten – ohne Hintergrund gäbe es nichts zu "brechen". */
+body::before {
+    content: "";
+    position: fixed;
+    inset: -10%;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(38% 42% at 12% 8%, var(--umgebung-1), transparent 70%),
+        radial-gradient(34% 40% at 92% 18%, var(--umgebung-2), transparent 70%),
+        radial-gradient(42% 44% at 70% 96%, var(--umgebung-3), transparent 70%);
+    filter: blur(20px);
 }
 
 a {
@@ -124,18 +167,23 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 
 .app-nav {
     position: sticky;
-    top: 0;
+    top: 12px;
     z-index: 1020;
-    background: var(--nav-bg);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border-bottom: 1px solid var(--linie);
+    width: min(1296px, calc(100% - 24px));
+    margin: 12px auto 0;
+    border-radius: 24px;
+    background: var(--karte-erhoeht);
+    backdrop-filter: var(--glas-unschaerfe);
+    -webkit-backdrop-filter: var(--glas-unschaerfe);
+    border: 1px solid var(--glas-rand);
+    box-shadow: var(--glas-kante), var(--schatten);
 }
 .app-nav .nav-zeile {
     display: flex;
     align-items: center;
     gap: 12px;
     min-height: 60px;
+    position: relative;
 }
 .marke {
     display: inline-flex;
@@ -149,9 +197,10 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .marke:hover { color: var(--text); text-decoration: none; }
 .marke-symbol {
     width: 32px; height: 32px;
-    border-radius: 9px;
+    border-radius: 10px;
     display: grid; place-items: center;
-    background: var(--akzent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--akzent) 75%, #fff) 0%, var(--akzent) 60%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 4px 12px var(--akzent-ring);
     color: #fff;
     font-size: 1rem;
     transition: transform .5s var(--weich);
@@ -171,7 +220,13 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 .nav-links a i { font-size: 1rem; opacity: .85; }
 .nav-links a:hover { color: var(--text); background: var(--fuellung); text-decoration: none; }
-.nav-links a.aktiv { color: var(--text); background: var(--fuellung); font-weight: 500; }
+/* Aktiver Punkt: eine helle "Glaslinse" */
+.nav-links a.aktiv {
+    color: var(--text);
+    background: var(--glas-linse);
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08), inset 0 1px 0 rgba(255, 255, 255, .6);
+}
 
 .nav-werkzeuge { display: flex; align-items: center; gap: 6px; }
 .rund-knopf {
@@ -193,12 +248,14 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .aufklapp-menue {
     position: absolute;
     right: 0;
-    top: calc(100% + 8px);
+    top: calc(100% + 10px);
     min-width: 220px;
     background: var(--karte-erhoeht);
-    border: 1px solid var(--linie);
-    border-radius: 14px;
-    box-shadow: var(--schatten-hover);
+    backdrop-filter: var(--glas-unschaerfe);
+    -webkit-backdrop-filter: var(--glas-unschaerfe);
+    border: 1px solid var(--glas-rand);
+    border-radius: 16px;
+    box-shadow: var(--glas-kante), var(--schatten-hover);
     padding: 6px;
     z-index: 1030;
     transform-origin: top right;
@@ -234,13 +291,16 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     .nav-menue-knopf { display: grid; }
     .nav-links {
         position: absolute;
-        left: 0; right: 0;
-        top: 100%;
+        left: -12px; right: -12px;
+        top: calc(100% + 10px);
         flex-direction: column;
-        padding: 10px 16px 16px;
-        background: var(--karte);
-        border-bottom: 1px solid var(--linie);
-        box-shadow: var(--schatten);
+        padding: 10px;
+        background: var(--karte-erhoeht);
+        backdrop-filter: var(--glas-unschaerfe);
+        -webkit-backdrop-filter: var(--glas-unschaerfe);
+        border: 1px solid var(--glas-rand);
+        border-radius: 20px;
+        box-shadow: var(--glas-kante), var(--schatten-hover);
         display: none;
     }
     .nav-links.offen { display: flex; animation: herabgleiten .25s var(--weich); }
@@ -281,8 +341,11 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 
 .karte {
     background: var(--karte);
+    backdrop-filter: var(--glas-unschaerfe);
+    -webkit-backdrop-filter: var(--glas-unschaerfe);
+    border: 1px solid var(--glas-rand);
     border-radius: var(--radius-karte);
-    box-shadow: var(--schatten);
+    box-shadow: var(--glas-kante), var(--schatten);
     padding: 28px;
     margin-bottom: 24px;
     transition: box-shadow var(--uebergang), transform var(--uebergang), background-color .4s ease;
@@ -291,7 +354,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 a.karte { display: block; color: inherit; }
 a.karte:hover {
     text-decoration: none;
-    box-shadow: var(--schatten-hover);
+    box-shadow: var(--glas-kante), var(--schatten-hover);
     transform: translateY(-3px);
 }
 .karte-kopf {
@@ -540,20 +603,22 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
 }
 .btn:active { transform: scale(.97); }
 .btn-primary {
-    background: var(--akzent);
-    border-color: var(--akzent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--akzent) 82%, #fff) 0%, var(--akzent) 55%);
+    border-color: transparent;
     color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 2px 8px var(--akzent-ring);
 }
 .btn-primary:hover, .btn-primary:focus {
-    background: var(--akzent-hover);
-    border-color: var(--akzent-hover);
-    box-shadow: 0 6px 18px var(--akzent-ring);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--akzent-hover) 78%, #fff) 0%, var(--akzent-hover) 55%);
+    border-color: transparent;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 8px 22px var(--akzent-ring);
 }
 .btn-primary:disabled { background: var(--akzent); border-color: var(--akzent); opacity: .7; }
 .btn-sekundaer {
     background: var(--fuellung);
-    border: 1px solid transparent;
+    border: 1px solid var(--glas-rand);
     color: var(--text);
+    backdrop-filter: blur(10px);
 }
 .btn-sekundaer:hover { background: var(--fuellung-hover); color: var(--text); }
 .btn-klein { padding: 6px 14px; font-size: .875rem; }
@@ -666,13 +731,13 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
     color: var(--text-leise);
     font-size: .85rem;
     padding: 24px 0 40px;
-    border-top: 1px solid var(--linie);
 }
 
 /* ---------- Anpassungen für Tablet & Smartphone ---------- */
 
 @media (max-width: 767.98px) {
     .app-main { padding-top: 24px; }
+    .app-nav { top: 8px; margin-top: 8px; width: calc(100% - 16px); border-radius: 20px; }
     .seitenkopf h1 { font-size: 1.95rem; }
     .karte { padding: 20px; }
     .kennzahl-wert { font-size: 2.4rem; }
@@ -696,7 +761,8 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
 .seiten-einstieg { animation: einblenden .5s var(--weich) both; }
 
 /* Karten erscheinen nacheinander: --i ist die Position (0, 1, 2, …) */
-.karte { animation: hochgleiten .6s var(--weich) both; animation-delay: calc(var(--i, 0) * 70ms); }
+/* 'backwards': Startzustand gilt nur bis zum Ende – danach greifen wieder Hover-Effekte */
+.karte { animation: hochgleiten .6s var(--weich) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
 
 @keyframes einblenden    { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hochgleiten   { from { opacity: 0; transform: translateY(14px) scale(.99); } to { opacity: 1; transform: none; } }
@@ -723,3 +789,332 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
 
 /* Der Seiten-Wrapper aus app/template.js füllt die Höhe aus (z. B. Login mittig) */
 body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
+
+/* =====================================================================
+ * 4. Störungskarte: Deutschlandkarte, Lageplan, Grundriss
+ * ================================================================== */
+
+:root {
+    --land: rgba(255, 255, 255, .85);
+    --land-rand: rgba(60, 60, 67, .28);
+    --nachbar: rgba(118, 118, 128, .05);
+    --plan-boden: rgba(255, 255, 255, .7);
+    --plan-wand: #3a3a3c;
+    --plan-strasse: rgba(118, 118, 128, .09);
+}
+:root[data-theme="dark"] {
+    --land: rgba(255, 255, 255, .07);
+    --land-rand: rgba(255, 255, 255, .28);
+    --nachbar: rgba(255, 255, 255, .025);
+    --plan-boden: rgba(255, 255, 255, .04);
+    --plan-wand: #d1d1d6;
+    --plan-strasse: rgba(255, 255, 255, .08);
+}
+
+/* Farbstufen der Punkte (Text steht immer dabei) */
+.stufe-rot    { --stufe: var(--rot);    --stufe-bg: var(--rot-bg); }
+.stufe-orange { --stufe: var(--orange); --stufe-bg: var(--orange-bg); }
+.stufe-blau   { --stufe: var(--blau);   --stufe-bg: var(--blau-bg); }
+.stufe-ruhig  { --stufe: var(--gruen);  --stufe-bg: var(--gruen-bg); }
+
+/* ---------- Deutschlandkarte ---------- */
+
+.dkarte { position: relative; width: 100%; max-width: 560px; margin: 0 auto; }
+.dkarte-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; border-radius: 14px; }
+.dkarte-land { fill: var(--land); stroke: var(--land-rand); stroke-width: 1.2; stroke-linejoin: round;
+               filter: drop-shadow(0 8px 24px rgba(31, 38, 64, .12)); }
+.dkarte-nachbar { fill: var(--nachbar); stroke: var(--linie); stroke-width: .8; }
+.dkarte-rasterpunkt, .plan-rasterpunkt { fill: var(--text-leise); opacity: .18; }
+
+.karten-punkt {
+    /* Anker: die Mitte des runden Punkts (34 px hoch) liegt genau auf der Position des Werks */
+    --anker: translate(-50%, -17px);
+    position: absolute;
+    transform: var(--anker);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--text);
+    text-decoration: none;
+    z-index: 1;
+    animation: punkt-erscheinen .5s var(--weich) backwards;
+    animation-delay: calc(var(--i, 0) * 60ms + 200ms);
+}
+.karten-punkt:hover { text-decoration: none; color: var(--text); z-index: 3; }
+.punkt-blase {
+    min-width: 34px; height: 34px;
+    padding: 0 9px;
+    border-radius: 999px;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: .95rem;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--stufe) 78%, #fff), var(--stufe));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 4px 14px color-mix(in srgb, var(--stufe) 45%, transparent),
+                0 0 0 3px var(--karte-erhoeht);
+    transition: transform var(--uebergang);
+    position: relative;
+}
+/* Werke mit dringenden Störungen pulsieren dezent */
+.stufe-rot .punkt-blase::after {
+    content: ""; position: absolute; inset: -3px; border-radius: inherit;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--rot) 55%, transparent);
+    animation: puls-ring 2.2s ease-out infinite;
+}
+.punkt-name {
+    font-size: .78rem; font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--karte-erhoeht);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+    white-space: nowrap;
+}
+.karten-punkt:hover .punkt-blase, .karten-punkt:focus-visible .punkt-blase, .karten-punkt.gewaehlt .punkt-blase { transform: scale(1.15); }
+.karten-punkt.gewaehlt .punkt-name { background: var(--akzent); color: #fff; }
+/* Name über dem Punkt (wenn darunter ein anderes Werk liegt) */
+.karten-punkt.name-oben { flex-direction: column-reverse; --anker: translate(-50%, calc(-100% + 17px)); }
+.karten-punkt.name-oben .punkt-info { bottom: auto; top: calc(100% + 8px); }
+.punkt-info {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translate(-50%, 4px);
+    min-width: 190px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--karte-erhoeht);
+    backdrop-filter: var(--glas-unschaerfe);
+    border: 1px solid var(--glas-rand);
+    box-shadow: var(--glas-kante), var(--schatten-hover);
+    font-size: .85rem;
+    color: var(--text-leise);
+    text-align: left;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease, transform .2s var(--weich);
+}
+.punkt-info strong { display: block; color: var(--text); font-size: .92rem; }
+.karten-punkt:hover .punkt-info, .karten-punkt:focus-visible .punkt-info { opacity: 1; transform: translate(-50%, 0); }
+.karten-punkt.info-links .punkt-info  { left: auto; right: -12px; transform: translateY(4px); }
+.karten-punkt.info-rechts .punkt-info { left: -12px; transform: translateY(4px); }
+.karten-punkt.info-links:hover .punkt-info, .karten-punkt.info-rechts:hover .punkt-info,
+.karten-punkt.info-links:focus-visible .punkt-info, .karten-punkt.info-rechts:focus-visible .punkt-info { transform: none; }
+
+.karten-legende { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .82rem; color: var(--text-leise); margin-top: 14px; }
+.karten-legende span { display: inline-flex; align-items: center; gap: 6px; }
+.karten-legende .punkt { width: 10px; height: 10px; border-radius: 50%; background: var(--stufe); display: inline-block; }
+
+/* ---------- Lageplan ---------- */
+
+.lageplan-rahmen, .grundriss-rahmen { overflow-x: auto; margin: 0 -6px; padding: 6px; }
+.lageplan, .grundriss { position: relative; width: 100%; min-width: 560px; }
+.lageplan-svg, .grundriss-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.plan-gelaende { fill: var(--plan-boden); stroke: var(--land-rand); stroke-width: .6; stroke-dasharray: 3 2; }
+.plan-strasse { fill: var(--plan-strasse); }
+.plan-mittellinie { stroke: var(--karte-erhoeht); stroke-width: .5; stroke-dasharray: 4 3; }
+.plan-tor { fill: var(--akzent); opacity: .7; }
+.plan-parkplatz { fill: var(--plan-strasse); }
+.plan-stellplatz { stroke: var(--karte-erhoeht); stroke-width: .4; }
+.plan-baum { fill: color-mix(in srgb, var(--gruen) 16%, transparent); stroke: color-mix(in srgb, var(--gruen) 26%, transparent); stroke-width: .4; }
+.plan-beschriftung {
+    position: absolute; transform: translate(-50%, -50%);
+    font-size: .7rem; font-weight: 600; color: var(--text-leise); text-transform: uppercase; letter-spacing: .08em;
+    pointer-events: none;
+}
+
+.plan-gebaeude {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    border-radius: 10px;
+    border: 1px solid var(--glas-rand);
+    background: var(--karte-erhoeht);
+    backdrop-filter: var(--glas-unschaerfe);
+    box-shadow: var(--glas-kante), 0 4px 12px rgba(31, 38, 64, .08);
+    color: var(--text);
+    text-align: center;
+    text-decoration: none;
+    overflow: visible;
+    transition: transform var(--uebergang), box-shadow var(--uebergang), border-color var(--uebergang);
+    animation: hochgleiten .5s var(--weich) backwards;
+    animation-delay: calc(var(--i, 0) * 80ms + 150ms);
+}
+.plan-gebaeude::before {   /* farbiger Streifen oben: Zustand des Gebäudes */
+    content: ""; position: absolute; left: 10px; right: 10px; top: 0; height: 3px; border-radius: 0 0 3px 3px;
+    background: var(--stufe);
+}
+.plan-gebaeude:hover, .plan-gebaeude:focus-visible, .plan-gebaeude.gewaehlt {
+    transform: translateY(-3px);
+    box-shadow: var(--glas-kante), 0 14px 32px rgba(31, 38, 64, .2);
+    border-color: var(--akzent);
+    color: var(--text);
+    text-decoration: none;
+}
+.gebaeude-kuerzel { font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em; }
+.gebaeude-name { font-size: .8rem; font-weight: 500; line-height: 1.2; }
+.gebaeude-info { font-size: .72rem; color: var(--text-leise); }
+
+/* Zahl-Marke oben rechts (Gebäude und Maschinen) */
+.zaehl-marke {
+    position: absolute;
+    top: -9px; right: -9px;
+    min-width: 22px; height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    display: grid; place-items: center;
+    font-size: .75rem; font-weight: 700;
+    color: #fff;
+    background: var(--stufe);
+    box-shadow: 0 0 0 2px var(--karte-solid), 0 3px 8px rgba(0, 0, 0, .18);
+    font-variant-numeric: tabular-nums;
+    z-index: 2;
+}
+
+/* ---------- Grundriss ---------- */
+
+.grundriss { min-width: 680px; }
+.plan-boden { fill: var(--plan-boden); }
+.plan-bereich { fill: none; stroke: var(--land-rand); stroke-width: .12; stroke-dasharray: .8 .6; }
+.plan-bereich-name { font-size: 1.35px; font-weight: 700; letter-spacing: .12px; fill: var(--text-leise); }
+.plan-wand { fill: none; stroke: var(--plan-wand); stroke-width: .55; }
+.plan-oeffnung { stroke: var(--plan-boden); stroke-width: .9; }
+.plan-tor-linie { stroke: var(--akzent); stroke-width: .3; stroke-dasharray: .6 .4; }
+.plan-tuer { fill: none; stroke: var(--plan-wand); stroke-width: .12; }
+.plan-innenwand { stroke: var(--plan-wand); stroke-width: .22; opacity: .55; }
+.plan-regal { fill: var(--fuellung-hover); stroke: var(--land-rand); stroke-width: .08; }
+.plan-moebel { fill: var(--fuellung-hover); }
+
+.plan-maschine {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--stufe) 35%, var(--glas-rand));
+    background: var(--karte-erhoeht);
+    box-shadow: var(--glas-kante), 0 3px 10px rgba(31, 38, 64, .1);
+    color: var(--text);
+    font-size: .72rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform var(--uebergang), box-shadow var(--uebergang), background-color var(--uebergang);
+    animation: maschine-erscheinen .45s var(--weich) backwards;
+    animation-delay: calc(var(--i, 0) * 35ms + 200ms);
+}
+.plan-maschine i { font-size: 1rem; color: var(--text-leise); }
+.plan-maschine.stufe-rot, .plan-maschine.stufe-orange, .plan-maschine.stufe-blau {
+    background: color-mix(in srgb, var(--stufe-bg) 70%, var(--karte-erhoeht));
+}
+.plan-maschine.stufe-rot i, .plan-maschine.stufe-orange i, .plan-maschine.stufe-blau i { color: var(--stufe); }
+.plan-maschine.stufe-ruhig { border-color: var(--glas-rand); }
+.plan-maschine.stufe-rot { animation: maschine-erscheinen .45s var(--weich) backwards, maschine-puls 2.4s ease-out 1s infinite; }
+.plan-maschine:hover, .plan-maschine:focus-visible { transform: scale(1.06); z-index: 3; box-shadow: var(--glas-kante), 0 8px 20px rgba(31, 38, 64, .18); }
+.plan-maschine.gewaehlt {
+    z-index: 4;
+    border-color: var(--akzent);
+    box-shadow: 0 0 0 3px var(--akzent-ring), 0 10px 24px rgba(31, 38, 64, .2);
+    transform: scale(1.06);
+}
+/* Modellname als kleines Schild unter der Maschine */
+.maschine-modell {
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: .66rem;
+    font-weight: 600;
+    color: var(--text-leise);
+    background: var(--karte-erhoeht);
+    padding: 0 5px;
+    border-radius: 5px;
+    pointer-events: none;
+}
+.plan-maschine.gewaehlt .maschine-modell { color: #fff; background: var(--akzent); }
+
+/* ---------- Seitenleiste & Brotkrumen ---------- */
+
+.brotkrumen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .9rem; color: var(--text-leise); margin-bottom: 14px; }
+.brotkrumen a { color: var(--text-leise); }
+.brotkrumen a:hover { color: var(--akzent); }
+.brotkrumen .bi-chevron-right { font-size: .7rem; opacity: .6; }
+
+.ort-liste { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.ort-liste a, .ort-liste button {
+    width: 100%;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    background: var(--fuellung);
+    color: var(--text);
+    text-align: left;
+    text-decoration: none;
+    transition: background-color var(--uebergang), transform var(--uebergang), border-color var(--uebergang);
+}
+.ort-liste a:hover, .ort-liste button:hover { background: var(--fuellung-hover); transform: translateX(2px); color: var(--text); text-decoration: none; }
+.ort-liste .gewaehlt { border-color: var(--akzent); background: var(--akzent-zart); }
+.ort-liste .ort-titel { font-weight: 600; display: block; }
+.ort-liste .ort-unter { font-size: .82rem; color: var(--text-leise); display: block; }
+.ort-liste .ort-zahl {
+    margin-left: auto; min-width: 30px; height: 30px; padding: 0 8px;
+    border-radius: 999px; display: grid; place-items: center;
+    font-weight: 700; font-size: .85rem; color: var(--stufe); background: var(--stufe-bg);
+    font-variant-numeric: tabular-nums;
+}
+
+.detail-kopf { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+.detail-symbol {
+    width: 46px; height: 46px; flex: 0 0 46px; border-radius: 14px;
+    display: grid; place-items: center; font-size: 1.3rem;
+    background: var(--stufe-bg); color: var(--stufe);
+}
+.mini-kennzahlen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.mini-kennzahlen div { background: var(--fuellung); border-radius: 12px; padding: 10px; text-align: center; }
+.mini-kennzahlen strong { display: block; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.mini-kennzahlen span { font-size: .75rem; color: var(--text-leise); }
+
+/* Schritte beim Melden über die Karte */
+.schritte-leiste { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.schritte-leiste button {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--glas-rand); border-radius: 999px;
+    padding: 7px 14px 7px 8px; font-size: .9rem;
+    background: var(--karte); backdrop-filter: blur(12px); color: var(--text-leise);
+    transition: background-color var(--uebergang), color var(--uebergang);
+}
+.schritte-leiste button:disabled { opacity: .55; }
+.schritte-leiste .nr {
+    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--fuellung); font-weight: 700; font-size: .8rem;
+}
+.schritte-leiste .aktiv { color: var(--text); background: var(--karte-erhoeht); font-weight: 600; }
+.schritte-leiste .aktiv .nr { background: var(--akzent); color: #fff; }
+.schritte-leiste .fertig .nr { background: var(--gruen); color: #fff; }
+.auswahl-chip {
+    display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 14px; border-radius: 14px; background: var(--akzent-zart); color: var(--text); margin-bottom: 18px;
+}
+
+@keyframes punkt-erscheinen { from { opacity: 0; transform: var(--anker) scale(.6); } to { opacity: 1; transform: var(--anker) scale(1); } }
+@keyframes maschine-erscheinen { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes puls-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rot) 50%, transparent); } 70%, 100% { box-shadow: 0 0 0 12px transparent; } }
+@keyframes maschine-puls { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rot) 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 9px transparent; } }
+
+/* Mittlere Breite (z. B. Tablet quer): in der Navigation nur Symbole zeigen */
+@media (min-width: 768px) and (max-width: 1099.98px) {
+    .nav-links .nav-text { display: none; }
+    .nav-links a { padding: 9px 12px; }
+    .nav-links a i { font-size: 1.1rem; }
+}

@@ -32,15 +32,24 @@ export default async function AuftragSeite({ params }) {
   const [auftrag] = await sql`
     SELECT w.id, w.stoermeldung_id, w.techniker_id, w.status, w.start_zeit, w.ende_zeit, w.massnahme,
            s.zeitpunkt, s.gemeldet_von, s.beschreibung, s.ursache_kategorie, s.prioritaet,
-           m.bezeichnung AS maschine, m.standort
+           m.id AS maschine_id, m.bezeichnung AS maschine, m.anlagennummer,
+           g.kuerzel AS gebaeude_kuerzel, g.bezeichnung AS gebaeude,
+           st.id AS standort_id, st.kuerzel AS standort_kuerzel, st.name AS standort
     FROM wartungsauftrag w
     JOIN stoermeldung s ON s.id = w.stoermeldung_id
     JOIN maschine m     ON m.id = s.maschine_id
+    JOIN gebaeude g     ON g.id = m.gebaeude_id
+    JOIN standort st    ON st.id = g.standort_id
     WHERE w.id = ${auftragId}`;
   if (!auftrag) notFound();
 
   const [techniker, ersatzteile, gebuchteTeile] = await Promise.all([
-    sql`SELECT id, name, qualifikation, schicht FROM techniker ORDER BY name`,
+    // Techniker des eigenen Standorts zuerst
+    sql`
+      SELECT t.id, t.name, t.qualifikation, t.schicht, (t.standort_id = ${auftrag.standort_id}) AS vor_ort,
+             COALESCE(st.name, 'ohne Standort') AS standort
+      FROM techniker t LEFT JOIN standort st ON st.id = t.standort_id
+      ORDER BY (t.standort_id = ${auftrag.standort_id}) DESC, st.name, t.name`,
     sql`SELECT id, bezeichnung, bestand, mindestbestand FROM ersatzteil ORDER BY bezeichnung`,
     sql`
       SELECT e.bezeichnung, ae.menge
@@ -77,7 +86,13 @@ export default async function AuftragSeite({ params }) {
           <PrioritaetPill prioritaet={auftrag.prioritaet} />
         </div>
         <h1>{auftrag.maschine}</h1>
-        <p>Störmeldung Nr. {auftrag.stoermeldung_id} · {auftrag.standort}</p>
+        <p>
+          Störmeldung Nr. {auftrag.stoermeldung_id} · {auftrag.standort} · {auftrag.gebaeude} · {auftrag.anlagennummer}{' '}
+          <Link href={`/karte/${auftrag.standort_kuerzel.toLowerCase()}/${auftrag.gebaeude_kuerzel.toLowerCase()}?maschine=${auftrag.maschine_id}`}
+                className="ms-1 text-nowrap">
+            <i className="bi bi-geo-alt" aria-hidden="true" /> Auf der Karte zeigen
+          </Link>
+        </p>
       </div>
 
       <div className="row g-4">

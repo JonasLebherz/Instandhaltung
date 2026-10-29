@@ -11,15 +11,19 @@
 --   - Zeitpunkte als TIMESTAMPTZ (mit Zeitzone), angezeigt wird in Europe/Berlin
 --   - Row Level Security: Die Tabellen sind für die öffentliche Supabase-API
 --     gesperrt. Zugriff nur über die Webanwendung (Server) und Power BI.
+--
+-- Aufbau des Unternehmens (für die Störungskarte):
+--   standort (Werk) 1 ── n gebaeude 1 ── n maschine 1 ── n stoermeldung 1 ── 1 wartungsauftrag
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
 -- Aufräumen (für erneutes Ausführen)
 -- ---------------------------------------------------------------------
-DROP VIEW IF EXISTS v_stoerung_details, v_stoerungen_monat, v_ausfallzeit_maschine, v_mttr_maschine;
+DROP VIEW IF EXISTS v_stoerung_details, v_stoerungen_monat, v_ausfallzeit_maschine, v_mttr_maschine,
+                    v_kennzahlen_standort;
 DROP TABLE IF EXISTS bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
-                     stoermeldung, techniker, maschine CASCADE;
-DROP TYPE IF EXISTS auftragsstatus, prioritaet, schicht, bestellstatus, ursache;
+                     stoermeldung, techniker, maschine, gebaeude, standort CASCADE;
+DROP TYPE IF EXISTS auftragsstatus, prioritaet, schicht, bestellstatus, ursache, maschinentyp;
 
 
 -- ---------------------------------------------------------------------
@@ -33,29 +37,76 @@ CREATE TYPE bestellstatus  AS ENUM ('bestellt', 'geliefert');
 CREATE TYPE ursache        AS ENUM ('Mechanischer Defekt', 'Elektrischer Fehler', 'Hydraulik/Pneumatik',
                                     'Steuerung/Software', 'Verschleiß', 'Bedienfehler',
                                     'Materialfehler', 'Sonstiges');
+-- Maschinenart: bestimmt u. a. das Symbol im Grundriss
+CREATE TYPE maschinentyp   AS ENUM ('Fräsen', 'Drehen', 'Spritzguss', 'Laserschneiden', 'Schweißen', 'Pressen',
+                                    'Fördertechnik', 'Lackieren', 'Montage', 'Druckluft', 'Lagertechnik');
 
 
 -- =====================================================================
 -- Stammdaten
 -- =====================================================================
 
--- Maschinen im Werk
-CREATE TABLE maschine (
+-- Standorte (Werke) des Unternehmens – mit GPS-Position für die Deutschlandkarte
+CREATE TABLE standort (
+    id                 INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    kuerzel            VARCHAR(5)   NOT NULL UNIQUE,      -- z. B. 'HAM'
+    name               VARCHAR(100) NOT NULL UNIQUE,      -- z. B. 'Werk Hamburg'
+    stadt              VARCHAR(100) NOT NULL,
+    adresse            VARCHAR(150) NOT NULL,
+    schwerpunkt        VARCHAR(100) NOT NULL,             -- was dort hauptsächlich gefertigt wird
+    breitengrad        DOUBLE PRECISION NOT NULL CHECK (breitengrad BETWEEN -90 AND 90),
+    laengengrad        DOUBLE PRECISION NOT NULL CHECK (laengengrad BETWEEN -180 AND 180),
+    -- Größe des Werksgeländes in Metern (für den Lageplan)
+    gelaende_breite_m  REAL NOT NULL CHECK (gelaende_breite_m > 0),
+    gelaende_tiefe_m   REAL NOT NULL CHECK (gelaende_tiefe_m > 0)
+);
+COMMENT ON TABLE standort IS 'Werke des Unternehmens';
+
+-- Gebäude eines Standorts – mit Lage auf dem Werksgelände und Raumaufteilung
+CREATE TABLE gebaeude (
     id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    bezeichnung  VARCHAR(100) NOT NULL UNIQUE,
-    standort     VARCHAR(100) NOT NULL,
-    baujahr      SMALLINT     NOT NULL CHECK (baujahr BETWEEN 1950 AND 2100)
+    standort_id  INTEGER      NOT NULL REFERENCES standort (id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    kuerzel      VARCHAR(10)  NOT NULL,                   -- z. B. 'H2'
+    bezeichnung  VARCHAR(100) NOT NULL,                   -- z. B. 'Halle 2 – Montage'
+    -- Position und Größe auf dem Lageplan des Werksgeländes (Meter, Ursprung oben links)
+    lage_x_m     REAL NOT NULL CHECK (lage_x_m >= 0),
+    lage_y_m     REAL NOT NULL CHECK (lage_y_m >= 0),
+    breite_m     REAL NOT NULL CHECK (breite_m > 0),
+    tiefe_m      REAL NOT NULL CHECK (tiefe_m > 0),
+    -- Raumaufteilung für den Grundriss, z. B. [{"name":"Fertigung","x":0,"y":0,"b":60,"t":40}, …]
+    bereiche     JSONB NOT NULL DEFAULT '[]',
+    UNIQUE (standort_id, kuerzel)                         -- 'H1' gibt es an jedem Standort, aber nur einmal
+);
+COMMENT ON TABLE gebaeude IS 'Gebäude (Hallen) der Standorte';
+CREATE INDEX idx_gebaeude_standort ON gebaeude (standort_id);
+
+-- Maschinen – mit Position im Grundriss ihres Gebäudes
+CREATE TABLE maschine (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    gebaeude_id    INTEGER      NOT NULL REFERENCES gebaeude (id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    anlagennummer  VARCHAR(20)  NOT NULL UNIQUE,          -- z. B. 'HAM-H2-03'
+    bezeichnung    VARCHAR(100) NOT NULL,                 -- z. B. 'CNC-Fräszentrum FZ-500'
+    typ            maschinentyp NOT NULL,
+    baujahr        SMALLINT     NOT NULL CHECK (baujahr BETWEEN 1950 AND 2100),
+    -- Position (linke obere Ecke) und Stellfläche im Gebäude, in Metern
+    pos_x_m        REAL NOT NULL CHECK (pos_x_m >= 0),
+    pos_y_m        REAL NOT NULL CHECK (pos_y_m >= 0),
+    breite_m       REAL NOT NULL CHECK (breite_m > 0),
+    tiefe_m        REAL NOT NULL CHECK (tiefe_m > 0)
 );
 COMMENT ON TABLE maschine IS 'Maschinen und Anlagen der Produktion';
+CREATE INDEX idx_maschine_gebaeude ON maschine (gebaeude_id);
 
--- Instandhaltungstechniker
+-- Instandhaltungstechniker – jeweils einem Standort zugeordnet
 CREATE TABLE techniker (
     id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    standort_id    INTEGER      NULL REFERENCES standort (id) ON UPDATE CASCADE ON DELETE SET NULL,
     name           VARCHAR(100) NOT NULL,
     qualifikation  VARCHAR(100) NOT NULL,
     schicht        schicht      NOT NULL
 );
 COMMENT ON TABLE techniker IS 'Techniker der Instandhaltung';
+CREATE INDEX idx_techniker_standort ON techniker (standort_id);
 
 -- Ersatzteillager
 CREATE TABLE ersatzteil (
@@ -150,6 +201,8 @@ CREATE INDEX idx_bestellung_teil_status ON bestellung (ersatzteil_id, status);
 -- Die Webanwendung greift serverseitig direkt auf die Datenbank zu und
 -- ist davon nicht betroffen, ebenso Power BI.
 -- =====================================================================
+ALTER TABLE standort           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gebaeude           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE maschine           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE techniker          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ersatzteil         ENABLE ROW LEVEL SECURITY;
@@ -177,33 +230,65 @@ ALTER TABLE bestellung         ENABLE ROW LEVEL SECURITY;
 CREATE VIEW v_mttr_maschine WITH (security_invoker = true) AS
 SELECT
     m.id                                        AS maschine_id,
+    m.anlagennummer,
     m.bezeichnung                               AS maschine,
-    m.standort,
+    st.name                                     AS standort,
+    g.bezeichnung                               AS gebaeude,
     COUNT(w.id)                                 AS anzahl_erledigt,
     ROUND(AVG(EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 60)::numeric, 1)        AS mttr_minuten,
     ROUND(AVG(EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 3600)::numeric, 2)      AS mttr_stunden
 FROM maschine m
+JOIN gebaeude g             ON g.id = m.gebaeude_id
+JOIN standort st            ON st.id = g.standort_id
 LEFT JOIN stoermeldung s    ON s.maschine_id = m.id
 LEFT JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
                            AND w.status = 'erledigt'
                            AND w.start_zeit IS NOT NULL
-GROUP BY m.id, m.bezeichnung, m.standort;
+GROUP BY m.id, m.anlagennummer, m.bezeichnung, st.name, g.bezeichnung;
 
 -- Ausfallzeit pro Maschine (Summe über alle erledigten Störungen)
 CREATE VIEW v_ausfallzeit_maschine WITH (security_invoker = true) AS
 SELECT
     m.id                                        AS maschine_id,
+    m.anlagennummer,
     m.bezeichnung                               AS maschine,
-    m.standort,
+    st.name                                     AS standort,
+    g.bezeichnung                               AS gebaeude,
     COUNT(s.id)                                 AS anzahl_stoerungen,
     ROUND(COALESCE(SUM(EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60)
           FILTER (WHERE w.status = 'erledigt'), 0)::numeric, 0)                          AS ausfallzeit_minuten,
     ROUND(COALESCE(SUM(EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 3600)
           FILTER (WHERE w.status = 'erledigt'), 0)::numeric, 1)                          AS ausfallzeit_stunden
 FROM maschine m
+JOIN gebaeude g             ON g.id = m.gebaeude_id
+JOIN standort st            ON st.id = g.standort_id
 LEFT JOIN stoermeldung s    ON s.maschine_id = m.id
 LEFT JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
-GROUP BY m.id, m.bezeichnung, m.standort;
+GROUP BY m.id, m.anlagennummer, m.bezeichnung, st.name, g.bezeichnung;
+
+-- Kennzahlen pro Standort (Werk): Störungen, offene Aufträge, MTTR, Ausfallzeit
+CREATE VIEW v_kennzahlen_standort WITH (security_invoker = true) AS
+SELECT
+    st.id                                       AS standort_id,
+    st.kuerzel,
+    st.name                                     AS standort,
+    st.stadt,
+    st.breitengrad,
+    st.laengengrad,
+    COUNT(DISTINCT g.id)                        AS anzahl_gebaeude,
+    COUNT(DISTINCT m.id)                        AS anzahl_maschinen,
+    COUNT(s.id)                                 AS anzahl_stoerungen,
+    COUNT(s.id) FILTER (WHERE w.status <> 'erledigt')                                   AS offene_auftraege,
+    ROUND((AVG(EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 3600)
+          FILTER (WHERE w.status = 'erledigt'))::numeric, 2)                            AS mttr_stunden,
+    ROUND(COALESCE(SUM(EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 3600)
+          FILTER (WHERE w.status = 'erledigt'), 0)::numeric, 1)                         AS ausfallzeit_stunden
+FROM standort st
+LEFT JOIN gebaeude g        ON g.standort_id = st.id
+LEFT JOIN maschine m        ON m.gebaeude_id = g.id
+LEFT JOIN stoermeldung s    ON s.maschine_id = m.id
+LEFT JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
+GROUP BY st.id, st.kuerzel, st.name, st.stadt, st.breitengrad, st.laengengrad;
 
 -- Anzahl der Störungen pro Monat (gesamt und nach Priorität), Monate nach deutscher Zeit
 CREATE VIEW v_stoerungen_monat WITH (security_invoker = true) AS
@@ -219,7 +304,7 @@ FROM stoermeldung s
 GROUP BY 1, 2, 3;
 
 -- Zusätzlich: eine flache Tabelle mit einer Zeile pro Störung.
--- Ideal als Faktentabelle in Power BI (eigene Filter nach Datum, Maschine, Techniker, Ursache).
+-- Ideal als Faktentabelle in Power BI (eigene Filter nach Datum, Standort, Maschine, Techniker, Ursache).
 CREATE VIEW v_stoerung_details WITH (security_invoker = true) AS
 SELECT
     s.id                                                         AS meldung_id,
@@ -227,9 +312,14 @@ SELECT
     s.zeitpunkt AT TIME ZONE 'Europe/Berlin'                     AS zeitpunkt,
     (s.zeitpunkt AT TIME ZONE 'Europe/Berlin')::date             AS datum,
     to_char(s.zeitpunkt AT TIME ZONE 'Europe/Berlin', 'YYYY-MM') AS monat,
+    st.kuerzel                                                   AS standort_kuerzel,
+    st.name                                                      AS standort,
+    st.stadt,
+    g.bezeichnung                                                AS gebaeude,
     m.id                                                         AS maschine_id,
+    m.anlagennummer,
     m.bezeichnung                                                AS maschine,
-    m.standort,
+    m.typ::text                                                  AS maschinentyp,
     s.ursache_kategorie::text                                    AS ursache_kategorie,
     s.prioritaet::text                                           AS prioritaet,
     s.gemeldet_von,
@@ -242,5 +332,7 @@ SELECT
     ROUND((EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60)::numeric)   AS ausfallzeit_minuten
 FROM stoermeldung s
 JOIN maschine m             ON m.id = s.maschine_id
+JOIN gebaeude g             ON g.id = m.gebaeude_id
+JOIN standort st            ON st.id = g.standort_id
 LEFT JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
 LEFT JOIN techniker t       ON t.id = w.techniker_id;

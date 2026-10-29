@@ -52,9 +52,17 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte }) {
           <select id="techniker_id" name="techniker_id" className={`form-select${fehlerklasse(fehler, 'techniker_id')}`}
                   defaultValue={eingabe.techniker_id}>
             <option value="">Noch nicht zugewiesen</option>
-            {techniker.map((t) => (
-              <option key={t.id} value={t.id}>{t.name} ({t.qualifikation}, {t.schicht})</option>
-            ))}
+            {/* Zuerst die Techniker vor Ort, darunter alle anderen Standorte */}
+            <optgroup label="Am Standort">
+              {techniker.filter((t) => t.vor_ort).map((t) => (
+                <option key={t.id} value={t.id}>{t.name} ({t.qualifikation}, {t.schicht})</option>
+              ))}
+            </optgroup>
+            <optgroup label="Andere Standorte">
+              {techniker.filter((t) => !t.vor_ort).map((t) => (
+                <option key={t.id} value={t.id}>{t.name} – {t.standort}</option>
+              ))}
+            </optgroup>
           </select>
           <Feldfehler fehler={fehler} name="techniker_id" />
         </div>

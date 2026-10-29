@@ -11,9 +11,11 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 
 ## Stand
 
-- **Fertig:** alle Seiten (Übersicht, Melden, Aufträge, Auftrag bearbeiten, Statistik, Login), Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
-- **Getestet** gegen PostgreSQL 16 lokal: 54 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz mit eingeschaltetem Login, RLS-Sperre für die Rolle `anon`.
-- **Noch nicht live getestet:** echtes Supabase-Projekt und Vercel-Deployment. Die Einrichtung steht im README.
+- **Live:** Die App läuft bei Vercel mit Supabase. Login funktioniert.
+- **Fertig:** alle Seiten (Übersicht, Melden-Assistent über die Karte, Störungskarte Deutschland/Werk/Gebäude, Aufträge, Auftrag bearbeiten, Statistik, Login), Glas-Design, Dunkelmodus, Animationen, `supabase/schema.sql` mit Views und RLS, `supabase/testdaten.sql`.
+- **Beispielunternehmen:** 10 Standorte, 27 Gebäude, 107 Maschinen, 20 Techniker (2 pro Standort), 20 Ersatzteile, ca. 600 Meldungen über 12 Monate, davon 36 offen. Berlin hat bewusst keine offenen Störungen.
+- **Getestet** gegen PostgreSQL 16 lokal: 76 Ende-zu-Ende-Prüfungen mit Playwright (alle Abläufe, Melde-Assistent, Karte, Validierung, Dunkelmodus, Tablet/Handy), Login-Schutz, RLS-Sperre für die Rolle `anon`.
+- **Nach Schemaänderungen** muss in Supabase `schema.sql` + `testdaten.sql` erneut ausgeführt werden. Das setzt alle Daten zurück, Login-Konten bleiben erhalten.
 
 ## Team & andere KI-Assistenten
 
@@ -50,11 +52,22 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 - **Sprache:** Oberfläche, Bezeichner, Kommentare und Doku sind auf **Deutsch**. Der Code ist ausführlich kommentiert, weil er in der Projektdoku erklärt wird.
 - **Abhängigkeiten** sind exakt gepinnt (`--save-exact`). `postcss` ist per `overrides` auf eine gepatchte Version gesetzt. Nach Änderungen `npm audit --omit=dev` ausführen.
 
+## Störungskarte
+
+- Ebenen: `/karte` (Deutschland) → `/karte/<standort-kürzel>` (Lageplan) → `/karte/<standort>/<gebäude-kürzel>` (Grundriss). Kürzel stehen in der URL klein, in der Datenbank groß (`HAM`, `H2`).
+- Abfragen in `lib/karten/daten.js`. Die Zahl auf jedem Punkt ist die Anzahl offener Aufträge (Status ≠ erledigt), die Farbe kommt von der höchsten offenen Priorität (`components/karten/stufe.js`).
+- `components/karten/DeutschlandKarte.js`, `Lageplan.js` und `Grundriss.js` haben zwei Modi: `modus="link"` (Anzeige, Klick navigiert) und `modus="auswahl"` mit `onWaehle` (Melde-Assistent). Der Grundriss ruft immer `onWaehle` auf.
+- Aufbau: SVG für Hintergrund (Umriss, Gelände, Wände, Bereiche), darüber absolut positionierte HTML-Elemente in Prozent der Größe in Metern. Container haben `aspect-ratio` = Breite/Tiefe.
+- Deutschland-Umriss: vorab berechnete SVG-Pfade in `lib/karten/deutschland.js` (Natural Earth über `world-atlas`, Mercator). `projizieren(breite, länge)` nutzt dieselbe Formel. Zur Laufzeit werden keine Kartenbibliotheken geladen.
+- Melden: `app/melden/MeldeAssistent.js` (Schritte Werk → Gebäude → Maschine → Beschreibung) und `MeldeFormular.js` (sendet `maschine_id` als verstecktes Feld). `?maschine=<id>` springt zu Schritt 4, `?standort=<id>` zu Schritt 2.
+
 ## Design
 
 Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos oder Markenzeichen.
 
 - Alle Farben sind CSS-Variablen in `app/globals.css`, mit einem hellen Satz in `:root` und einem dunklen in `:root[data-theme="dark"]`. Nie feste Farben in Komponenten verwenden.
+- „Glas“-Optik (dezent, angelehnt an Liquid Glass): `--karte` ist halbtransparent, dazu `backdrop-filter: var(--glas-unschaerfe)`, `border: 1px solid var(--glas-rand)` und `box-shadow: var(--glas-kante), var(--schatten)`. Der weiche Hintergrund entsteht in `body::before`. Wo eine feste Farbe nötig ist (z. B. Chart.js), `--karte-solid` verwenden. Bei `prefers-reduced-transparency` gibt es feste Flächen.
+- Einblend-Animationen mit `backwards` statt `both`, sonst blockieren sie hinterher Hover-Transformationen.
 - Hell/Dunkel: Ein Skript in `app/layout.js` setzt `data-theme` und `data-bs-theme` vor dem ersten Anzeigen. Die Auswahl steht in `localStorage` unter `darstellung` (`hell`, `dunkel` oder leer = automatisch). Beim Umschalten wird das Event `darstellungswechsel` ausgelöst, die Diagramme färben sich daraufhin neu ein.
 - Karten (`.karte`) gleiten versetzt ein. Die Reihenfolge steuert `style={{ '--i': n }}`. Kennzahlen zählen hoch (`components/Zaehler.js`), Balken wachsen. Bei `prefers-reduced-motion` ist alles aus.
 - Akzentfarbe `#0071e3` (dunkel `#2997ff`). Status und Priorität werden als Pills angezeigt (`components/Pills.js`), immer mit Text.
@@ -62,8 +75,9 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
 
 ## Datenmodell (siehe `supabase/schema.sql`)
 
-- Tabellen: `maschine`, `techniker`, `stoermeldung`, `wartungsauftrag`, `ersatzteil`, `auftrag_ersatzteil`, `bestellung`.
-- Wertelisten als ENUM-Typen: `auftragsstatus`, `prioritaet` (Reihenfolge niedrig < mittel < hoch, deshalb `ORDER BY prioritaet DESC`), `schicht`, `bestellstatus`, `ursache`. Gespiegelt in `lib/konstanten.js`.
+- Tabellen: `standort`, `gebaeude`, `maschine`, `techniker`, `stoermeldung`, `wartungsauftrag`, `ersatzteil`, `auftrag_ersatzteil`, `bestellung`.
+- `standort` (GPS-Position, Geländegröße) 1:n `gebaeude` (Lage auf dem Gelände, `bereiche` als JSONB) 1:n `maschine` (`anlagennummer` eindeutig, `typ` vom ENUM `maschinentyp`, Position und Stellfläche in Metern). Techniker gehören zu einem Standort, Ersatzteile liegen zentral.
+- Wertelisten als ENUM-Typen: `auftragsstatus`, `prioritaet` (Reihenfolge niedrig < mittel < hoch, deshalb gehen `ORDER BY prioritaet DESC` und `MAX(prioritaet)`), `schicht`, `bestellstatus`, `ursache`, `maschinentyp`. Gespiegelt in `lib/konstanten.js` (inkl. `MASCHINEN_SYMBOLE`).
 - **Zu jeder Störmeldung gibt es genau einen Wartungsauftrag.** Links auf Detailseiten verwenden die **Auftrags-ID**: `/auftraege/<id>`.
 - `auftrag_ersatzteil` hat den Primärschlüssel `(auftrag_id, ersatzteil_id)`. Mehrfachbuchungen laufen über `ON CONFLICT … DO UPDATE`.
 - `bestellung.lieferdatum` ist das tatsächliche Lieferdatum und bis zur Lieferung NULL.
@@ -72,12 +86,13 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
   - Reparaturdauer = `ende_zeit - start_zeit`
   - MTTR = Durchschnitt der Reparaturdauer über alle erledigten Aufträge
   - Ausfallzeit = `ende_zeit - stoermeldung.zeitpunkt`
-  - Diese Definitionen gelten gleichermaßen für die Views und für `app/statistik/page.js`.
+  - Diese Definitionen gelten gleichermaßen für alle Views (`v_mttr_maschine`, `v_ausfallzeit_maschine`, `v_kennzahlen_standort`, `v_stoerungen_monat`, `v_stoerung_details`) und für `app/statistik/page.js`.
 
 ## SQL-Dateien
 
 - `schema.sql` ist wiederholt ausführbar. Es löscht alles und legt es neu an.
 - `testdaten.sql` leert die Tabellen mit `TRUNCATE … RESTART IDENTITY CASCADE`, fügt feste IDs per `OVERRIDING SYSTEM VALUE` ein und setzt die Sequenzen danach mit `setval`.
 - Zeitangaben in den Testdaten sind relativ: `now() - interval '90 minutes'`.
-- Die Testdaten wurden mit einem Python-Skript mit festem Zufalls-Seed erzeugt. Das Skript liegt nicht im Repository. Kleine Änderungen direkt in der SQL-Datei vornehmen.
+- Die Testdaten wurden mit einem Python-Skript mit festem Zufalls-Seed erzeugt. Es plant auch die Grundrisse: Maschinen in zwei Reihen mit Gang, daraus folgt die Gebäudegröße. Das Skript liegt nicht im Repository. Kleine Änderungen direkt in der SQL-Datei vornehmen und dabei darauf achten, dass Maschinen innerhalb ihres Gebäudes liegen.
+- Die Verteilung ist bewusst gleichmäßig: ältere Meldungen 30–365 Tage zurück, im letzten Monat einige erledigte und die offenen. So gibt es keinen künstlichen Ausschlag im aktuellen Monat.
 - Neue Ursachen-Kategorien: `ursache`-Typ in `schema.sql`, `URSACHEN_LISTE` in `lib/konstanten.js` und gegebenenfalls die Testdaten anpassen.

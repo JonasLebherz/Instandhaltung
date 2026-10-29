@@ -1,6 +1,9 @@
 'use client';
 /**
- * app/melden/MeldeFormular.js – Formular "Störung melden"
+ * app/melden/MeldeFormular.js – Formular "Störung melden" (Schritt 4 des Assistenten)
+ *
+ * Die Maschine wurde vorher auf der Karte gewählt und wird als verstecktes
+ * Feld mitgeschickt.
  *
  * Die Prüfung der Eingaben passiert auf dem Server (app/aktionen.js →
  * meldungAnlegen). Bei Fehlern kommen die Meldungen zurück und erscheinen
@@ -21,7 +24,7 @@ const PRIORITAETEN = [
   { wert: 'hoch', text: 'Hoch – Maschine steht', symbol: 'bi-lightning-charge' },
 ];
 
-export default function MeldeFormular({ maschinen, startwerte, jetzt }) {
+export default function MeldeFormular({ maschineId, startwerte, jetzt }) {
   const [zustand, aktion] = useActionState(meldungAnlegen, { fehler: {}, eingabe: startwerte });
   const { fehler, eingabe } = zustand;
   const hatFehler = Object.keys(fehler).length > 0;
@@ -37,18 +40,9 @@ export default function MeldeFormular({ maschinen, startwerte, jetzt }) {
 
       {/* key: Nach einer Fehlermeldung werden die Felder mit den letzten Eingaben neu befüllt */}
       <form action={aktion} className="karte" noValidate key={JSON.stringify(eingabe)}>
-        {/* Maschine */}
-        <div className="mb-4">
-          <label htmlFor="maschine_id" className="form-label">Maschine</label>
-          <select id="maschine_id" name="maschine_id" className={`form-select${fehlerklasse(fehler, 'maschine_id')}`}
-                  defaultValue={eingabe.maschine_id} aria-describedby="fehler-maschine_id">
-            <option value="">Bitte auswählen …</option>
-            {maschinen.map((m) => (
-              <option key={m.id} value={m.id}>{m.bezeichnung} – {m.standort}</option>
-            ))}
-          </select>
-          <Feldfehler fehler={fehler} name="maschine_id" />
-        </div>
+        {/* Maschine: kommt aus der Auswahl auf der Karte */}
+        <input type="hidden" name="maschine_id" value={maschineId} />
+        <Feldfehler fehler={fehler} name="maschine_id" />
 
         <div className="row g-4 mb-4">
           {/* Gemeldet von */}

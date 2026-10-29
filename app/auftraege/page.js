@@ -4,6 +4,7 @@
  * Listet alle Störmeldungen mit ihrem Wartungsauftrag auf.
  * Filter über die Adresse (damit gefilterte Ansichten als Link teilbar sind):
  *   ?status=     ein Auftragsstatus oder "offen" (= alle außer "erledigt")
+ *   ?standort=   ID eines Standorts (Werks)
  *   ?maschine=   ID einer Maschine
  *   ?prioritaet= niedrig / mittel / hoch
  *   ?suche=      Text, der in der Beschreibung vorkommt
@@ -25,11 +26,13 @@ export default async function AuftraegeSeite({ searchParams }) {
   /* ---------- Filterwerte prüfen: ungültige Werte werden ignoriert ---------- */
   const filter = {
     status: String(parameter?.status ?? ''),
+    standort: String(parameter?.standort ?? ''),
     maschine: String(parameter?.maschine ?? ''),
     prioritaet: String(parameter?.prioritaet ?? ''),
     suche: String(parameter?.suche ?? '').trim().slice(0, 100),
   };
   if (filter.status !== 'offen' && !STATUS_WERTE.includes(filter.status)) filter.status = '';
+  if (!/^\d+$/.test(filter.standort)) filter.standort = '';
   if (!/^\d+$/.test(filter.maschine)) filter.maschine = '';
   if (!PRIORITAET_WERTE.includes(filter.prioritaet)) filter.prioritaet = '';
 
@@ -40,27 +43,40 @@ export default async function AuftraegeSeite({ searchParams }) {
    */
   const bedingungStatus = filter.status === 'offen' ? sql`w.status <> 'erledigt'`
     : filter.status ? sql`w.status = ${filter.status}` : sql`TRUE`;
+  const bedingungStandort = filter.standort ? sql`g.standort_id = ${Number(filter.standort)}` : sql`TRUE`;
   const bedingungMaschine = filter.maschine ? sql`s.maschine_id = ${Number(filter.maschine)}` : sql`TRUE`;
   const bedingungPrio = filter.prioritaet ? sql`s.prioritaet = ${filter.prioritaet}` : sql`TRUE`;
   // ILIKE = Groß-/Kleinschreibung egal; % und _ aus der Eingabe werden als normale Zeichen behandelt
   const suchmuster = `%${filter.suche.replace(/[\\%_]/g, (z) => `\\${z}`)}%`;
   const bedingungSuche = filter.suche ? sql`s.beschreibung ILIKE ${suchmuster}` : sql`TRUE`;
 
-  const [maschinen, auftraege] = await Promise.all([
-    sql`SELECT id, bezeichnung FROM maschine ORDER BY bezeichnung`,
+  const [standorte, maschinen, auftraege] = await Promise.all([
+    sql`SELECT id, name FROM standort ORDER BY name`,
+    // Maschinen für die Auswahl – gruppiert nach Standort (siehe <optgroup> unten)
+    sql`
+      SELECT m.id, m.bezeichnung, m.anlagennummer, st.id AS standort_id, st.name AS standort
+      FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id
+      ${filter.standort ? sql`WHERE st.id = ${Number(filter.standort)}` : sql``}
+      ORDER BY st.name, m.anlagennummer`,
     sql`
       SELECT w.id AS auftrag_id, w.status,
              s.id AS meldung_id, s.zeitpunkt, s.beschreibung, s.ursache_kategorie, s.prioritaet,
-             m.bezeichnung AS maschine, t.name AS techniker
+             m.bezeichnung AS maschine, m.anlagennummer, st.stadt, g.kuerzel AS gebaeude, t.name AS techniker
       FROM stoermeldung s
       JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
       JOIN maschine m        ON m.id = s.maschine_id
+      JOIN gebaeude g        ON g.id = m.gebaeude_id
+      JOIN standort st       ON st.id = g.standort_id
       LEFT JOIN techniker t  ON t.id = w.techniker_id
-      WHERE ${bedingungStatus} AND ${bedingungMaschine} AND ${bedingungPrio} AND ${bedingungSuche}
+      WHERE ${bedingungStatus} AND ${bedingungStandort} AND ${bedingungMaschine} AND ${bedingungPrio} AND ${bedingungSuche}
       ORDER BY s.zeitpunkt DESC`,
   ]);
 
   const filterAktiv = Object.values(filter).some((wert) => wert !== '');
+
+  // Maschinen nach Standort gruppieren: { 'Werk Hamburg': [ … ], … }
+  const maschinenNachStandort = {};
+  maschinen.forEach((m) => { (maschinenNachStandort[m.standort] ??= []).push(m); });
 
   return (
     <>
@@ -89,10 +105,21 @@ export default async function AuftraegeSeite({ searchParams }) {
             </select>
           </div>
           <div>
+            <label htmlFor="f-standort" className="form-label">Standort</label>
+            <select id="f-standort" name="standort" className="form-select" defaultValue={filter.standort}>
+              <option value="">Alle</option>
+              {standorte.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+            </select>
+          </div>
+          <div>
             <label htmlFor="f-maschine" className="form-label">Maschine</label>
             <select id="f-maschine" name="maschine" className="form-select" defaultValue={filter.maschine}>
               <option value="">Alle</option>
-              {maschinen.map((m) => <option key={m.id} value={m.id}>{m.bezeichnung}</option>)}
+              {Object.entries(maschinenNachStandort).map(([standort, liste]) => (
+                <optgroup key={standort} label={standort}>
+                  {liste.map((m) => <option key={m.id} value={m.id}>{m.anlagennummer} – {m.bezeichnung}</option>)}
+                </optgroup>
+              ))}
             </select>
           </div>
           <div>
@@ -119,7 +146,7 @@ export default async function AuftraegeSeite({ searchParams }) {
               <thead>
                 <tr>
                   <th className="zahl">Nr.</th>
-                  <th>Maschine / Beschreibung</th>
+                  <th>Maschine / Ort</th>
                   <th className="d-none d-lg-table-cell">Ursache</th>
                   <th>Priorität</th>
                   <th>Status</th>
@@ -134,6 +161,7 @@ export default async function AuftraegeSeite({ searchParams }) {
                     <td className="zahl klein">{a.meldung_id}</td>
                     <td>
                       <Link className="zeilen-link" href={`/auftraege/${a.auftrag_id}`}>{a.maschine}</Link>
+                      <div className="klein">{a.stadt} · {a.gebaeude} · {a.anlagennummer}</div>
                       <div className="klein text-truncate beschreibung-kurz">{a.beschreibung}</div>
                     </td>
                     <td className="d-none d-lg-table-cell klein">{a.ursache_kategorie}</td>

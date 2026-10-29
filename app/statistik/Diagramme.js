@@ -31,8 +31,8 @@ function grundeinstellungen() {
   Chart.defaults.color = farbe('--text-leise');
   Chart.defaults.plugins.legend.display = false;   // je Diagramm nur eine Datenreihe
   Chart.defaults.plugins.tooltip.backgroundColor = farbe('--text');
-  Chart.defaults.plugins.tooltip.titleColor = farbe('--karte');
-  Chart.defaults.plugins.tooltip.bodyColor = farbe('--karte');
+  Chart.defaults.plugins.tooltip.titleColor = farbe('--karte-solid');
+  Chart.defaults.plugins.tooltip.bodyColor = farbe('--karte-solid');
   Chart.defaults.plugins.tooltip.padding = 10;
   Chart.defaults.plugins.tooltip.cornerRadius = 10;
   Chart.defaults.plugins.tooltip.displayColors = false;
@@ -78,7 +78,7 @@ export default function Diagramme({ proMonat, topUrsachen }) {
             cubicInterpolationMode: 'monotone',   // weiche Linie ohne Überschwingen
             pointRadius: 4,
             pointHoverRadius: 7,
-            pointBackgroundColor: farbe('--karte'),
+            pointBackgroundColor: farbe('--karte-solid'),
             pointBorderWidth: 2,
           }],
         },

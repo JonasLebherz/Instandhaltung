@@ -14,6 +14,7 @@ import { abmelden } from '@/app/login/aktionen';
 const SEITEN = [
   { pfad: '/', text: 'Übersicht', symbol: 'bi-grid-1x2' },
   { pfad: '/melden', text: 'Störung melden', symbol: 'bi-exclamation-triangle' },
+  { pfad: '/karte', text: 'Karte', symbol: 'bi-map' },
   { pfad: '/auftraege', text: 'Aufträge', symbol: 'bi-list-check' },
   { pfad: '/statistik', text: 'Statistik', symbol: 'bi-bar-chart' },
 ];
@@ -91,10 +92,10 @@ export default function Navigation({ benutzer }) {
         <ul className={`nav-links${menueOffen ? ' offen' : ''}`} id="hauptmenue">
           {SEITEN.map((seite) => (
             <li key={seite.pfad}>
-              <Link href={seite.pfad} className={istAktiv(seite) ? 'aktiv' : ''}
+              <Link href={seite.pfad} className={istAktiv(seite) ? 'aktiv' : ''} title={seite.text}
                     aria-current={istAktiv(seite) ? 'page' : undefined}>
                 <i className={`bi ${seite.symbol}`} aria-hidden="true" />
-                {seite.text}
+                <span className="nav-text">{seite.text}</span>
               </Link>
             </li>
           ))}

@@ -1,15 +1,16 @@
 /**
  * app/melden/page.js – Neue Störmeldung erfassen
  *
- * Lädt die Maschinen für die Auswahlliste; das Formular selbst ist in
- * MeldeFormular.js (läuft im Browser, zeigt Fehler direkt am Feld).
- * Eine Maschine kann per Link vorausgewählt werden: /melden?maschine=3
- * (praktisch für einen QR-Code an der Maschine).
+ * Lädt Standorte, Gebäude und Maschinen für die Auswahl über die Karte
+ * (MeldeAssistent.js): Werk → Gebäude → Maschine → Beschreibung.
+ * Vorauswahl über die Adresse:
+ *   /melden?maschine=12  springt direkt zur Beschreibung (z. B. per QR-Code an der Maschine)
+ *   /melden?standort=3   startet beim Lageplan dieses Werks
  */
-import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
 import { fuerDatetimeInput } from '@/lib/format';
-import MeldeFormular from './MeldeFormular';
+import { standorteMitZahlen, gebaeudeMitZahlen, maschinenMitZahlen } from '@/lib/karten/daten';
+import MeldeAssistent from './MeldeAssistent';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Störung melden' };
@@ -17,13 +18,16 @@ export const metadata = { title: 'Störung melden' };
 export default async function MeldenSeite({ searchParams }) {
   const benutzer = await benutzerPflicht();
   const parameter = await searchParams;
-  const maschinen = await sql`SELECT id, bezeichnung, standort FROM maschine ORDER BY bezeichnung`;
+  const [standorte, gebaeude, maschinen] = await Promise.all([
+    standorteMitZahlen(), gebaeudeMitZahlen(), maschinenMitZahlen(),
+  ]);
 
-  const vorauswahl = /^\d+$/.test(parameter?.maschine ?? '') ? parameter.maschine : '';
+  const vorauswahlMaschine = maschinen.find((m) => String(m.id) === String(parameter?.maschine ?? ''))?.id ?? null;
+  const vorauswahlStandort = standorte.find((st) => String(st.id) === String(parameter?.standort ?? ''))?.id ?? null;
 
   // Startwerte des Formulars
   const startwerte = {
-    maschine_id: vorauswahl,
+    maschine_id: vorauswahlMaschine ? String(vorauswahlMaschine) : '',
     gemeldet_von: benutzer.anzeigename === 'Lokaler Test' ? '' : benutzer.anzeigename,
     zeitpunkt: fuerDatetimeInput(new Date()),
     beschreibung: '',
@@ -32,14 +36,13 @@ export default async function MeldenSeite({ searchParams }) {
   };
 
   return (
-    <div className="row justify-content-center">
-      <div className="col-lg-8 col-xl-7">
-        <div className="seitenkopf">
-          <h1>Störung melden</h1>
-          <p>Beschreiben Sie kurz, was an der Maschine passiert ist.</p>
-        </div>
-        <MeldeFormular maschinen={maschinen} startwerte={startwerte} jetzt={startwerte.zeitpunkt} />
+    <>
+      <div className="seitenkopf">
+        <h1>Störung melden</h1>
+        <p>Werk, Gebäude und Maschine auf der Karte antippen – dann kurz beschreiben, was passiert ist.</p>
       </div>
-    </div>
+      <MeldeAssistent standorte={standorte} gebaeude={gebaeude} maschinen={maschinen} startwerte={startwerte}
+                      vorauswahlMaschine={vorauswahlMaschine} vorauswahlStandort={vorauswahlStandort} />
+    </>
   );
 }
