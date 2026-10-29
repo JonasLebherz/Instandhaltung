@@ -8,6 +8,7 @@
  */
 import { sql } from '@/lib/db';
 import { aktuellerBenutzer } from '@/lib/auth';
+import { alleKartenDaten } from '@/lib/karten/daten';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +43,10 @@ export async function GET() {
   zeilen.push(`Datenbank, 2. Abfrage:    ${await messen(() => sql`SELECT 1`)}`);
   zeilen.push(`Datenbank, offene Aufträge zählen: ${await messen(() => sql`SELECT COUNT(*)::int FROM wartungsauftrag WHERE status <> 'erledigt'`)}`);
   zeilen.push(`Datenbank, 5 Abfragen gleichzeitig: ${await messen(() => Promise.all([1, 2, 3, 4, 5].map(() => sql`SELECT 1`)))}`);
+  // Dieselben Abfragen wie Übersicht und Karte – zeigt bei einem Fehler die genaue Meldung
+  zeilen.push(`Kartendaten (Übersicht/Karte): ${await messen(() => alleKartenDaten())}`);
+  zeilen.push(`Statistik-View v_stoerung_details: ${await messen(() => sql`SELECT COUNT(*)::int FROM v_stoerung_details`)}`);
+  zeilen.push(`Ersatzteile/Bestellungen: ${await messen(() => sql`SELECT COUNT(*)::int FROM ersatzteil e LEFT JOIN bestellung b ON b.ersatzteil_id = e.id`)}`);
 
   return new Response(`Verbindungstest Instandhaltung\n\n${zeilen.join('\n')}\n`, {
     headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
