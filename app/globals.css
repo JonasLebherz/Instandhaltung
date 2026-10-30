@@ -1043,7 +1043,8 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .wkarte-klein .karten-punkt.in-lupe { --anker: translate(-50%, -10px); }
 /* Bühne der Weltebene: so hoch wie die Karte (Breite der Bühne / Seitenverhältnis) */
 .explorer-buehne-rahmen { container-type: inline-size; }
-.explorer-buehne { transition: height .45s var(--weich); }
+/* Weltkarte oben verankert: Ändert sich die Höhe der Bühne beim Zoomen, rutscht sie nicht mit */
+.ebene-inhalt.ebene-welt { margin: 0 auto auto; }
 .explorer-buehne.buehne-welt { --buehne-h: max(240px, calc((100cqw - 44px) / var(--welt-verhaeltnis) + 66px + 22px)); }
 .welt-land { fill: var(--land); stroke: var(--land-rand); stroke-width: .45; stroke-linejoin: round; }
 /* Länder mit Werken: getönt in der Farbe der dringendsten offenen Störung */

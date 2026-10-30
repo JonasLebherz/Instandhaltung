@@ -280,7 +280,7 @@ function Funke({ p, farbe, aktiv, groesse = 0.08 }) {
  * Zusätzliche Einzelheiten für die Detailansicht im Infofenster: Bedienpult mit Bildschirm und
  * Not-Halt, Warnstreifen, Kabelkanal und je Typ ein paar typische Teile.
  */
-function Details({ typ, L, W, f, laeuft }) {
+function Details({ typ, L, W, f, laeuft, voll }) {
   const d = f['maschine-dunkel'];
   const s = f.signal;
   const streifen = Math.max(2, Math.floor((L * 0.85) / 0.3));
@@ -389,8 +389,8 @@ function Details({ typ, L, W, f, laeuft }) {
         </mesh>
         <Rolle p={[0.2, 1.2, 0.07]} r={0.045} l={0.05} achse="z" farbe={f['ampel-rot']} />
       </group>
-      {/* Warnstreifen gelb/schwarz am Sockel */}
-      {Array.from({ length: streifen }, (_, i) => (
+      {/* Warnstreifen gelb/schwarz am Sockel (nur in der Detailansicht – viele kleine Teile) */}
+      {voll && Array.from({ length: streifen }, (_, i) => (
         <Kiste key={i} p={[-L * 0.425 + (i + 0.5) * ((L * 0.85) / streifen), 0.07, W * 0.44]} g={[(L * 0.85) / streifen, 0.14, 0.02]}
                farbe={i % 2 ? d : s} schatten={false} />
       ))}
@@ -403,14 +403,17 @@ function Details({ typ, L, W, f, laeuft }) {
 
 const k = (f) => f.maschine;
 
-/** Maschine mit Ampel an der Ecke (lokale Achsen wie MaschinenForm). detail: mehr Einzelheiten (Infofenster). */
-export function MaschineMitAmpel({ m, L, W, f, bewegt, neutral = false, detail = false, ampelGroesse = 1 }) {
-  const zustand = neutral ? null : ampelZustand(m);
+/**
+ * Maschine mit Ampel an der Ecke (lokale Achsen wie MaschinenForm). Die Ampel leuchtet immer – auch beim Melden.
+ * detail: "voll" (Infofenster: alle Einzelheiten) oder "mittel" (Halle: Bedienpult und typische Teile, sparsamer).
+ */
+export function MaschineMitAmpel({ m, L, W, f, bewegt, detail = null, ampelGroesse = 1 }) {
+  const zustand = ampelZustand(m);
   const laeuft = bewegt && zustand !== 'rot';
   return (
     <>
       <MaschinenForm typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} />
-      {detail && <Details typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} />}
+      {detail && <Details typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} voll={detail === 'voll'} />}
       <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} />
     </>
   );

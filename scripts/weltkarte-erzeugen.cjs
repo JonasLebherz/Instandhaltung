@@ -75,6 +75,20 @@ const welt = { breite: WB, hoehe: WH, skala: WS, versatzX: -minX * WS, versatzY:
 const weltPunkt = ([lo, la]) => { const [x, y] = equalEarth(la, lo); return [welt.versatzX + welt.skala * x, welt.versatzY - welt.skala * y]; };
 const weltPfade = { rest: '' };
 const weltMitten = {};
+const weltKerne = {};
+// Begrenzungsrechteck der größten Fläche (Hauptland ohne Inseln, z. B. US-Festland ohne Alaska) –
+// darauf zoomt die Karte beim Anklicken
+function kern(rs) {
+  let best = null;
+  for (const ring of rs) {
+    let a = 0;
+    for (let i = 0; i < ring.length; i++) { const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length]; a += x0 * y1 - x1 * y0; }
+    if (!best || Math.abs(a) > best.a) best = { a: Math.abs(a), ring };
+  }
+  const xs = best.ring.map((p) => p[0]), ys = best.ring.map((p) => p[1]);
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x: Math.round(x), y: Math.round(y), w: Math.round(Math.max(...xs) - x), h: Math.round(Math.max(...ys) - y) };
+}
 // Schwerpunkt der größten Fläche eines Landes (dort sitzt die Markierung auf der Weltkarte)
 function schwerpunkt(rs) {
   let best = null;
@@ -89,7 +103,7 @@ for (const f of ohneAntarktis) {
   const code = Object.keys(ISO).find((k) => ISO[k] === f.id);
   // kleine Inseln weglassen (weniger Daten)
   const rs = ringe(f.geometry).map((r) => zuschneiden(r.map(weltPunkt), -5, -5, WB + 5, WH + 5)).filter((r) => r.length > 2).filter((r) => { const xs = r.map((p) => p[0]), ys = r.map((p) => p[1]); return Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys) > 4; });
-  if (code) { weltPfade[code] = pfad(rs); weltMitten[code] = schwerpunkt(rs); } else weltPfade.rest += pfad(rs);
+  if (code) { weltPfade[code] = pfad(rs); weltMitten[code] = schwerpunkt(rs); weltKerne[code] = kern(rs); } else weltPfade.rest += pfad(rs);
 }
 
 /* ---------- Länder: Mercator, auf den Ausschnitt eingepasst ---------- */
@@ -124,11 +138,13 @@ const lupe = (() => {
   const k = r / (LUPE.sichtGrad * Math.PI / 180);   // Einheiten je Bogenmaß (Mercator)
   const punkt = ([lo, la]) => [cx + k * (lo - LUPE.mitteLaenge) * Math.PI / 180, cy - k * (merc(la) - merc(LUPE.mitteBreite))];
   const gross = (ring) => { const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1]); return Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys) > 3; };
-  const laender = {}, mitten = {};
+  const laender = {}, mitten = {}, kerne = {};
   let rest = '';
   for (const f of w50) {
     if (f.id === '010') continue;
     const projiziert = ringe(f.geometry).map((ring) => ring.map(punkt));
+    const codeK = Object.keys(ISO).find((c) => ISO[c] === f.id);
+    if (codeK) kerne[codeK] = kern(projiziert);
     const rs = projiziert.map((ring) => zuschneiden(ring, cx - r, cy - r, cx + r, cy + r)).filter((ring) => ring.length > 2 && gross(ring));
     if (!rs.length) continue;
     const code = Object.keys(ISO).find((c) => ISO[c] === f.id);
@@ -141,7 +157,7 @@ const lupe = (() => {
   const [rx] = weltPunkt([LUPE.mitteLaenge + LUPE.sichtGrad, LUPE.mitteBreite]);
   return {
     cx: Math.round(cx), cy: Math.round(cy), r, quelle: { cx: Math.round(qx), cy: Math.round(qy), r: Math.round(rx - qx) },
-    markiert, mitten: Object.fromEntries(markiert.map((c) => [c, mitten[c]])), laender, rest,
+    markiert, mitten: Object.fromEntries(markiert.map((c) => [c, mitten[c]])), kerne: Object.fromEntries(markiert.map((c) => [c, kerne[c]])), laender, rest,
   };
 })();
 
@@ -196,6 +212,9 @@ export const WELT_PFADE = ${JSON.stringify(weltPfade, null, 1).replace(/\n\s*/g,
  * markiert = Länder mit Markierung in der Lupe (statt auf der Weltkarte), mitten = ihre Lage in der Lupe.
  */
 export const LUPE = ${JSON.stringify(lupe)};
+
+/** Hauptfläche je Land (Rechteck um die größte Fläche) – Ziel des Zooms beim Anklicken */
+export const WELT_KERNE = ${JSON.stringify(weltKerne)};
 
 /** Mitte (Schwerpunkt der größten Fläche) der Länder des Unternehmens auf der Weltkarte */
 export const WELT_MITTEN = ${JSON.stringify(weltMitten)};

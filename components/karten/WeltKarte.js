@@ -16,7 +16,7 @@
  * neutral: beim Melden – keine Störungszahlen, nur Ortsmarken
  */
 import { useEffect, useRef, useState } from 'react';
-import { LUPE, WELT, WELT_MITTEN, WELT_PFADE, weltPunkt } from '@/lib/karten/welt';
+import { LUPE, WELT, WELT_KERNE, WELT_MITTEN, WELT_PFADE, weltPunkt } from '@/lib/karten/welt';
 import { inLupe, markenPositionen } from '@/lib/karten/laender';
 import { stufe, offenText } from './stufe';
 import { useT } from '@/components/SpracheKontext';
@@ -91,16 +91,15 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
     );
   };
 
-  /** Umrisse: übrige Länder grau, Länder des Unternehmens getönt und anklickbar.
-   *  data-flaeche: Daran misst die Zoom-Karte die Fläche, aus der das Land herauswächst. */
-  const umrisse = (pfade, mitFlaeche) => (
+  /** Umrisse: übrige Länder grau, Länder des Unternehmens getönt und anklickbar */
+  const umrisse = (pfade) => (
     <>
       <path d={pfade.rest} className="welt-land" />
       {Object.entries(pfade).filter(([k]) => k !== 'rest' && !firma.has(k))
         .map(([k, d]) => <path key={k} d={d} className="welt-land" />)}
       {laender.map((land) => pfade[land.kuerzel] && (
         <path key={land.kuerzel} d={pfade[land.kuerzel]} className={`welt-firma stufe-${farbe(land)}`}
-              data-flaeche={mitFlaeche(land) ? `land-${land.kuerzel}` : undefined} onClick={(e) => onWaehle?.(land, e)} />
+              onClick={(e) => onWaehle?.(land, e)} />
       ))}
     </>
   );
@@ -110,8 +109,16 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
       <svg className="dkarte-svg" viewBox={`0 0 ${breite} ${hoehe}`} aria-hidden="true">
         <defs>
           <clipPath id="lupe-ausschnitt"><circle cx={LUPE.cx} cy={LUPE.cy} r={LUPE.r} /></clipPath>
+          {/* Oben und unten läuft die Weltkarte weich aus (statt hart abgeschnitten) */}
+          <linearGradient id="welt-blende-verlauf" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#fff" stopOpacity="0" />
+            <stop offset="0.16" stopColor="#fff" />
+            <stop offset="0.86" stopColor="#fff" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0" />
+          </linearGradient>
+          <mask id="welt-blende"><rect width={breite} height={hoehe} fill="url(#welt-blende-verlauf)" /></mask>
         </defs>
-        {umrisse(WELT_PFADE, (l) => !mitLupe || !inLupe(l))}
+        <g mask="url(#welt-blende)">{umrisse(WELT_PFADE)}</g>
 
         {/* Feine Linie von der Markierung zur Mitte des Landes, falls verschoben */}
         {aussen.map((land) => {
@@ -130,10 +137,16 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
             <circle cx={LUPE.quelle.cx} cy={LUPE.quelle.cy} r={LUPE.quelle.r} className="lupe-quelle" />
             {tangenten(LUPE, LUPE.quelle).map((l, i) => <line key={i} {...l} className="lupe-linie" />)}
             <circle cx={LUPE.cx} cy={LUPE.cy} r={LUPE.r} className="lupe-flaeche" />
-            <g clipPath="url(#lupe-ausschnitt)">{umrisse({ ...LUPE.laender, rest: LUPE.rest }, inLupe)}</g>
+            <g clipPath="url(#lupe-ausschnitt)">{umrisse({ ...LUPE.laender, rest: LUPE.rest })}</g>
             <circle cx={LUPE.cx} cy={LUPE.cy} r={LUPE.r} className="lupe-rand" />
           </g>
         )}
+        {/* Unsichtbare Rechtecke um die Hauptfläche jedes Landes (ohne Inseln wie Alaska) –
+            daran misst die Zoom-Karte, wohin sie hineinzoomt (data-flaeche) */}
+        {laender.map((land) => {
+          const k = mitLupe && inLupe(land) ? LUPE.kerne[land.kuerzel] : WELT_KERNE[land.kuerzel];
+          return k && <rect key={`k${land.kuerzel}`} x={k.x} y={k.y} width={k.w} height={k.h} fill="none" data-flaeche={`land-${land.kuerzel}`} />;
+        })}
       </svg>
       {mitLupe && !klein && (
         <span className="lupe-titel" style={{ left: `${(LUPE.cx / breite) * 100}%`, top: `${((LUPE.cy + LUPE.r) / hoehe) * 100}%` }}>

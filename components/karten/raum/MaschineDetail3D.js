@@ -35,7 +35,7 @@ export default function MaschineDetail3D({ maschine }) {
           <planeGeometry args={[L * 2.2 + 2, W * 2.2 + 2]} />
           <meshStandardMaterial color={f.hallenboden} roughness={1} />
         </mesh>
-        <MaschineMitAmpel m={maschine} L={L} W={W} f={f} bewegt={bewegt} detail ampelGroesse={1.2} />
+        <MaschineMitAmpel m={maschine} L={L} W={W} f={f} bewegt={bewegt} detail="voll" ampelGroesse={1.2} />
       </Canvas>
     </div>
   );

@@ -61,25 +61,24 @@ const stufe01 = (x, von, bis) => Math.min(1, Math.max(0, (x - von) / (bis - von)
  * Bilder einer Kamerafahrt zwischen übergeordneter Ebene (Eltern) und Unterebene (Kind).
  * A = angeklickte Fläche in der Elternebene, B = Inhalt der Kindebene (Mitte x/y, Breite w, Höhe h).
  *
- * Reiner Zoom um einen festen Punkt Z: Es gibt genau einen Punkt auf dem Bildschirm, der
- * beim Vergrößern stehen bleibt – er liegt dicht an der angeklickten Stelle. Dadurch wird man
- * in das Land "hineingezogen", statt dass die Karte seitlich wegrutscht. Der Maßstab ändert
- * sich gleichmäßig (logarithmisch), wie bei einem Flug auf die Erde zu.
+ * Wie ein Flug über einem Globus: Zuerst schwenkt die Kamera, bis die angeklickte Fläche in der
+ * Mitte liegt (schwenk), danach taucht sie senkrecht hinein (zoom) – nichts rutscht mehr schräg weg.
+ * Der Maßstab ändert sich gleichmäßig (logarithmisch).
  */
-function kamerafahrt(A, B, rein, schritte = 30) {
+function kamerafahrt(A, B, rein, schritte = 32) {
   const s = Math.min(A.w / B.w, A.h / B.h);      // so klein beginnt die Kindebene (passt genau in A)
-  // Fester Punkt der Abbildung Kind → Eltern (x ↦ s·x + A − s·B)
-  const zx = s < 0.999 ? (A.x - s * B.x) / (1 - s) : B.x;
-  const zy = s < 0.999 ? (A.y - s * B.y) / (1 - s) : B.y;
-  const um = (k) => `translate(${zx * (1 - k)}px, ${zy * (1 - k)}px) scale(${k})`;   // Skalierung um Z
   const kind = [];
   const eltern = [];
   for (let i = 0; i <= schritte; i += 1) {
     const zeit = i / schritte;
-    const p = rein ? weich(zeit) : 1 - weich(zeit);
-    const k = s ** (1 - p);
-    kind.push({ offset: zeit, transform: um(k) });
-    eltern.push({ offset: zeit, transform: um(k / s) });
+    const p = rein ? zeit : 1 - zeit;
+    const schwenk = weich(stufe01(p, 0, 0.4));       // Fläche wandert in die Mitte
+    const zoom = weich(stufe01(p, 0.18, 1));        // danach senkrecht hinein
+    const k = s ** (1 - zoom);                       // Maßstab der Kindebene
+    const cx = A.x + (B.x - A.x) * schwenk;          // dort erscheint die Mitte der Kindebene
+    const cy = A.y + (B.y - A.y) * schwenk;
+    kind.push({ offset: zeit, transform: `translate(${cx - k * B.x}px, ${cy - k * B.y}px) scale(${k})` });
+    eltern.push({ offset: zeit, transform: `translate(${cx - (k / s) * A.x}px, ${cy - (k / s) * A.y}px) scale(${k / s})` });
   }
   return { kind, eltern };
 }
@@ -200,7 +199,7 @@ export default function KartenExplorer({
     const animationen = [];
     const dauer = uebergang.dauer;
     const blende = (el, ein) => el.animate(
-      Array.from({ length: 11 }, (_, i) => ({ offset: i / 10, opacity: ein ? stufe01(i / 10, 0.12, 0.5) : 1 - stufe01(i / 10, 0.3, 0.65) })),
+      Array.from({ length: 11 }, (_, i) => ({ offset: i / 10, opacity: ein ? stufe01(i / 10, 0.3, 0.65) : 1 - stufe01(i / 10, 0.45, 0.8) })),
       { duration: dauer, fill: 'both' },
     );
     const A = fokus ? rechteck(fokus) : null;
@@ -320,8 +319,9 @@ export default function KartenExplorer({
       </nav>
       )}
 
-      {/* Weltebene: Bühne so hoch wie die (breite) Weltkarte, damit oben und unten nichts leer bleibt */}
-      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' ? ' buehne-welt' : ''}`} ref={buehneRef}
+      {/* Weltebene: Bühne so hoch wie die (breite) Weltkarte, damit oben und unten nichts leer bleibt.
+          Während eines Zooms behält die Bühne die volle Höhe – die Weltkarte ist oben verankert und bewegt sich nicht. */}
+      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' && !uebergang ? ' buehne-welt' : ''}`} ref={buehneRef}
            style={{ '--welt-verhaeltnis': weltVerhaeltnis() }}>
         {/* Kopf über der Karte: Zurück und Titel */}
         <div className="buehne-kopf">

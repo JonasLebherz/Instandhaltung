@@ -120,33 +120,96 @@ function Flaeche({ x, z, b, t, farbe, y = 0.02, deckkraft = 1 }) {
   );
 }
 
-/** Figur (Kapsel mit Kopf und Helm), läuft zwischen a und b hin und her */
+/** Figur mit Beinen, Armen (schwingen beim Gehen), Warnweste und Helm – läuft zwischen a und b hin und her */
 function Person({ a, b, farbe, f, bewegt, phase, tempo }) {
   const ref = useRef(null);
+  const glieder = useRef([]);          // linkes/rechtes Bein, linker/rechter Arm
   const laenge = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-  const setzen = (s) => {
+  const setzen = (s, zeit) => {
     const weg = s % (2 * laenge);
     const d = weg < laenge ? weg : 2 * laenge - weg;
     const vor = weg < laenge;
     ref.current.position.set(a[0] + ((b[0] - a[0]) * d) / laenge, 0, a[1] + ((b[1] - a[1]) * d) / laenge);
     ref.current.rotation.y = Math.atan2((b[0] - a[0]) * (vor ? 1 : -1), (b[1] - a[1]) * (vor ? 1 : -1));
+    const schwung = Math.sin(zeit * tempo * 5.5) * 0.5;
+    glieder.current.forEach((g, i) => { if (g) g.rotation.x = (i % 2 ? -schwung : schwung) * (i < 2 ? 1 : -0.8); });
   };
-  useEffect(() => { if (ref.current) setzen(phase * laenge * 2); });
-  useFrame(({ clock }) => { if (bewegt && ref.current) setzen(clock.elapsedTime * tempo + phase * laenge * 2); });
+  useEffect(() => { if (ref.current) setzen(phase * laenge * 2, 0); });
+  useFrame(({ clock }) => { if (bewegt && ref.current) setzen(clock.elapsedTime * tempo + phase * laenge * 2, clock.elapsedTime); });
+  const glied = (i, x, y, r, l, farbeGlied) => (
+    <group key={i} position={[x, y, 0]} ref={(el) => { glieder.current[i] = el; }}>
+      <mesh position={[0, -(l / 2 + r), 0]} castShadow>
+        <capsuleGeometry args={[r, l, 3, 8]} />
+        <meshStandardMaterial color={farbeGlied} roughness={0.8} />
+      </mesh>
+    </group>
+  );
   return (
     <group ref={ref}>
-      <mesh position={[0, 0.72, 0]} castShadow>
-        <capsuleGeometry args={[0.24, 0.75, 4, 10]} />
+      {glied(0, -0.11, 0.86, 0.075, 0.68, f['maschine-dunkel'])}
+      {glied(1, 0.11, 0.86, 0.075, 0.68, f['maschine-dunkel'])}
+      {glied(2, -0.27, 1.4, 0.055, 0.5, farbe)}
+      {glied(3, 0.27, 1.4, 0.055, 0.5, farbe)}
+      {/* Rumpf mit Warnweste */}
+      <mesh position={[0, 1.18, 0]} castShadow>
+        <capsuleGeometry args={[0.19, 0.4, 4, 10]} />
         <meshStandardMaterial color={farbe} roughness={0.7} />
       </mesh>
-      <mesh position={[0, 1.42, 0]} castShadow>
-        <sphereGeometry args={[0.17, 14, 10]} />
+      <mesh position={[0, 1.66, 0]} castShadow>
+        <sphereGeometry args={[0.13, 14, 10]} />
         <meshStandardMaterial color={f.haut} roughness={0.8} />
       </mesh>
-      <mesh position={[0, 1.5, 0]}>
-        <sphereGeometry args={[0.19, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+      <mesh position={[0, 1.71, 0]}>
+        <sphereGeometry args={[0.15, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color={f.signal} roughness={0.5} />
       </mesh>
+    </group>
+  );
+}
+
+/**
+ * Autos und Lkw fahren ab und zu über die Zufahrt (je Fahrspur eine Richtung).
+ * Jedes Fahrzeug hat einen Umlauf, der länger ist als die Straße – in der übrigen Zeit
+ * ist es "unterwegs" und unsichtbar. Nachts leuchten die Scheinwerfer.
+ */
+function Fahrzeug({ art, von, bis, z, richtung, tempo, phase, farbe, f }) {
+  const ref = useRef(null);
+  const strecke = Math.abs(bis - von);
+  const umlauf = strecke * (art === 'lkw' ? 3.2 : 2.4);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const s = (clock.elapsedTime * tempo + phase * umlauf) % umlauf;
+    ref.current.visible = s < strecke;
+    ref.current.position.x = richtung > 0 ? von + s : bis - s;
+  });
+  const lkw = art === 'lkw';
+  const rad = (x, zr, r) => (
+    <mesh key={`${x}${zr}`} position={[x, r, zr]} rotation-x={Math.PI / 2}>
+      <cylinderGeometry args={[r, r, 0.3, 12]} />
+      <meshStandardMaterial color="#202227" roughness={0.9} />
+    </mesh>
+  );
+  return (
+    <group ref={ref} position={[von, 0, z]} rotation-y={richtung > 0 ? 0 : Math.PI} visible={false}>
+      {lkw ? (
+        <>
+          <Quader p={[-1.6, 2.15, 0]} g={[8.6, 3.1, 2.5]} farbe={f.wand} />
+          <Quader p={[3.8, 1.6, 0]} g={[2.2, 2.6, 2.4]} farbe={farbe} />
+          <Quader p={[4.92, 2.1, 0]} g={[0.05, 1, 2.1]} farbe={f.glas} schatten={false} />
+          {[-4.6, -3.4, 3.8].flatMap((x) => [rad(x, 1.15, 0.5), rad(x, -1.15, 0.5)])}
+        </>
+      ) : (
+        <>
+          <Quader p={[0, 0.7, 0]} g={[4.3, 0.8, 1.8]} farbe={farbe} />
+          <Quader p={[-0.2, 1.38, 0]} g={[2.3, 0.62, 1.6]} farbe={f.glas} />
+          {[-1.35, 1.35].flatMap((x) => [rad(x, 0.85, 0.34), rad(x, -0.85, 0.34)])}
+        </>
+      )}
+      {/* Scheinwerfer vorn (nachts an) */}
+      {[-0.6, 0.6].map((zl) => (
+        <Quader key={zl} p={[lkw ? 4.92 : 2.16, lkw ? 1 : 0.75, zl]} g={[0.05, 0.2, 0.35]} farbe={f.nacht ? f.licht : f.tank}
+                leuchten={f.nacht ? 2.5 : 0} lichtFarbe={f.licht} schatten={false} />
+      ))}
     </group>
   );
 }
@@ -423,6 +486,14 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       })}
 
       {figuren.map((p, i) => <Person key={`${gewaehlt?.id ?? 'w'}-${i}`} {...p} f={f} bewegt={bewegt} />)}
+      {/* Verkehr auf der Zufahrt: je Spur eine Richtung */}
+      {bewegt && [
+        { art: 'lkw', spur: 2.6, richtung: 1, tempo: 7, phase: 0.1, farbe: f['person-1'] },
+        { art: 'auto', spur: 7.4, richtung: -1, tempo: 11, phase: 0.45, farbe: f['person-0'] },
+        { art: 'auto', spur: 2.6, richtung: 1, tempo: 10, phase: 0.75, farbe: f['person-2'] },
+      ].map((v, i) => (
+        <Fahrzeug key={i} {...v} von={X(6)} bis={X(B - 6)} z={Z(gs.zufahrtY + v.spur)} f={f} />
+      ))}
     </>
   );
 }
@@ -480,7 +551,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
                                  transparent opacity={gewaehlt ? 0.7 : mitStoerung ? 0.5 : hervor ? 0.45 : 0.22} />
             </mesh>
             <group rotation-y={m.tiefe_m > m.breite_m ? Math.PI / 2 : 0} scale={hervor || gewaehlt ? 1.04 : 1}>
-              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} neutral={neutral} ampelGroesse={2.3} />
+              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} detail="mittel" ampelGroesse={2.3} />
             </group>
             {/* Name beim Darüberfahren */}
             {hervor && !gewaehlt && (
