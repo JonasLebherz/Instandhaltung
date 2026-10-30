@@ -10,6 +10,7 @@
  *   ?suche=      Text, der in der Beschreibung vorkommt
  */
 import Link from 'next/link';
+import Auswahl from '@/components/Auswahl';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
 import { ansichtAusCookie, ansichtBedingung } from '@/lib/ansicht';
@@ -103,36 +104,26 @@ export default async function AuftraegeSeite({ searchParams }) {
           </div>
           <div>
             <label htmlFor="f-status" className="form-label">{t('Status')}</label>
-            <select id="f-status" name="status" className="form-select" defaultValue={filter.status}>
-              <option value="">{t('Alle')}</option>
-              <option value="offen">{t('Alle offenen')}</option>
-              {STATUS_WERTE.map((s) => <option key={s} value={s}>{gross(t(s))}</option>)}
-            </select>
+            <Auswahl id="f-status" name="status" standard={filter.status}
+                     optionen={[{ wert: '', text: t('Alle') }, { wert: 'offen', text: t('Alle offenen') },
+                       ...STATUS_WERTE.map((s) => ({ wert: s, text: gross(t(s)) }))]} />
           </div>
           <div>
             <label htmlFor="f-standort" className="form-label">{t('Standort')}</label>
-            <select id="f-standort" name="standort" className="form-select" defaultValue={filter.standort}>
-              <option value="">{t('Alle')}</option>
-              {standorte.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-            </select>
+            <Auswahl id="f-standort" name="standort" standard={filter.standort}
+                     optionen={[{ wert: '', text: t('Alle') }, ...standorte.map((st) => ({ wert: st.id, text: st.name }))]} />
           </div>
           <div>
             <label htmlFor="f-maschine" className="form-label">{t('Maschine')}</label>
-            <select id="f-maschine" name="maschine" className="form-select" defaultValue={filter.maschine}>
-              <option value="">{t('Alle')}</option>
-              {Object.entries(maschinenNachStandort).map(([standort, liste]) => (
-                <optgroup key={standort} label={standort}>
-                  {liste.map((m) => <option key={m.id} value={m.id}>{m.anlagennummer} – {m.bezeichnung}</option>)}
-                </optgroup>
-              ))}
-            </select>
+            <Auswahl id="f-maschine" name="maschine" standard={filter.maschine}
+                     optionen={[{ wert: '', text: t('Alle') }, ...Object.entries(maschinenNachStandort).map(([standort, liste]) => ({
+                       gruppe: standort, optionen: liste.map((m) => ({ wert: m.id, text: `${m.anlagennummer} – ${m.bezeichnung}` })),
+                     }))]} />
           </div>
           <div>
             <label htmlFor="f-prio" className="form-label">{t('Priorität')}</label>
-            <select id="f-prio" name="prioritaet" className="form-select" defaultValue={filter.prioritaet}>
-              <option value="">{t('Alle')}</option>
-              {PRIORITAET_WERTE.map((p) => <option key={p} value={p}>{gross(t(p))}</option>)}
-            </select>
+            <Auswahl id="f-prio" name="prioritaet" standard={filter.prioritaet}
+                     optionen={[{ wert: '', text: t('Alle') }, ...PRIORITAET_WERTE.map((p) => ({ wert: p, text: gross(t(p)) }))]} />
           </div>
           <div className="aktionen">
             <button type="submit" className="btn btn-primary"><i className="bi bi-funnel" aria-hidden="true" /> {t('Filtern')}</button>

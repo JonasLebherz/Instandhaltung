@@ -12,11 +12,12 @@
  * „Mir zuweisen“. Als Person aus der Produktion ist das Formular gesperrt
  * (die Server-Aktion prüft das zusätzlich).
  */
-import { useActionState, useRef } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { auftragSpeichern, teilBuchen } from '@/app/aktionen';
 import { STATUS_WERTE } from '@/lib/konstanten';
 import Feldfehler, { fehlerklasse } from '@/components/Feldfehler';
 import SpeichernKnopf from '@/components/SpeichernKnopf';
+import Auswahl from '@/components/Auswahl';
 import { useT } from '@/components/SpracheKontext';
 import { gross } from '@/lib/sprache';
 
@@ -32,14 +33,16 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte, person 
   const { fehler, eingabe } = zustand;
   const endeRef = useRef(null);
   const massnahmeRef = useRef(null);
-  const technikerRef = useRef(null);
-  const statusRef = useRef(null);
+  // Techniker und Status gesteuert, damit "Mir zuweisen" beide setzen kann
+  const [technikerId, setTechnikerId] = useState(eingabe.techniker_id);
+  const [status, setStatus] = useState(eingabe.status);
   const hatFehler = Object.keys(fehler).length > 0;
   const t = useT();
 
   // Komfort: Beim Wechsel auf "erledigt" die Endzeit mit jetzt vorbelegen und zur Maßnahme springen
-  function statusGeaendert(e) {
-    if (e.target.value !== 'erledigt') return;
+  function statusGeaendert(neu) {
+    setStatus(neu);
+    if (neu !== 'erledigt') return;
     if (endeRef.current && endeRef.current.value === '') endeRef.current.value = jetztFuerInput();
     massnahmeRef.current?.focus();
   }
@@ -47,9 +50,9 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte, person 
   // "Mir zuweisen": eigenen Techniker auswählen; ein nur gemeldeter Auftrag wird dabei "zugewiesen"
   const eigeneId = person?.rolle === 'Instandhaltung' && person.techniker_id ? String(person.techniker_id) : null;
   function mirZuweisen() {
-    if (technikerRef.current) technikerRef.current.value = eigeneId;
-    if (statusRef.current?.value === 'gemeldet') statusRef.current.value = 'zugewiesen';
-    technikerRef.current?.focus();
+    setTechnikerId(eigeneId);
+    if (status === 'gemeldet') setStatus('zugewiesen');
+    document.getElementById('techniker_id')?.focus();
   }
 
   return (
@@ -81,30 +84,23 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte, person 
               </button>
             )}
           </div>
-          <select id="techniker_id" name="techniker_id" ref={technikerRef} className={`form-select${fehlerklasse(fehler, 'techniker_id')}`}
-                  defaultValue={eingabe.techniker_id}>
-            <option value="">{t('Noch nicht zugewiesen')}</option>
-            {/* Zuerst die Techniker vor Ort, darunter alle anderen Standorte */}
-            <optgroup label={t('Am Standort')}>
-              {techniker.filter((x) => x.vor_ort).map((x) => (
-                <option key={x.id} value={x.id}>{x.name} ({t(x.qualifikation)}, {t(x.schicht)})</option>
-              ))}
-            </optgroup>
-            <optgroup label={t('Andere Standorte')}>
-              {techniker.filter((x) => !x.vor_ort).map((x) => (
-                <option key={x.id} value={x.id}>{x.name} – {x.standort}</option>
-              ))}
-            </optgroup>
-          </select>
+          {/* Zuerst die Techniker vor Ort, darunter alle anderen Standorte */}
+          <Auswahl id="techniker_id" name="techniker_id" wert={technikerId} onAendern={setTechnikerId}
+                   ungueltig={Boolean(fehler.techniker_id)}
+                   optionen={[
+                     { wert: '', text: t('Noch nicht zugewiesen') },
+                     { gruppe: t('Am Standort'), optionen: techniker.filter((x) => x.vor_ort)
+                       .map((x) => ({ wert: x.id, text: `${x.name} (${t(x.qualifikation)}, ${t(x.schicht)})` })) },
+                     { gruppe: t('Andere Standorte'), optionen: techniker.filter((x) => !x.vor_ort)
+                       .map((x) => ({ wert: x.id, text: `${x.name} – ${x.standort}` })) },
+                   ]} />
           <Feldfehler fehler={fehler} name="techniker_id" />
         </div>
 
         <div className="col-md-6">
           <label htmlFor="status" className="form-label">{t('Status')}</label>
-          <select id="status" name="status" ref={statusRef} className={`form-select${fehlerklasse(fehler, 'status')}`}
-                  defaultValue={eingabe.status} onChange={statusGeaendert}>
-            {STATUS_WERTE.map((s) => <option key={s} value={s}>{gross(t(s))}</option>)}
-          </select>
+          <Auswahl id="status" name="status" wert={status} onAendern={statusGeaendert} ungueltig={Boolean(fehler.status)}
+                   optionen={STATUS_WERTE.map((s) => ({ wert: s, text: gross(t(s)) }))} />
           <Feldfehler fehler={fehler} name="status" />
         </div>
 
@@ -162,13 +158,9 @@ export function TeilBuchenFormular({ auftragId, ersatzteile }) {
 
       <div className="mb-3">
         <label htmlFor="ersatzteil_id" className="form-label">{t('Ersatzteil buchen')}</label>
-        <select id="ersatzteil_id" name="ersatzteil_id" className={`form-select${fehlerklasse(fehler, 'ersatzteil_id')}`}
-                defaultValue={eingabe.ersatzteil_id}>
-          <option value="">{t('Bitte auswählen …')}</option>
-          {ersatzteile.map((e) => (
-            <option key={e.id} value={e.id}>{e.bezeichnung} – {t('Bestand')}: {e.bestand}</option>
-          ))}
-        </select>
+        <Auswahl id="ersatzteil_id" name="ersatzteil_id" standard={eingabe.ersatzteil_id}
+                 ungueltig={Boolean(fehler.ersatzteil_id)} platzhalter={t('Bitte auswählen …')}
+                 optionen={ersatzteile.map((e) => ({ wert: e.id, text: `${e.bezeichnung} – ${t('Bestand')}: ${e.bestand}` }))} />
         <Feldfehler fehler={fehler} name="ersatzteil_id" />
       </div>
 

@@ -17,6 +17,7 @@ import { meldungAnlegen } from '@/app/aktionen';
 import { URSACHEN_LISTE } from '@/lib/konstanten';
 import Feldfehler, { fehlerklasse } from '@/components/Feldfehler';
 import SpeichernKnopf from '@/components/SpeichernKnopf';
+import Auswahl from '@/components/Auswahl';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 
@@ -81,12 +82,9 @@ export default function MeldeFormular({ maschineId, startwerte, jetzt }) {
         {/* Ursache */}
         <div className="mb-4">
           <label htmlFor="ursache_kategorie" className="form-label">{t('Vermutete Ursache')}</label>
-          <select id="ursache_kategorie" name="ursache_kategorie"
-                  className={`form-select${fehlerklasse(fehler, 'ursache_kategorie')}`}
-                  defaultValue={eingabe.ursache_kategorie}>
-            <option value="">{t('Bitte auswählen …')}</option>
-            {URSACHEN_LISTE.map((u) => <option key={u} value={u}>{t(u)}</option>)}
-          </select>
+          <Auswahl id="ursache_kategorie" name="ursache_kategorie" standard={eingabe.ursache_kategorie}
+                   ungueltig={Boolean(fehler.ursache_kategorie)} platzhalter={t('Bitte auswählen …')}
+                   optionen={URSACHEN_LISTE.map((u) => ({ wert: u, text: t(u) }))} />
           <Feldfehler fehler={fehler} name="ursache_kategorie" />
         </div>
 

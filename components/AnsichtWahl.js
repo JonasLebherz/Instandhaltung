@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useT } from './SpracheKontext';
+import Auswahl from './Auswahl';
 
 function ansichtSpeichern(land, werk) {
   const wert = land || werk ? encodeURIComponent(JSON.stringify({ land: land || null, werk: werk ? Number(werk) : null })) : '';
@@ -39,21 +40,15 @@ export default function AnsichtWahl({ ansicht }) {
 
   return (
     <div className="ansicht-wahl">
-      <label className="visually-hidden" htmlFor="ansicht-land">{t('Land')}</label>
-      <select id="ansicht-land" className="form-select form-select-sm" value={land}
-              onChange={(e) => aendern(e.target.value, '')}>
-        <option value="">{t('Alle Länder')}</option>
-        {laender.map(([kuerzel, name]) => <option key={kuerzel} value={kuerzel}>{t(name)}</option>)}
-      </select>
-      <label className="visually-hidden" htmlFor="ansicht-werk">{t('Werk')}</label>
-      <select id="ansicht-werk" className="form-select form-select-sm" value={werk}
-              onChange={(e) => {
-                const st = standorte.find((x) => String(x.id) === e.target.value);
-                aendern(st ? st.land : land, e.target.value);
-              }}>
-        <option value="">{t('Alle Werke')}</option>
-        {werke.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-      </select>
+      <Auswahl id="ansicht-land" klein ariaLabel={t('Land')} wert={land}
+               optionen={[{ wert: '', text: t('Alle Länder') }, ...laender.map(([kuerzel, name]) => ({ wert: kuerzel, text: t(name) }))]}
+               onAendern={(w) => aendern(w, '')} />
+      <Auswahl id="ansicht-werk" klein ariaLabel={t('Werk')} wert={werk}
+               optionen={[{ wert: '', text: t('Alle Werke') }, ...werke.map((st) => ({ wert: st.id, text: st.name }))]}
+               onAendern={(w) => {
+                 const st = standorte.find((x) => String(x.id) === w);
+                 aendern(st ? st.land : land, w);
+               }} />
     </div>
   );
 }
