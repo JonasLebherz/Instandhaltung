@@ -71,6 +71,15 @@
     --uebergang: .25s cubic-bezier(.2, .8, .2, 1);
     --weich: cubic-bezier(.2, .8, .2, 1);
 
+
+    /* 3D-Ansicht und Werks-Deko (components/karten/raum/) – feste Farben, weil WebGL keine Transparenz-Mischung wie CSS kann */
+    --raum-umgebung: #e6e9ee; --raum-gelaende: #dfe5dc; --raum-strasse: #c9ced6; --raum-markierung: #ffffff;
+    --raum-wand: #f6f7f9; --raum-fenster: #9db4cf; --raum-tor: #8e96a3;
+    --raum-dach-0: #8f9bab; --raum-dach-1: #b39c86; --raum-dach-2: #8ea597; --raum-dach-3: #a3a4c2;
+    --raum-hallenboden: #eceef1; --raum-linie: #b9c0ca;
+    --raum-maschine: #d8dde4; --raum-maschine-dunkel: #5f6672; --raum-signal: #f2b632; --raum-glas: #a9c7e6;
+    --raum-baum: #86b583; --raum-stamm: #8b6b4e; --raum-buero: #e7e1d6; --raum-tank: #cfd6de;
+    --raum-person-0: #ff9f0a; --raum-person-1: #0071e3; --raum-person-2: #2e9b4a; --raum-haut: #e8c2a2;
     color-scheme: light;
 }
 
@@ -112,6 +121,14 @@
     --schatten: 0 8px 32px rgba(0, 0, 0, .45);
     --schatten-hover: 0 16px 44px rgba(0, 0, 0, .6);
 
+
+    --raum-umgebung: #18191c; --raum-gelaende: #20242a; --raum-strasse: #33363d; --raum-markierung: #5a5f69;
+    --raum-wand: #3b3f47; --raum-fenster: #4d6585; --raum-tor: #262930;
+    --raum-dach-0: #566070; --raum-dach-1: #6b5d50; --raum-dach-2: #4f6358; --raum-dach-3: #5c5d7a;
+    --raum-hallenboden: #2a2d33; --raum-linie: #4b515b;
+    --raum-maschine: #6f7580; --raum-maschine-dunkel: #2b2e35; --raum-signal: #e0a526; --raum-glas: #5d7fa6;
+    --raum-baum: #3f6b47; --raum-stamm: #5a4634; --raum-buero: #3d3a35; --raum-tank: #4d535c;
+    --raum-person-0: #ff9f0a; --raum-person-1: #2997ff; --raum-person-2: #30d158; --raum-haut: #c49a7a;
     color-scheme: dark;
 }
 
@@ -1003,15 +1020,28 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 
 /* ---------- Weltkarte (components/karten/WeltKarte.js) ---------- */
 .wkarte { max-width: none; }
-/* Weltebene: Weltkarte oben, Europa als Detailkarte darunter */
-.weltebene { display: flex; flex-direction: column; gap: 14px; }
-.weltebene .wkarte + .wkarte { border-radius: 14px; background: var(--karte-erhoeht); border: 1px solid var(--linie); }
-.wkarte-titel {
-    position: absolute; top: 8px; left: 10px; z-index: 2; padding: 1px 10px; border-radius: 999px;
-    font-size: .75rem; font-weight: 600; color: var(--text-leise); background: var(--fuellung);
+/* Lupe: vergrößertes Europa auf der Weltkarte */
+.lupe-flaeche { fill: var(--karte-solid); filter: drop-shadow(0 6px 18px rgba(31, 38, 64, .16)); }
+.lupe-rand { fill: none; stroke: var(--glas-rand); stroke-width: 3; }
+.lupe-quelle { fill: color-mix(in srgb, var(--akzent) 8%, transparent); stroke: var(--text-leise); stroke-width: 1; stroke-dasharray: 3 3; }
+.lupe-linie { stroke: var(--text-leise); stroke-width: .8; stroke-dasharray: 3 3; opacity: .8; }
+.lupe-titel {
+    position: absolute; transform: translate(-50%, -50%); z-index: 2; padding: 1px 10px; border-radius: 999px;
+    font-size: .72rem; font-weight: 600; color: var(--text-leise); background: var(--karte-solid);
+    border: 1px solid var(--linie); white-space: nowrap; pointer-events: none;
 }
-.welt-rahmen { fill: none; stroke: var(--text-leise); stroke-width: 1; stroke-dasharray: 4 3; opacity: .7; }
-.wkarte-klein .weltebene, .weltebene.wkarte-klein { gap: 8px; }
+/* Markierungen in der Lupe: etwas kleiner, Name seitlich (weg von den Nachbarn) */
+.karten-punkt.in-lupe .punkt-blase { min-width: 28px; height: 28px; font-size: .85rem; }
+.karten-punkt.in-lupe { --anker: translate(-50%, -14px); }
+.karten-punkt.in-lupe.name-oben { --anker: translate(-50%, calc(-100% + 14px)); }
+.karten-punkt.in-lupe.name-rechts { flex-direction: row; --anker: translate(-14px, -50%); }
+.karten-punkt.in-lupe.name-links { flex-direction: row-reverse; --anker: translate(calc(-100% + 14px), -50%); }
+.wkarte-klein .karten-punkt.in-lupe .punkt-blase { min-width: 20px; height: 20px; font-size: .68rem; padding: 0 5px; }
+.wkarte-klein .karten-punkt.in-lupe { --anker: translate(-50%, -10px); }
+/* Bühne der Weltebene: so hoch wie die Karte (Breite der Bühne / Seitenverhältnis) */
+.explorer-buehne-rahmen { container-type: inline-size; }
+.explorer-buehne { transition: height .45s var(--weich); }
+.explorer-buehne.buehne-welt { --buehne-h: max(240px, calc((100cqw - 44px) / var(--welt-verhaeltnis) + 66px + 22px)); }
 .welt-land { fill: var(--land); stroke: var(--land-rand); stroke-width: .45; stroke-linejoin: round; }
 /* Länder mit Werken: getönt in der Farbe der dringendsten offenen Störung */
 .welt-firma {
@@ -1125,6 +1155,8 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .plan-mittellinie { stroke: var(--karte-erhoeht); stroke-width: .5; stroke-dasharray: 4 3; }
 .plan-tor { fill: var(--akzent); opacity: .7; }
 .plan-parkplatz { fill: var(--plan-strasse); }
+.plan-buero { fill: var(--raum-buero); stroke: var(--linie); stroke-width: .5; }
+.plan-tank { fill: var(--raum-tank); stroke: var(--linie); stroke-width: .5; }
 .plan-stellplatz { stroke: var(--karte-erhoeht); stroke-width: .4; }
 .plan-baum { fill: color-mix(in srgb, var(--gruen) 16%, transparent); stroke: color-mix(in srgb, var(--gruen) 26%, transparent); stroke-width: .4; }
 .plan-beschriftung {
@@ -1379,6 +1411,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 
 /* Elemente der neuen Ebene erscheinen schneller als auf den Einzelseiten */
 .explorer-ebene .karten-punkt { animation-delay: calc(var(--i, 0) * 30ms + 140ms); }
+.plan-gebaeude[style*="--dach"] { box-shadow: inset 0 5px 0 var(--dach), var(--glas-kante); }
 .explorer-ebene .plan-gebaeude { animation-delay: calc(var(--i, 0) * 45ms + 120ms); }
 .explorer-ebene .plan-maschine { animation-delay: calc(var(--i, 0) * 12ms + 160ms); }
 
@@ -1927,6 +1960,10 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     transform-origin: top left;
 }
 .auswahl-liste.nach-oben { top: auto; bottom: calc(100% + 6px); transform-origin: bottom left; }
+.auswahl-liste.rechts { left: auto; right: 0; transform-origin: top right; }
+/* Karte mit offener Liste nach vorn holen – sonst liegt die Liste unter der nächsten Karte
+   (Karten bilden wegen Glas-Effekt und Animation eigene Ebenen) */
+.karte:has(.auswahl-liste) { position: relative; z-index: 40; }
 .auswahl-liste ul { list-style: none; margin: 0; padding: 0; }
 .auswahl-liste [role="option"] {
     display: flex; align-items: center; gap: 10px;
@@ -1941,3 +1978,38 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     text-transform: uppercase; letter-spacing: .05em;
 }
 .form-select-sm.auswahl-knopf + .auswahl-liste [role="option"] { font-size: .88rem; padding: 6px 9px; }
+
+/* =====================================================================
+   3D-Ansicht (components/karten/raum/) – Werk und Halle
+   ===================================================================== */
+.explorer-ebene.ebene-raum { padding: 0; overflow: hidden; }
+.raum, .raum-laden { position: absolute; inset: 0; }
+.raum canvas { touch-action: none; outline: none; }
+.raum-laden { background: radial-gradient(60% 50% at 50% 55%, var(--fuellung), transparent); animation: einblenden .4s ease; }
+.raum-schalter { position: absolute; top: 14px; right: 14px; z-index: 6; box-shadow: var(--glas-kante), 0 4px 16px rgba(31, 38, 64, .08); background: var(--karte-erhoeht); }
+.raum-schalter button { min-width: 44px; }
+/* Beschriftung einer Halle über dem Dach */
+.raum-halle {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    padding: 4px 6px 4px 10px; border-radius: 999px; border: 1px solid var(--glas-rand);
+    background: var(--karte-erhoeht); color: var(--text); font-size: .8rem;
+    box-shadow: var(--glas-kante), 0 4px 14px rgba(31, 38, 64, .14);
+    backdrop-filter: var(--glas-unschaerfe); -webkit-backdrop-filter: var(--glas-unschaerfe);
+    transition: transform var(--uebergang);
+}
+.raum-halle:hover, .raum-halle:focus-visible { transform: translateY(-2px) scale(1.04); }
+.raum-halle.klein { padding: 2px 4px 2px 8px; font-size: .72rem; opacity: .85; }
+.raum-halle-name { color: var(--text-leise); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.raum-halle .zaehl-marke, .raum-marke .zaehl-marke {
+    position: static; display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px;
+    border-radius: 999px; font-size: .75rem; font-weight: 700; color: #fff; background: var(--stufe);
+}
+/* Störungszahl bzw. Name über einer Maschine */
+.raum-marke {
+    display: inline-flex; align-items: center; gap: 6px; padding: 2px; border: 0; border-radius: 999px;
+    background: transparent; color: var(--text); font-size: .78rem; font-weight: 600; white-space: nowrap;
+}
+.raum-marke.gewaehlt { padding: 2px 10px 2px 2px; background: var(--akzent); color: #fff; box-shadow: 0 4px 14px var(--akzent-ring); }
+.raum-marke .zaehl-marke { box-shadow: 0 0 0 3px var(--karte-erhoeht); }
+.stufe-rot.raum-marke .zaehl-marke { animation: maschine-puls 2s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .stufe-rot.raum-marke .zaehl-marke { animation: none; } }

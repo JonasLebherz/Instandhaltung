@@ -67,8 +67,9 @@ function equalEarth(lat, lon) {
   return [l * Math.cos(th) / (M * (A1 + 3 * A2 * t2 + t6 * (7 * A3 + 9 * A4 * t2))), th * (A1 + A2 * t2 + t6 * (A3 + A4 * t2))];
 }
 const ohneAntarktis = w110.filter((f) => f.id !== '010');
-// Ganze Welt (ohne Antarktis): 84° N bis 57° S
-const minX = equalEarth(0, -180)[0], maxX = equalEarth(0, 180)[0], maxY = equalEarth(84, 0)[1], minY = equalEarth(-57, 0)[1];
+// Ausschnitt mit allen Werken: etwa 128° W bis 152° O, 75° N bis 10° S
+// (Südamerika, Afrika und Australien unten abgeschnitten)
+const minX = equalEarth(0, -128)[0], maxX = equalEarth(0, 152)[0], maxY = equalEarth(75, 0)[1], minY = equalEarth(-10, 0)[1];
 const WB = 1000, WS = WB / (maxX - minX), WH = Math.round((maxY - minY) * WS);
 const welt = { breite: WB, hoehe: WH, skala: WS, versatzX: -minX * WS, versatzY: maxY * WS };
 const weltPunkt = ([lo, la]) => { const [x, y] = equalEarth(la, lo); return [welt.versatzX + welt.skala * x, welt.versatzY - welt.skala * y]; };
@@ -113,36 +114,35 @@ for (const [code, [lo0, lo1, la0, la1]] of Object.entries(ANSICHTEN)) {
   laender[code] = { ...v, land, nachbarn };
 }
 
-/* ---------- Europa als eigene Detailkarte unter der Weltkarte (Mercator) ---------- */
-// In Europa liegen die Länder zu dicht für Markierungen auf der Weltkarte
-const EUROPA = [-11, 42, 42, 55.6];
-const europa = (() => {
-  const [lo0, lo1, la0, la1] = EUROPA, breite = 1000;
-  const x0 = lo0 * Math.PI / 180, x1 = lo1 * Math.PI / 180, y0 = merc(la0), y1 = merc(la1);
-  const skala = breite / (x1 - x0), hoehe = Math.round((y1 - y0) * skala);
-  const v = { breite, hoehe, skala, versatzX: -x0 * skala, versatzY: y1 * skala };
-  const punkt = ([lo, la]) => [v.versatzX + v.skala * lo * Math.PI / 180, v.versatzY - v.skala * merc(la)];
-  const gross = (r) => { const xs = r.map((p) => p[0]), ys = r.map((p) => p[1]); return Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys) > 6; };
+/* ---------- Lupe: vergrößertes Europa auf der Weltkarte ---------- */
+// Deutschland, Frankreich und Polen liegen auf der Weltkarte zu dicht beieinander.
+// Ein runder, vergrößerter Ausschnitt über dem Atlantik zeigt sie getrennt.
+const LUPE = { laenge: -38, breite: 22.5, radius: 146, mitteLaenge: 10.5, mitteBreite: 49.5, sichtGrad: 13 };
+const lupe = (() => {
+  const [cx, cy] = weltPunkt([LUPE.laenge, LUPE.breite]);
+  const r = LUPE.radius;
+  const k = r / (LUPE.sichtGrad * Math.PI / 180);   // Einheiten je Bogenmaß (Mercator)
+  const punkt = ([lo, la]) => [cx + k * (lo - LUPE.mitteLaenge) * Math.PI / 180, cy - k * (merc(la) - merc(LUPE.mitteBreite))];
+  const gross = (ring) => { const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1]); return Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys) > 3; };
   const laender = {}, mitten = {};
   let rest = '';
   for (const f of w50) {
     if (f.id === '010') continue;
-    const rs = ringe(f.geometry).map((r) => zuschneiden(r.map(punkt), -20, -20, breite + 20, hoehe + 20)).filter((r) => r.length > 2 && gross(r));
+    const projiziert = ringe(f.geometry).map((ring) => ring.map(punkt));
+    const rs = projiziert.map((ring) => zuschneiden(ring, cx - r, cy - r, cx + r, cy + r)).filter((ring) => ring.length > 2 && gross(ring));
     if (!rs.length) continue;
-    const code = Object.keys(ISO).find((k) => ISO[k] === f.id);
-    if (code) { laender[code] = pfad(rs); mitten[code] = schwerpunkt(rs); } else rest += pfad(rs);
+    const code = Object.keys(ISO).find((c) => ISO[c] === f.id);
+    if (code) { laender[code] = pfad(rs); mitten[code] = schwerpunkt(projiziert); } else rest += pfad(rs);
   }
-  // Rahmen um Europa auf der Weltkarte (Ränder des Ausschnitts in Equal Earth)
-  const rand = [];
-  for (let lo = lo0; lo <= lo1; lo += 1) rand.push([lo, la1]);
-  for (let lo = lo1; lo >= lo0; lo -= 1) rand.push([lo, la0]);
-  // Markierung auf der Europakarte: Länder, deren Mitte (Längen-/Breitengrad) im Ausschnitt liegt
-  const markiert = Object.entries(ISO).filter(([, id]) => {
-    const f = w110.find((x) => x.id === id);
-    const m = schwerpunkt(ringe(f.geometry));
-    return m.x >= lo0 && m.x <= lo1 && m.y >= la0 && m.y <= la1;
-  }).map(([code]) => code);
-  return { ...v, laender, mitten, rest, markiert, rahmen: pfad([rand.map(weltPunkt)]) };
+  // Markierung in der Lupe: Länder, deren Mitte innerhalb der Lupe liegt (Russland nicht)
+  const markiert = Object.keys(mitten).filter((c) => Math.hypot(mitten[c].x - cx, mitten[c].y - cy) < r * 0.8);
+  // Kreis um Europa auf der Weltkarte: Mitte und Radius des gezeigten Ausschnitts
+  const [qx, qy] = weltPunkt([LUPE.mitteLaenge, LUPE.mitteBreite]);
+  const [rx] = weltPunkt([LUPE.mitteLaenge + LUPE.sichtGrad, LUPE.mitteBreite]);
+  return {
+    cx: Math.round(cx), cy: Math.round(cy), r, quelle: { cx: Math.round(qx), cy: Math.round(qy), r: Math.round(rx - qx) },
+    markiert, mitten: Object.fromEntries(markiert.map((c) => [c, mitten[c]])), laender, rest,
+  };
 })();
 
 const r = (n) => Math.round(n * 1000) / 1000;
@@ -191,12 +191,11 @@ export function landPunkt(ansicht, breitengrad, laengengrad) {
 export const WELT_PFADE = ${JSON.stringify(weltPfade, null, 1).replace(/\n\s*/g, '\n  ').replace(/\n  }$/, '\n}')};
 
 /**
- * Europa als Detailkarte unter der Weltkarte (Mercator, 11° W bis 42° O, 42° bis 55,6° N):
- * Umrisse der Länder des Unternehmens, übrige Länder, Mitte je Land und der Rahmen
- * auf der Weltkarte. Länder, deren Mitte auf der Weltkarte in diesem Rahmen liegt,
- * bekommen ihre Markierung auf der Europakarte.
+ * Lupe: runder, vergrößerter Europa-Ausschnitt auf der Weltkarte (über dem Atlantik).
+ * cx/cy/r = Lupe, quelle = gestrichelter Kreis um Europa, alles in Einheiten der Weltkarte.
+ * markiert = Länder mit Markierung in der Lupe (statt auf der Weltkarte), mitten = ihre Lage in der Lupe.
  */
-export const EUROPA = ${JSON.stringify({ breite: europa.breite, hoehe: europa.hoehe, skala: r(europa.skala), versatzX: r(europa.versatzX), versatzY: r(europa.versatzY), grenzen: EUROPA, markiert: europa.markiert, mitten: europa.mitten, rahmen: europa.rahmen, laender: europa.laender, rest: europa.rest })};
+export const LUPE = ${JSON.stringify(lupe)};
 
 /** Mitte (Schwerpunkt der größten Fläche) der Länder des Unternehmens auf der Weltkarte */
 export const WELT_MITTEN = ${JSON.stringify(weltMitten)};

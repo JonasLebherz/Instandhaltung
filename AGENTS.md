@@ -26,4 +26,7 @@ Jeder Push nach GitHub wird von Vercel automatisch veröffentlicht. Deshalb vor 
 - Statistik (`app/statistik/`) und Datenbasis (`app/datenbasis/`): Aufbau in `CLAUDE.md` in den gleichnamigen Abschnitten. Pro Seite höchstens 5 Datenbankabfragen gleichzeitig.
 - Strukturänderungen an der Datenbank als Migrationsdatei `supabase/migrationen/NNN_beschreibung.sql` anlegen. Vorhandene Daten müssen erhalten bleiben, denn die Datenbank läuft produktiv. Zusätzlich `supabase/schema.sql` **und** passend `supabase/testdaten.sql` nachziehen. Neue Tabellen bekommen `ENABLE ROW LEVEL SECURITY`, neue Views `WITH (security_invoker = true)`.
 - Personen & Rollen: Die gewählte fiktive Person steht im Cookie `person`. Für Speichern und Rechte zählt nur `aktuellePerson()` aus `lib/person.js` (Abgleich mit der Datenbank). Produktion darf melden, aber keine Aufträge bearbeiten (`darfBearbeiten`). Änderungen an Aufträgen zusätzlich in `auftrag_verlauf` schreiben. Ansicht (nur Land/Werk anzeigen) über `lib/ansicht.js`. Details in `CLAUDE.md` unter „Personen & Rollen“.
+- Auswahlfelder immer mit `components/Auswahl.js`, nie natives `<select>`.
+- Störungskarte: Werk und Halle auch in 3D (`components/karten/raum/`, three.js, nur per `next/dynamic` laden). Farben dort nur über CSS-Variablen `--raum-*`. Abwechslung je Werk in `lib/karten/werkGestaltung.js`.
+- Tests: `node tests/e2e.cjs` (lokale Datenbank, Voraussetzungen im Kopf der Datei) – bei neuen Funktionen erweitern.
 - Zugangsdaten nie in den Code oder ins Repository. Sie gehören in `.env.local` bzw. zu Vercel.

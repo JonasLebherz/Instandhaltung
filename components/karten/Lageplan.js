@@ -5,31 +5,21 @@
  * Gelände, Zufahrt und Parkplatz werden als SVG gezeichnet, die Gebäude liegen
  * als anklickbare Flächen darüber (Position und Größe aus der Datenbank, in Metern).
  * Ein Klick ruft onWaehle(gebaeude) auf – die Zoom-Karte zoomt in das Gebäude.
+ * Aufbau und Deko kommen aus lib/karten/werkGestaltung.js – so sieht jedes Werk etwas
+ * anders aus (gespiegelt, Bürogebäude, Tanks, Dachfarbe), genau wie in der 3D-Ansicht.
  * neutral: beim Melden – ohne Zahlen und Farben offener Störungen.
  */
 import { stufe, offenText } from './stufe';
 import { useT } from '@/components/SpracheKontext';
-
-/** Kleine, gleichmäßig verteilte Bäume entlang des Zauns (rein dekorativ) */
-function baeume(B, T, zufahrtY) {
-  const liste = [];
-  for (let x = 16; x < B - 10; x += 13) liste.push([x, 9]);                 // oben
-  for (let y = 24; y < zufahrtY - 8; y += 13) liste.push([B - 9, y]);      // rechts
-  return liste;
-}
+import { werkGestaltung } from '@/lib/karten/werkGestaltung';
 
 export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehle, neutral = false }) {
   const t = useT();
-  const B = standort.gelaende_breite_m;
-  const T = standort.gelaende_tiefe_m;
+  // Aufbau mit Abwechslung je Werk (gespiegelt, Deko) – gleich wie in der 3D-Ansicht
+  const g3 = werkGestaltung(standort, gebaeude);
+  const { B, T, zufahrtY, parkplatz } = g3;
   const prozent = (wert, gesamt) => `${(wert / gesamt) * 100}%`;
-  const zufahrtY = T - 24;   // unten: Werksstraße mit Tor und Parkplatz (nur gezeichnet)
-
-  // Unter jeder Gebäudereihe verläuft eine Werksstraße; links verbindet eine Straße alles mit der Zufahrt
-  const reihenUnten = [...new Set(gebaeude.map((g) => g.lage_y_m + g.tiefe_m))].sort((a, b) => a - b);
-  const strassenY = reihenUnten.map((unten) => unten + 4).filter((y) => y < zufahrtY - 8);
-  const parkplatzBreite = Math.min(70, B * 0.3);
-  const stellplaetze = Math.floor((parkplatzBreite - 4) / 3);
+  const stellplaetze = Math.floor((parkplatz.b - 4) / 3);
 
   return (
     <div className="lageplan-rahmen">
@@ -44,32 +34,37 @@ export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehl
           <rect x="3" y="3" width={B - 6} height={T - 6} rx="6" className="plan-gelaende" />
           <rect x="3" y="3" width={B - 6} height={T - 6} rx="6" fill="url(#lageplan-raster)" />
 
-          {/* Werksstraßen */}
-          {strassenY.map((y) => <rect key={y} x="10" y={y} width={B - 20} height="6" rx="3" className="plan-strasse" />)}
-          <rect x="10" y={strassenY[0] ?? zufahrtY} width="6" height={Math.max(0, zufahrtY - (strassenY[0] ?? zufahrtY) + 4)} className="plan-strasse" />
-          <rect x="3" y={zufahrtY} width={B - 6} height="10" className="plan-strasse" />
+          {/* Werksstraßen und Zufahrt */}
+          {g3.strassen.map((st, i) => <rect key={i} x={st.x} y={st.y} width={st.b} height={st.t} rx={i < g3.strassen.length - 1 ? 3 : 0} className="plan-strasse" />)}
           <line x1="8" y1={zufahrtY + 5} x2={B - 8} y2={zufahrtY + 5} className="plan-mittellinie" />
 
           {/* Parkplatz und Tor */}
-          <rect x={B - parkplatzBreite - 10} y={zufahrtY + 12} width={parkplatzBreite} height="8" rx="1.5" className="plan-parkplatz" />
+          <rect x={parkplatz.x} y={parkplatz.y} width={parkplatz.b} height={parkplatz.t} rx="1.5" className="plan-parkplatz" />
           {Array.from({ length: stellplaetze }, (_, i) => (
-            <line key={i} x1={B - parkplatzBreite - 8 + i * 3 + 2} y1={zufahrtY + 12} x2={B - parkplatzBreite - 8 + i * 3 + 2} y2={zufahrtY + 17}
-                  className="plan-stellplatz" />
+            <line key={i} x1={parkplatz.x + 2 + i * 3 + 2} y1={parkplatz.y} x2={parkplatz.x + 2 + i * 3 + 2} y2={parkplatz.y + 5} className="plan-stellplatz" />
           ))}
-          <rect x={B / 2 - 8} y={T - 5.5} width="16" height="4" rx="1.5" className="plan-tor" />
+          <rect x={g3.tor.x} y={g3.tor.y} width={g3.tor.b} height={g3.tor.t} rx="1.5" className="plan-tor" />
 
-          {/* Bäume */}
-          {baeume(B, T, zufahrtY).map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="3" className="plan-baum" />)}
+          {/* Deko: Bürogebäude, Tanks/Silos, Bäume (nur Darstellung) */}
+          {g3.deko.map((d, i) => (d.art === 'buero'
+            ? <rect key={i} x={d.x} y={d.y} width={d.b} height={d.t} rx="1" className="plan-buero" />
+            : <circle key={i} cx={d.x} cy={d.y} r={d.r} className="plan-tank" />))}
+          {g3.baeume.map((bm) => <circle key={`${bm.x}-${bm.y}`} cx={bm.x} cy={bm.y} r={3 * bm.groesse} className="plan-baum" />)}
         </svg>
         <span className="plan-beschriftung" style={{ left: '50%', top: prozent(zufahrtY - 3, T) }}>{t('Zufahrt · Tor')}</span>
-        <span className="plan-beschriftung" style={{ left: prozent(B - parkplatzBreite / 2 - 10, B), top: prozent(zufahrtY - 3, T) }}>{t('Parkplatz')}</span>
+        <span className="plan-beschriftung" style={{ left: prozent(parkplatz.x + parkplatz.b / 2, B), top: prozent(zufahrtY - 3, T) }}>{t('Parkplatz')}</span>
+        {g3.deko.filter((d) => d.art === 'buero').map((d) => (
+          <span key="buero" className="plan-beschriftung" style={{ left: prozent(d.x + d.b / 2, B), top: prozent(d.y + d.t / 2, T) }}>{t('Verwaltung')}</span>
+        ))}
         {gebaeude.map((g, i) => {
           const farbe = neutral ? 'neutral' : stufe(g.offen, g.hoechste_prioritaet);
           return (
             <button key={g.id} type="button" onClick={(e) => onWaehle?.(g, e)}
                     className={`plan-gebaeude stufe-${farbe}${auswahlId === g.id ? ' gewaehlt' : ''}`}
                     style={{
-                      left: prozent(g.lage_x_m, B), top: prozent(g.lage_y_m, T),
+                      // Dachfarbe des Werks als schmaler Streifen oben (siehe .plan-gebaeude)
+                      '--dach': `var(--raum-dach-${g3.dachFarbe})`,
+                      left: prozent(g3.hallen[g.id].x, B), top: prozent(g3.hallen[g.id].y, T),
                       width: prozent(g.breite_m, B), height: prozent(g.tiefe_m, T), '--i': i,
                     }}
                     aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen, t)}`}

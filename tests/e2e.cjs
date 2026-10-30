@@ -28,6 +28,9 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1280, height: 900 }, timezoneId: 'Europe/Berlin' });
+  // Die bisherigen Kartentests prüfen den 2D-Lageplan; die 3D-Ansicht hat einen eigenen Abschnitt (19b)
+  await p.goto(BASE + '/login');
+  await p.evaluate(() => localStorage.setItem('kartenansicht', '2d'));
   const konsole = [];
   p.on('console', (m) => { if (m.type() === 'error') konsole.push(m.text()); });
   p.on('pageerror', (e) => konsole.push('PAGEERROR ' + e.message));
@@ -360,6 +363,36 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('button[aria-label^="Language"]');
   await p.click('.aufklapp-menue button[lang="de"]'); await p.waitForTimeout(1500);
   pruefe('Sprache: zurück auf Deutsch', (await p.textContent('h1')) === 'Statistik' && (await p.getAttribute('html', 'lang')) === 'de');
+
+  // 19b. 3D-Ansicht: Werk mit Hallen, Klick in die Halle, Maschinen mit Störungen, zurück, 2D
+  // Eigener Browser mit WebGL ohne Grafikkarte (Software-Rendering, langsam – deshalb nur hier)
+  const b3 = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
+  const p3 = await b3.newPage({ viewport: { width: 1280, height: 900 }, timezoneId: 'Europe/Berlin' });
+  p3.on('pageerror', (e) => konsole.push('PAGEERROR 3D ' + e.message));
+  { const p = p3;
+  await p.goto(BASE + '/karte?werk=alb'); await p.waitForTimeout(800);
+  pruefe('3D: Umschalter 2D/3D im Werk', await p.isVisible('.raum-schalter'));
+  await p.click('.raum-schalter button:has-text("3D")');
+  const hallenAlb = Number(sql("SELECT count(*) FROM gebaeude g JOIN standort s ON s.id=g.standort_id WHERE s.kuerzel='ALB'"));
+  await p.waitForFunction((n) => document.querySelectorAll('.raum-halle').length >= n, hallenAlb, { timeout: 60000 }).catch(() => {});
+  pruefe('3D: Werk mit Beschriftung je Halle', (await p.$('.raum canvas')) !== null && (await p.$$eval('.raum-halle', (z) => z.length)) === hallenAlb);
+  await p.screenshot({ path: SHOTS + 'r-werk-3d.png' });
+  await p.click('.raum-halle:has-text("H1")');
+  const offenH1 = Number(sql("SELECT count(DISTINCT m.id) FROM maschine m JOIN gebaeude g ON g.id=m.gebaeude_id JOIN standort s ON s.id=g.standort_id JOIN stoermeldung sm ON sm.maschine_id=m.id JOIN wartungsauftrag w ON w.stoermeldung_id=sm.id WHERE s.kuerzel='ALB' AND g.kuerzel='H1' AND w.status <> 'erledigt'"));
+  await p.waitForFunction((n) => document.querySelectorAll('.raum-marke').length >= n, offenH1, { timeout: 60000 }).catch(() => {});
+  pruefe('3D: Halle – Adresse und Störungen an den Maschinen', /halle=h1/.test(p.url()) && (await p.$$eval('.raum-marke', (z) => z.length)) === offenH1, `${p.url()} ${offenH1}`);
+  await p.waitForTimeout(1500);
+  await p.screenshot({ path: SHOTS + 'r-halle-3d.png' });
+  if (offenH1 > 0) {
+    await p.click('.raum-marke >> nth=0'); await p.waitForTimeout(800);
+    pruefe('3D: Klick auf Maschine zeigt Details', (await p.textContent('main')).includes('Störung an dieser Maschine melden') && /maschine=\d+/.test(p.url()));
+  }
+  await p.click('.buehne-kopf button[aria-label="Herauszoomen"]'); await p.waitForTimeout(1500);
+  pruefe('3D: zurück zum Werk ohne Neuladen der Szene', p.url().endsWith('/karte?werk=alb') && (await p.$$eval('.raum canvas', (z) => z.length)) === 1, p.url());
+  await p.click('.raum-schalter button:has-text("2D")'); await p.waitForTimeout(800);
+  pruefe('2D: Lageplan wieder da, Wahl gemerkt', (await p.$('.ebene-neu .lageplan')) !== null && (await p.evaluate(() => localStorage.getItem('kartenansicht'))) === '2d');
+  }
+  await b3.close();
 
   // 19. Personen & Rollen
   await p.goto(BASE + '/'); await p.waitForTimeout(800);

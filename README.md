@@ -26,7 +26,7 @@ aus den letzten 12 Monaten.
 | Anmelden | `/login` | Login mit E-Mail und Passwort, nur für angelegte Team-Konten |
 | Übersicht | `/` | Aufgaben der gewählten Person („Dir zugewiesene Aufgaben“), Kennzahlen, offene Meldungen, Aufträge nach Status, kleine Weltkarte (Klick öffnet die Störungskarte im Land), Ersatzteile unter Mindestbestand, Wareneingang buchen |
 | Störung melden | `/melden` | In vier Schritten mit eigener Schritt-Leiste: Werk → Gebäude → Maschine auf der Karte antippen (ohne Störungszahlen), dann Beschreibung, Ursache und Priorität angeben (mit Eingabeprüfung) |
-| Störungskarte | `/karte` | Weltkarte mit allen Ländern und der Zahl offener Störungen. Ein Klick zoomt animiert in das Land (Karte mit seinen Werken), dann in das Werk (Lageplan mit Gebäuden, offenen Störungen, Technikern vor Ort) und in das Gebäude (Grundriss mit allen Maschinen). |
+| Störungskarte | `/karte` | Weltkarte mit allen Ländern und der Zahl offener Störungen (Europa vergrößert in einer Lupe). Ein Klick zoomt animiert in das Land (Karte mit seinen Werken), dann in das Werk (Lageplan mit Gebäuden, offenen Störungen, Technikern vor Ort) und in das Gebäude (Grundriss mit allen Maschinen). Werk und Halle gibt es auch **in 3D**: Hallen mit Dach, Klick fliegt hinein, Maschinen als einfache Formen, laufende Figuren; drehen und zoomen mit Maus oder Finger. Jedes Werk sieht etwas anders aus. |
 | Aufträge | `/auftraege` | Alle Meldungen mit Suche und Filter nach Status, Standort, Maschine und Priorität |
 | Auftrag bearbeiten | `/auftraege/123` | Techniker zuweisen („Mir zuweisen“), Status ändern, Ersatzteile buchen, Auftrag abschließen; Verlauf zeigt, wer wann gemeldet, zugewiesen und bearbeitet hat |
 | Statistik | `/statistik` | Zum Hineinzoomen wie die Karte: alle Standorte → Werk → Gebäude → Maschine. Je Ebene MTTR, Ausfallzeit, Störungen, offene Aufträge, MTBF bzw. Störungen je Maschine, Vergleich der Unterebene, Störungen und MTTR pro Monat, Ursachen, Wochentag × Uhrzeit, Prioritäten, Schichten, Techniker, verbaute Ersatzteile. Filter nach Zeitraum. |
@@ -158,6 +158,7 @@ Wer den Code auf dem eigenen Rechner ausprobieren möchte:
    ```
 5. <http://localhost:3000> öffnen.
 6. Neue Texte in der Oberfläche? `npm run texte` zeigt, welche englischen Übersetzungen in `lib/sprache/en.js` noch fehlen.
+7. Automatische Tests: `tests/e2e.cjs` prüft alle Abläufe im Browser (Playwright) – aber nur gegen eine **lokale** Datenbank, weil die Tests Daten ändern. Die Voraussetzungen stehen im Kopf der Datei.
 
 > **Achtung:** Lokal arbeitet man dann mit **derselben Datenbank** wie die Online-Version.
 > Testmeldungen sind also für alle sichtbar. Zurücksetzen geht jederzeit, indem man `supabase/testdaten.sql` erneut ausführt.
@@ -234,7 +235,7 @@ app/                         Seiten (Next.js App Router)
 ├── karte/                   Störungskarte mit Zoom (alte Adressen /karte/ham/h2 leiten dorthin um, siehe next.config.mjs)
 └── login/                   Anmeldung
 components/                  Wiederverwendbare Bausteine (Seitenleiste, Logo, Pills, Kennzahlen …)
-components/karten/           Zoom-Karte (KartenExplorer) mit Weltkarte, Länderkarte, Lageplan, Grundriss
+components/karten/           Zoom-Karte (KartenExplorer) mit Weltkarte, Länderkarte, Lageplan, Grundriss; raum/ = 3D-Ansicht
 lib/                         Datenbankverbindung, Login-Prüfung, Formatierung, Wertelisten
 lib/karten/                  Kartendaten (Umriss Deutschland) und Abfragen für die Karte
 lib/sprache/                 Übersetzung: index.js (t-Funktion), server.js, en.js (englische Texte)

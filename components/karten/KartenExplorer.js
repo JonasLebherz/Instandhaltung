@@ -22,7 +22,8 @@
  * Ebene im Zustand: { land: 'DE' | null, standortId, gebaeudeId }.
  */
 import Link from 'next/link';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import WeltKarte from './WeltKarte';
 import LandKarte from './LandKarte';
 import Lageplan from './Lageplan';
@@ -34,6 +35,19 @@ import MeldeSchritte from './MeldeSchritte';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 import { laenderAus, landKarte, weltVerhaeltnis } from '@/lib/karten/laender';
+
+// 3D-Ansicht für Werk und Halle: three.js wird nur im Browser und nur bei Bedarf geladen
+const Werk3D = dynamic(() => import('./raum/Werk3D'), { ssr: false, loading: () => <div className="raum-laden" /> });
+
+/** Kann der Browser WebGL (3D)? */
+function webglVorhanden() {
+  try {
+    const c = document.createElement('canvas');
+    return Boolean(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch {
+    return false;
+  }
+}
 
 const DAUER = 560;   // ms – so lange bleibt die alte Ebene während des Zooms sichtbar
 
@@ -61,6 +75,21 @@ export default function KartenExplorer({
   const [ebene, setEbene] = useState({ land: startLand, standortId: start.standortId ?? null, gebaeudeId: start.gebaeudeId ?? null });
   const [maschineId, setMaschineId] = useState(start.maschineId ?? null);
   const [uebergang, setUebergang] = useState(null);   // { von, richtung: 'rein'|'raus', ursprung: {x,y}|null }
+  // 2D oder 3D für Werk und Halle (gemerkt im Browser; ohne Wahl ab Tablet-Breite 3D). Melden bleibt 2D.
+  const [webgl, setWebgl] = useState(false);
+  const [dreiD, setDreiD] = useState(false);
+  useEffect(() => {
+    const kann = webglVorhanden();
+    setWebgl(kann);
+    let wahl = null;
+    try { wahl = localStorage.getItem('kartenansicht'); } catch { /* z. B. privater Modus */ }
+    setDreiD(kann && (wahl ? wahl === '3d' : window.innerWidth >= 768));
+  }, []);
+  function ansichtWaehlen(drei) {
+    setDreiD(drei);
+    setUebergang(null);
+    try { localStorage.setItem('kartenansicht', drei ? '3d' : '2d'); } catch { /* ignorieren */ }
+  }
 
   const standortVon = (e) => standorte.find((st) => st.id === e.standortId) ?? null;
   const gebaeudeVon = (e) => gebaeude.find((g) => g.id === e.gebaeudeId) ?? null;
@@ -69,6 +98,13 @@ export default function KartenExplorer({
   const aktuellesGebaeude = gebaeudeVon(ebene);
   const land = landVon(ebene);
   const stufeName = ebene.gebaeudeId ? 'gebaeude' : ebene.standortId ? 'werk' : ebene.land ? 'land' : 'welt';
+  const raumMoeglich = webgl && !melden;
+  // Gebäude und Maschinen des aktuellen Werks (für die 3D-Ansicht)
+  const werkGebaeude = useMemo(() => gebaeude.filter((g) => g.standort_id === ebene.standortId), [gebaeude, ebene.standortId]);
+  const werkMaschinen = useMemo(() => {
+    const ids = new Set(werkGebaeude.map((g) => g.id));
+    return maschinen.filter((m) => ids.has(m.gebaeude_id));
+  }, [maschinen, werkGebaeude]);
 
   /* ---------- Wechsel zwischen den Ebenen ---------- */
 
@@ -81,6 +117,12 @@ export default function KartenExplorer({
   }
 
   function wechsle(neueEbene, richtung, ursprungsElement = null) {
+    // 3D: Zwischen Werk und Halle fliegt die Kamera – die Ebene selbst bleibt, keine Zoom-Animation
+    if (raumMoeglich && dreiD && ebene.standortId && neueEbene.standortId === ebene.standortId) {
+      setEbene(neueEbene);
+      setMaschineId(null);
+      return;
+    }
     setUebergang({ von: ebene, richtung, ursprung: mitteVon(ursprungsElement) });
     setEbene(neueEbene);
     setMaschineId(null);
@@ -176,7 +218,8 @@ export default function KartenExplorer({
     return <div className={`ebene-inhalt ebene-${art}${hochkant}`} style={{ '--verhaeltnis': verhaeltnis }}>{inhalt}</div>;
   }
 
-  const schluessel = `${ebene.land ?? 'welt'}-${ebene.standortId ?? 'x'}-${ebene.gebaeudeId ?? 'x'}`;
+  const raum = raumMoeglich && dreiD && (stufeName === 'werk' || stufeName === 'gebaeude');
+  const schluessel = raum ? `raum-${ebene.standortId}` : `${ebene.land ?? 'welt'}-${ebene.standortId ?? 'x'}-${ebene.gebaeudeId ?? 'x'}`;
   const schrittNr = { welt: 1, land: 2, werk: 3, gebaeude: 4 }[stufeName];
   const ursprungStil = uebergang?.ursprung ? { transformOrigin: `${uebergang.ursprung.x}px ${uebergang.ursprung.y}px` } : undefined;
   const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? (land ? t(land.name) : t('Weltweit'));
@@ -184,7 +227,8 @@ export default function KartenExplorer({
     ? { welt: T('In welchem Land?'), land: T('In welchem Werk?'), werk: T('In welchem Gebäude?'), gebaeude: T('An welcher Maschine?') }[stufeName]
     : {
       welt: T('Land anklicken zum Hineinzoomen'), land: T('Werk anklicken zum Hineinzoomen'),
-      werk: T('Gebäude anklicken für den Grundriss'), gebaeude: T('Maschine anklicken für Details'),
+      werk: raum ? T('Halle anklicken · ziehen zum Drehen') : T('Gebäude anklicken für den Grundriss'),
+      gebaeude: raum ? T('Maschine anklicken · ziehen zum Drehen') : T('Maschine anklicken für Details'),
     }[stufeName]);
 
   const buehne = (
@@ -219,7 +263,9 @@ export default function KartenExplorer({
       </nav>
       )}
 
-      <div className={`explorer-buehne buehne-${groesse}`} ref={buehneRef}>
+      {/* Weltebene: Bühne so hoch wie die (breite) Weltkarte, damit oben und unten nichts leer bleibt */}
+      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' ? ' buehne-welt' : ''}`} ref={buehneRef}
+           style={{ '--welt-verhaeltnis': weltVerhaeltnis() }}>
         {/* Kopf über der Karte: Zurück und Titel */}
         <div className="buehne-kopf">
           {zurueck && (
@@ -240,9 +286,20 @@ export default function KartenExplorer({
           </div>
         )}
         <div ref={neuRef} key={schluessel}
-             className={`explorer-ebene ebene-neu${uebergang ? ` zoom-${uebergang.richtung}` : ''}`} style={ursprungStil}>
-          {ebeneZeichnen(ebene, true)}
+             className={`explorer-ebene ebene-neu${raum ? ' ebene-raum' : ''}${uebergang ? ` zoom-${uebergang.richtung}` : ''}`} style={ursprungStil}>
+          {raum ? (
+            <Werk3D standort={standort} gebaeude={werkGebaeude} maschinen={werkMaschinen} gebaeudeId={ebene.gebaeudeId}
+                    maschineId={maschineId} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} />
+          ) : ebeneZeichnen(ebene, true)}
         </div>
+
+        {/* Umschalter 2D / 3D (nur für Werk und Halle) */}
+        {raumMoeglich && (stufeName === 'werk' || stufeName === 'gebaeude') && (
+          <div className="sprach-schalter raum-schalter" role="group" aria-label={t('Darstellung der Karte')}>
+            <button type="button" aria-pressed={!dreiD} onClick={() => ansichtWaehlen(false)}>2D</button>
+            <button type="button" aria-pressed={dreiD} onClick={() => ansichtWaehlen(true)}>3D</button>
+          </div>
+        )}
       </div>
       {!melden && <Legende />}
     </div>

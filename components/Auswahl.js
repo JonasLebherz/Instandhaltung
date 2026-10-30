@@ -24,6 +24,7 @@ export default function Auswahl({
   const [eigenerWert, setEigenerWert] = useState(String(standard ?? ''));
   const [offen, setOffen] = useState(false);
   const [nachOben, setNachOben] = useState(false);
+  const [rechts, setRechts] = useState(false);     // Liste rechtsbündig, wenn sie sonst aus dem Bild ragt
   const [aktiv, setAktiv] = useState(-1);          // hervorgehobene Option (Index in "flach")
   const rahmenRef = useRef(null);
   const knopfRef = useRef(null);
@@ -47,6 +48,7 @@ export default function Auswahl({
     // Nicht genug Platz nach unten (z. B. im Konto-Menü unten links)? Dann nach oben aufklappen.
     const r = knopfRef.current.getBoundingClientRect();
     setNachOben(window.innerHeight - r.bottom < 280 && r.top > window.innerHeight - r.bottom);
+    setRechts(r.left + 420 > window.innerWidth);
     setAktiv(Math.max(0, flach.findIndex((o) => o.wert === aktuell)));
     setOffen(true);
   }
@@ -119,7 +121,7 @@ export default function Auswahl({
         <span className={gewaehlt ? '' : 'text-leise'}>{gewaehlt?.text ?? platzhalter}</span>
       </button>
       {offen && (
-        <ul ref={listeRef} id={`${feldId}-liste`} role="listbox" className={`auswahl-liste${nachOben ? ' nach-oben' : ''}`}
+        <ul ref={listeRef} id={`${feldId}-liste`} role="listbox" className={`auswahl-liste${nachOben ? ' nach-oben' : ''}${rechts ? ' rechts' : ''}`}
             aria-labelledby={feldId}>
           {optionen.map((o) => (o.gruppe ? (
             <li key={`g-${o.gruppe}`} role="presentation">
