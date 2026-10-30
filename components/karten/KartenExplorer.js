@@ -15,9 +15,9 @@
  *                  statt Pfad, warmer Hintergrund, keine Störungszahlen.
  *
  * So funktioniert die Animation:
- *  Beim Ebenenwechsel bleibt die alte Ebene kurz sichtbar ("uebergang") und wird
- *  vergrößert ausgeblendet, während die neue aus demselben Punkt herauswächst.
- *  Der Punkt (transform-origin) ist die Mitte des angeklickten Landes/Werks/Gebäudes.
+ *  Beim Ebenenwechsel bleibt die alte Ebene kurz sichtbar ("uebergang"). Beide Ebenen
+ *  werden wie von einer Kamera bewegt (kamerafahrt): Die neue Karte wächst genau aus
+ *  der angeklickten Fläche (Land, Werkspunkt, Halle), die alte vergrößert sich mit und blendet aus.
  *
  * Ebene im Zustand: { land: 'DE' | null, standortId, gebaeudeId }.
  */
@@ -35,9 +35,12 @@ import MeldeSchritte from './MeldeSchritte';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 import { laenderAus, landKarte, weltVerhaeltnis } from '@/lib/karten/laender';
+import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
 
 // 3D-Ansicht für Werk und Halle: three.js wird nur im Browser und nur bei Bedarf geladen
 const Werk3D = dynamic(() => import('./raum/Werk3D'), { ssr: false, loading: () => <div className="raum-laden" /> });
+// Drehendes 3D-Modell der gewählten Maschine im Infofenster
+const MaschineDetail3D = dynamic(() => import('./raum/MaschineDetail3D'), { ssr: false, loading: () => <div className="maschine-detail-3d" /> });
 
 /** Kann der Browser WebGL (3D)? */
 function webglVorhanden() {
@@ -49,7 +52,31 @@ function webglVorhanden() {
   }
 }
 
-const DAUER = 560;   // ms – so lange bleibt die alte Ebene während des Zooms sichtbar
+/** Dauer der Kamerafahrt in ms: in Land und Werk etwas länger (großer Maßstabssprung) */
+const dauerFuer = (kindEbene) => (kindEbene.gebaeudeId ? 700 : 1000);
+const weich = (x) => (x < 0.5 ? 4 * x * x * x : 1 - ((-2 * x + 2) ** 3) / 2);
+const stufe01 = (x, von, bis) => Math.min(1, Math.max(0, (x - von) / (bis - von)));
+
+/**
+ * Bilder einer Kamerafahrt zwischen übergeordneter Ebene (Eltern) und Unterebene (Kind).
+ * A = angeklickte Fläche in der Elternebene, B = Inhalt der Kindebene (Mitte x/y, Breite w, Höhe h).
+ * Der Maßstab ändert sich gleichmäßig (logarithmisch) – so wirkt es wie ein Flug auf die Erde zu.
+ */
+function kamerafahrt(A, B, rein, schritte = 24) {
+  const s = Math.min(A.w / B.w, A.h / B.h);      // so klein beginnt die Kindebene (passt genau in A)
+  const kind = [];
+  const eltern = [];
+  for (let i = 0; i <= schritte; i += 1) {
+    const zeit = i / schritte;
+    const p = rein ? weich(zeit) : 1 - weich(zeit);
+    const k = s ** (1 - p);
+    const cx = A.x + (B.x - A.x) * p;
+    const cy = A.y + (B.y - A.y) * p;
+    kind.push({ offset: zeit, transform: `translate(${cx - k * B.x}px, ${cy - k * B.y}px) scale(${k})` });
+    eltern.push({ offset: zeit, transform: `translate(${cx - (k / s) * A.x}px, ${cy - (k / s) * A.y}px) scale(${k / s})` });
+  }
+  return { kind, eltern };
+}
 
 /** Seitenverhältnis (Breite / Höhe) des Inhalts einer Ebene – damit er in die Bühne passt */
 function seitenverhaeltnis(ebene, standort, gebaeude, karte, laender) {
@@ -74,8 +101,8 @@ export default function KartenExplorer({
   const startLand = standorte.find((st) => st.id === start.standortId)?.land ?? start.land ?? null;
   const [ebene, setEbene] = useState({ land: startLand, standortId: start.standortId ?? null, gebaeudeId: start.gebaeudeId ?? null });
   const [maschineId, setMaschineId] = useState(start.maschineId ?? null);
-  const [uebergang, setUebergang] = useState(null);   // { von, richtung: 'rein'|'raus', ursprung: {x,y}|null }
-  // 2D oder 3D für Werk und Halle (gemerkt im Browser; ohne Wahl ab Tablet-Breite 3D). Melden bleibt 2D.
+  const [uebergang, setUebergang] = useState(null);   // { von, richtung: 'rein'|'raus', dauer }
+  // 2D oder 3D für Werk und Halle (gemerkt im Browser; ohne Wahl ab Tablet-Breite 3D) – auch beim Melden
   const [webgl, setWebgl] = useState(false);
   const [dreiD, setDreiD] = useState(false);
   useEffect(() => {
@@ -98,7 +125,7 @@ export default function KartenExplorer({
   const aktuellesGebaeude = gebaeudeVon(ebene);
   const land = landVon(ebene);
   const stufeName = ebene.gebaeudeId ? 'gebaeude' : ebene.standortId ? 'werk' : ebene.land ? 'land' : 'welt';
-  const raumMoeglich = webgl && !melden;
+  const raumMoeglich = webgl;
   // Gebäude und Maschinen des aktuellen Werks (für die 3D-Ansicht)
   const werkGebaeude = useMemo(() => gebaeude.filter((g) => g.standort_id === ebene.standortId), [gebaeude, ebene.standortId]);
   const werkMaschinen = useMemo(() => {
@@ -108,32 +135,21 @@ export default function KartenExplorer({
 
   /* ---------- Wechsel zwischen den Ebenen ---------- */
 
-  /** Mitte eines Elements relativ zur Bühne (Ausgangspunkt der Zoom-Animation) */
-  function mitteVon(element) {
-    if (!element || !buehneRef.current) return null;
-    const r = element.getBoundingClientRect();
-    const b = buehneRef.current.getBoundingClientRect();
-    return { x: r.left + r.width / 2 - b.left, y: r.top + r.height / 2 - b.top };
-  }
-
-  function wechsle(neueEbene, richtung, ursprungsElement = null) {
+  function wechsle(neueEbene, richtung) {
     // 3D: Zwischen Werk und Halle fliegt die Kamera – die Ebene selbst bleibt, keine Zoom-Animation
     if (raumMoeglich && dreiD && ebene.standortId && neueEbene.standortId === ebene.standortId) {
       setEbene(neueEbene);
       setMaschineId(null);
       return;
     }
-    setUebergang({ von: ebene, richtung, ursprung: mitteVon(ursprungsElement) });
+    setUebergang({ von: ebene, richtung, dauer: dauerFuer(richtung === 'rein' ? neueEbene : ebene) });
     setEbene(neueEbene);
     setMaschineId(null);
   }
 
-  const zuLand = (l) => wechsle({ land: l.kuerzel, standortId: null, gebaeudeId: null }, 'rein',
-    buehneRef.current?.querySelector(`[data-ort="land-${l.kuerzel}"]`));
-  const zuWerk = (st) => wechsle({ land: st.land, standortId: st.id, gebaeudeId: null }, 'rein',
-    buehneRef.current?.querySelector(`[data-ort="st-${st.id}"]`));
-  const zuGebaeude = (g) => wechsle({ land: ebene.land, standortId: g.standort_id, gebaeudeId: g.id }, 'rein',
-    buehneRef.current?.querySelector(`[data-ort="g-${g.id}"]`));
+  const zuLand = (l) => wechsle({ land: l.kuerzel, standortId: null, gebaeudeId: null }, 'rein');
+  const zuWerk = (st) => wechsle({ land: st.land, standortId: st.id, gebaeudeId: null }, 'rein');
+  const zuGebaeude = (g) => wechsle({ land: ebene.land, standortId: g.standort_id, gebaeudeId: g.id }, 'rein');
   const zuWelt = () => wechsle({ land: null, standortId: null, gebaeudeId: null }, 'raus');
   const zuLandRaus = () => wechsle({ land: ebene.land, standortId: null, gebaeudeId: null }, 'raus');
   const zuStandort = () => wechsle({ land: ebene.land, standortId: ebene.standortId, gebaeudeId: null }, 'raus');
@@ -145,28 +161,53 @@ export default function KartenExplorer({
     else setMaschineId(maschineId === m.id ? null : m.id);
   }
 
-  // Beim Herauszoomen liegt der Ausgangspunkt in der NEUEN (übergeordneten) Ebene:
-  // dort, wo das Werk bzw. Gebäude sitzt, aus dem wir kommen. Vor dem Zeichnen messen.
-  // Die Klasse "messen" hält die Animation kurz an, sonst würde die bereits
-  // vergrößerte Ebene gemessen (sie startet danach ganz normal von vorn).
+  // Kamerafahrt: Vor dem ersten Zeichnen messen, wo die angeklickte Fläche in der Elternebene liegt (A)
+  // und wie groß der Inhalt der Kindebene ist (B). Dann beide Ebenen gemeinsam bewegen:
+  // Hinein wächst die Kindebene aus A heraus, die Elternebene vergrößert sich mit; heraus umgekehrt.
+  // Die neue Ebene blendet ein, die alte aus. Web-Animationen statt CSS-Klassen, damit ein
+  // Neuzeichnen durch React die Fahrt nicht unterbricht.
   useLayoutEffect(() => {
-    if (!uebergang || uebergang.richtung !== 'raus' || !neuRef.current) return;
-    const { von } = uebergang;
-    const kennung = von.gebaeudeId ? `g-${von.gebaeudeId}` : von.standortId ? `st-${von.standortId}` : `land-${von.land}`;
-    neuRef.current.classList.add('messen');
-    const punkt = mitteVon(neuRef.current.querySelector(`[data-ort="${kennung}"]`));
-    neuRef.current.classList.remove('messen');
-    if (punkt) {
-      const ursprung = `${punkt.x}px ${punkt.y}px`;
-      neuRef.current.style.transformOrigin = ursprung;
-      if (altRef.current) altRef.current.style.transformOrigin = ursprung;
+    const neu = neuRef.current;
+    const alt = altRef.current;
+    const buehne = buehneRef.current;
+    if (!uebergang || !neu || !alt || !buehne) return undefined;
+    const rein = uebergang.richtung === 'rein';
+    const [eltern, kind] = rein ? [alt, neu] : [neu, alt];
+    const kindEbene = rein ? ebene : uebergang.von;
+    const kennung = kindEbene.gebaeudeId ? `g-${kindEbene.gebaeudeId}` : kindEbene.standortId ? `st-${kindEbene.standortId}` : `land-${kindEbene.land}`;
+    const b = buehne.getBoundingClientRect();
+    const rechteck = (el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left - b.left + r.width / 2, y: r.top - b.top + r.height / 2, w: r.width, h: r.height };
+    };
+    // Fokus: Umriss des Landes, Punkt des Werks bzw. Fläche der Halle
+    const fokus = eltern.querySelector(`[data-flaeche="${kennung}"]`)
+      ?? eltern.querySelector(`[data-ort="${kennung}"] .punkt-blase`) ?? eltern.querySelector(`[data-ort="${kennung}"]`);
+    const ziel = kind.querySelector('.dkarte-land, .lageplan, .grundriss, .raum, .raum-laden') ?? kind.firstElementChild;
+    const animationen = [];
+    const dauer = uebergang.dauer;
+    const blende = (el, ein) => el.animate(
+      Array.from({ length: 11 }, (_, i) => ({ offset: i / 10, opacity: ein ? stufe01(i / 10, 0.12, 0.5) : 1 - stufe01(i / 10, 0.3, 0.65) })),
+      { duration: dauer, fill: 'both' },
+    );
+    const A = fokus ? rechteck(fokus) : null;
+    const B = ziel ? rechteck(ziel) : null;
+    if (A && B && A.w > 0 && B.w > 0 && A.h > 0 && B.h > 0) {
+      const fahrt = kamerafahrt(A, B, rein);
+      animationen.push(kind.animate(fahrt.kind, { duration: dauer, fill: 'both' }));
+      animationen.push(eltern.animate(fahrt.eltern, { duration: dauer, fill: 'both' }));
     }
+    animationen.push(blende(neu, true), blende(alt, false));
+    neu.style.transformOrigin = '0 0';
+    alt.style.transformOrigin = '0 0';
+    return () => animationen.forEach((a) => a.cancel());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uebergang]);
 
   // Nach der Animation die alte Ebene entfernen
   useEffect(() => {
     if (!uebergang) return undefined;
-    const timer = setTimeout(() => setUebergang(null), DAUER);
+    const timer = setTimeout(() => setUebergang(null), uebergang.dauer);
     return () => clearTimeout(timer);
   }, [uebergang]);
 
@@ -221,7 +262,6 @@ export default function KartenExplorer({
   const raum = raumMoeglich && dreiD && (stufeName === 'werk' || stufeName === 'gebaeude');
   const schluessel = raum ? `raum-${ebene.standortId}` : `${ebene.land ?? 'welt'}-${ebene.standortId ?? 'x'}-${ebene.gebaeudeId ?? 'x'}`;
   const schrittNr = { welt: 1, land: 2, werk: 3, gebaeude: 4 }[stufeName];
-  const ursprungStil = uebergang?.ursprung ? { transformOrigin: `${uebergang.ursprung.x}px ${uebergang.ursprung.y}px` } : undefined;
   const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? (land ? t(land.name) : t('Weltweit'));
   const hinweis = t(modus === 'auswahl'
     ? { welt: T('In welchem Land?'), land: T('In welchem Werk?'), werk: T('In welchem Gebäude?'), gebaeude: T('An welcher Maschine?') }[stufeName]
@@ -281,15 +321,16 @@ export default function KartenExplorer({
         </div>
 
         {uebergang && (
-          <div ref={altRef} className={`explorer-ebene ebene-alt zoom-${uebergang.richtung}`} style={ursprungStil} aria-hidden="true">
+          <div ref={altRef} className="explorer-ebene ebene-alt" aria-hidden="true">
             {ebeneZeichnen(uebergang.von, false)}
           </div>
         )}
         <div ref={neuRef} key={schluessel}
-             className={`explorer-ebene ebene-neu${raum ? ' ebene-raum' : ''}${uebergang ? ` zoom-${uebergang.richtung}` : ''}`} style={ursprungStil}>
+             // Beim Herauszoomen sind die Beschriftungen der neuen (zunächst stark vergrößerten) Ebene kurz verborgen
+             className={`explorer-ebene ebene-neu${raum ? ' ebene-raum' : ''}${uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`}>
           {raum ? (
             <Werk3D standort={standort} gebaeude={werkGebaeude} maschinen={werkMaschinen} gebaeudeId={ebene.gebaeudeId}
-                    maschineId={maschineId} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} />
+                    maschineId={maschineId} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
           ) : ebeneZeichnen(ebene, true)}
         </div>
 
@@ -313,7 +354,7 @@ export default function KartenExplorer({
       <div className="col-xl-4 explorer-info-spalte">
         <div className="explorer-info">
           <InfoSpalte key={`${schluessel}-${maschineId ?? ''}`} stufe={stufeName} modus={modus} daten={daten}
-                      laender={laender} land={land}
+                      laender={laender} land={land} webgl={webgl}
                       standort={standort} gebaeudeAktuell={aktuellesGebaeude} maschineId={maschineId}
                       onLand={zuLand} onWerk={zuWerk} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt}
                       onAuswahlAufheben={() => setMaschineId(null)} />
@@ -327,7 +368,7 @@ export default function KartenExplorer({
  * Info-Spalte rechts neben der Karte – Inhalt passend zur Ebene
  * ================================================================== */
 function InfoSpalte({
-  stufe: ebeneName, modus, daten, laender, land, standort, gebaeudeAktuell, maschineId,
+  stufe: ebeneName, modus, daten, laender, land, standort, gebaeudeAktuell, maschineId, webgl,
   onLand, onWerk, onGebaeude, onMaschine, onAuswahlAufheben,
 }) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
@@ -484,6 +525,12 @@ function InfoSpalte({
             <i className="bi bi-x-lg" />
           </button>
         </div>
+        {/* Signalampel der Maschine und – wenn der Browser 3D kann – das animierte Modell */}
+        <div className={`ampel-zeile ampel-${ampelZustand(auswahl)}`}>
+          <span className="ampel-symbol" aria-hidden="true"><i /><i /><i /></span>
+          {t(AMPEL_TEXT[ampelZustand(auswahl)])}
+        </div>
+        {webgl && <MaschineDetail3D key={auswahl.id} maschine={auswahl} />}
         <div className="mini-kennzahlen">
           <div><strong>{auswahl.offen}</strong><span>{t('offen')}</span></div>
           <div><strong>{auswahl.stoerungen_12m}</strong><span>{t('Störungen 12 Mon.')}</span></div>

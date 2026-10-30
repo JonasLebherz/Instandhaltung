@@ -80,6 +80,7 @@
     --raum-maschine: #d8dde4; --raum-maschine-dunkel: #5f6672; --raum-signal: #f2b632; --raum-glas: #a9c7e6;
     --raum-baum: #86b583; --raum-stamm: #8b6b4e; --raum-buero: #e7e1d6; --raum-tank: #cfd6de;
     --raum-person-0: #ff9f0a; --raum-person-1: #0071e3; --raum-person-2: #2e9b4a; --raum-haut: #e8c2a2;
+    --raum-ampel-rot: #ff3b30; --raum-ampel-orange: #ff9500; --raum-ampel-gruen: #34c759; --raum-licht: #ffd58a;
     color-scheme: light;
 }
 
@@ -129,6 +130,7 @@
     --raum-maschine: #6f7580; --raum-maschine-dunkel: #2b2e35; --raum-signal: #e0a526; --raum-glas: #5d7fa6;
     --raum-baum: #3f6b47; --raum-stamm: #5a4634; --raum-buero: #3d3a35; --raum-tank: #4d535c;
     --raum-person-0: #ff9f0a; --raum-person-1: #2997ff; --raum-person-2: #30d158; --raum-haut: #c49a7a;
+    --raum-ampel-rot: #ff453a; --raum-ampel-orange: #ff9f0a; --raum-ampel-gruen: #30d158; --raum-licht: #ffcf7a;
     color-scheme: dark;
 }
 
@@ -1421,17 +1423,11 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .explorer-ebene.messen, .explorer-ebene.messen * { animation: none !important; }
 .ebene-neu { z-index: 2; }
 
-/* Hineinzoomen: alte Ebene wächst über den Rand hinaus, neue wächst aus dem angeklickten Punkt */
-.ebene-alt.zoom-rein { animation: zoom-rein-alt .56s cubic-bezier(.45, 0, .2, 1) forwards; }
-.ebene-neu.zoom-rein { animation: zoom-rein-neu .56s cubic-bezier(.3, 0, .1, 1) backwards; }
-/* Herauszoomen: genau umgekehrt – die alte Ebene schrumpft zurück an ihren Platz */
-.ebene-alt.zoom-raus { animation: zoom-raus-alt .56s cubic-bezier(.45, 0, .2, 1) forwards; }
-.ebene-neu.zoom-raus { animation: zoom-raus-neu .56s cubic-bezier(.3, 0, .1, 1) backwards; }
-
-@keyframes zoom-rein-alt { 0% { transform: none; opacity: 1; } 65% { opacity: 0; } 100% { transform: scale(3.2); opacity: 0; } }
-@keyframes zoom-rein-neu { 0% { transform: scale(.18); opacity: 0; } 30% { opacity: .35; } 100% { transform: none; opacity: 1; } }
-@keyframes zoom-raus-alt { 0% { transform: none; opacity: 1; } 70% { opacity: 0; } 100% { transform: scale(.2); opacity: 0; } }
-@keyframes zoom-raus-neu { 0% { transform: scale(2.6); opacity: 0; } 35% { opacity: .4; } 100% { transform: none; opacity: 1; } }
+/* Zoom zwischen den Ebenen: Kamerafahrt per Web-Animation, siehe kamerafahrt() in KartenExplorer.js */
+/* Beschriftungen würden bei der Fahrt riesig mitwachsen – in der alten Ebene (und beim Herauszoomen
+   in der neuen) deshalb ausblenden; die Karte selbst bleibt sichtbar */
+.ebene-alt :is(.karten-punkt, .lupe-titel, .plan-beschriftung, .gebaeude-name, .gebaeude-info, .zaehl-marke, .plan-maschine i, .maschine-modell),
+.ohne-marken :is(.karten-punkt, .lupe-titel, .plan-beschriftung) { visibility: hidden; }
 
 .explorer-karte .karten-legende { margin: 12px 6px 2px; }
 .explorer-seite .abschnitt-titel { font-size: 1.1rem; }
@@ -1983,6 +1979,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
    3D-Ansicht (components/karten/raum/) – Werk und Halle
    ===================================================================== */
 .explorer-ebene.ebene-raum { padding: 0; overflow: hidden; }
+.explorer-ebene:has(> .ebene-welt), .explorer-ebene:has(> .ebene-land), .explorer-ebene:has(> .ebene-werk) { overflow: hidden; }
 .raum, .raum-laden { position: absolute; inset: 0; }
 .raum canvas { touch-action: none; outline: none; }
 .raum-laden { background: radial-gradient(60% 50% at 50% 55%, var(--fuellung), transparent); animation: einblenden .4s ease; }
@@ -2013,3 +2010,33 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .raum-marke .zaehl-marke { box-shadow: 0 0 0 3px var(--karte-erhoeht); }
 .stufe-rot.raum-marke .zaehl-marke { animation: maschine-puls 2s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .stufe-rot.raum-marke .zaehl-marke { animation: none; } }
+
+/* Namensschild beim Darüberfahren (3D) */
+.raum-name {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+    font-size: .76rem; font-weight: 600; color: var(--text);
+    background: var(--karte-erhoeht); border: 1px solid var(--glas-rand); box-shadow: 0 4px 12px rgba(31, 38, 64, .14);
+}
+.raum-halle.stufe-neutral { border-color: color-mix(in srgb, var(--orange) 40%, var(--glas-rand)); }
+
+/* Signalampel im Infofenster: drei Leuchten, die aktive strahlt */
+.ampel-zeile { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; font-weight: 600; font-size: .9rem; }
+.ampel-symbol {
+    display: inline-flex; flex-direction: column; gap: 3px; padding: 4px; border-radius: 8px;
+    background: var(--raum-maschine-dunkel);
+}
+.ampel-symbol i { width: 10px; height: 10px; border-radius: 50%; opacity: .25; }
+.ampel-symbol i:nth-child(1) { background: var(--raum-ampel-rot); }
+.ampel-symbol i:nth-child(2) { background: var(--raum-ampel-orange); }
+.ampel-symbol i:nth-child(3) { background: var(--raum-ampel-gruen); }
+.ampel-rot .ampel-symbol i:nth-child(1), .ampel-orange .ampel-symbol i:nth-child(2), .ampel-gruen .ampel-symbol i:nth-child(3) {
+    opacity: 1; box-shadow: 0 0 8px currentColor;
+}
+.ampel-rot { color: var(--rot); } .ampel-orange { color: var(--orange); } .ampel-gruen { color: var(--gruen); }
+/* 3D-Modell der Maschine im Infofenster */
+.maschine-detail-3d {
+    position: relative; height: 230px; margin: 0 0 14px; border-radius: 14px; overflow: hidden;
+    background: radial-gradient(70% 60% at 50% 40%, var(--karte-erhoeht), var(--fuellung));
+    border: 1px solid var(--linie);
+}
+.maschine-detail-3d canvas { touch-action: none; }

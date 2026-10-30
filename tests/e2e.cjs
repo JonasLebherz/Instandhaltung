@@ -63,8 +63,9 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.ebene-neu .dkarte button[aria-label^="Werk Dortmund"]');
   await p.waitForSelector('.ebene-neu .lageplan');
   pruefe('Melden: Zoom auf Werk Dortmund', (await p.textContent('.buehne-titel')) === 'Werk Dortmund');
-  pruefe('Melden: Zoom-Animation läuft (alte Ebene sichtbar)', (await p.$('.ebene-alt.zoom-rein')) !== null);
-  await p.waitForTimeout(700);
+  pruefe('Melden: Kamerafahrt läuft (alte Ebene sichtbar, Animation aktiv)',
+    await p.evaluate(() => (document.querySelector('.ebene-alt')?.getAnimations().length ?? 0) > 0));
+  await p.waitForTimeout(1200);
   pruefe('Melden: alte Ebene nach dem Zoom entfernt', (await p.$('.ebene-alt')) === null);
   await p.click('.ebene-neu .lageplan button[aria-label^="Halle 1"]');
   await p.waitForSelector('.ebene-neu .grundriss'); await p.waitForTimeout(700);
@@ -214,6 +215,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.goto(BASE + '/karte');
   const offenKarte = await p.$$eval('.dkarte .punkt-blase', (z) => z.reduce((s, e) => s + (Number(e.textContent) || 0), 0));
   pruefe('Karte: Summe der Punkte = offene Aufträge', offenKarte === Number(sql("SELECT count(*) FROM wartungsauftrag WHERE status <> 'erledigt'")), offenKarte);
+  pruefe('Karte: Weltebene ohne Scrollbalken', (await p.$eval('.ebene-neu', (e) => getComputedStyle(e).overflowY)) === 'hidden');
   pruefe('Karte: Welt- und Europakarte mit 8 Ländern', (await p.$$eval('.wkarte .karten-punkt', (z) => z.length)) === Number(sql('SELECT count(DISTINCT land_kuerzel) FROM standort')) && (await p.$$eval('.wkarte .karten-punkt', (z) => z.length)) === 8);
   await p.evaluate(() => { window.__ohneNeuladen = true; });
   await p.click('.ebene-neu [data-ort="land-US"]'); await p.waitForTimeout(800);
@@ -386,9 +388,23 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   if (offenH1 > 0) {
     await p.click('.raum-marke >> nth=0'); await p.waitForTimeout(800);
     pruefe('3D: Klick auf Maschine zeigt Details', (await p.textContent('main')).includes('Störung an dieser Maschine melden') && /maschine=\d+/.test(p.url()));
+    await p.waitForSelector('.maschine-detail-3d canvas', { timeout: 60000 }).catch(() => {});
+    const ampel = await p.getAttribute('.ampel-zeile', 'class');
+    pruefe('3D: Detail mit drehendem Modell und Ampel (orange/rot bei Störung)', (await p.$('.maschine-detail-3d canvas')) !== null && /ampel-(orange|rot)/.test(ampel ?? ''), ampel);
   }
   await p.click('.buehne-kopf button[aria-label="Herauszoomen"]'); await p.waitForTimeout(1500);
   pruefe('3D: zurück zum Werk ohne Neuladen der Szene', p.url().endsWith('/karte?werk=alb') && (await p.$$eval('.raum canvas', (z) => z.length)) === 1, p.url());
+  await p.click('.raum-schalter button:has-text("2D")'); await p.waitForTimeout(800);
+  // Melden in 3D: neutral (keine Störungszahlen), Maschine über die Liste wählen
+  await p.click('.raum-schalter button:has-text("3D")'); await p.waitForTimeout(300);
+  await p.goto(BASE + '/melden?standort=' + sql("SELECT id FROM standort WHERE kuerzel='ALB'"));
+  await p.waitForFunction((n) => document.querySelectorAll('.raum-halle').length >= n, hallenAlb, { timeout: 60000 }).catch(() => {});
+  pruefe('Melden 3D: Werk in 3D ohne Störungszahlen', (await p.$('.explorer-melden .raum canvas')) !== null && (await p.$$('.explorer-melden .raum-halle .zaehl-marke')).length === 0);
+  await p.click('.raum-halle:has-text("H1")'); await p.waitForTimeout(1500);
+  await p.click('.explorer-info button:has-text("ALB-H1-01")');
+  await p.waitForSelector('#beschreibung', { timeout: 15000 }).catch(() => {});
+  pruefe('Melden 3D: Maschine gewählt, Formular offen', (await p.$('#beschreibung')) !== null && (await p.textContent('.auswahl-chip')).includes('ALB-H1-01'));
+  await p.goto(BASE + '/karte?werk=alb'); await p.waitForTimeout(1500);
   await p.click('.raum-schalter button:has-text("2D")'); await p.waitForTimeout(800);
   pruefe('2D: Lageplan wieder da, Wahl gemerkt', (await p.$('.ebene-neu .lageplan')) !== null && (await p.evaluate(() => localStorage.getItem('kartenansicht'))) === '2d');
   }

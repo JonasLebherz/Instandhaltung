@@ -15,6 +15,9 @@
  *  - Figuren laufen die Werksstraßen bzw. den Gang in der Halle entlang.
  *  - Maus/Finger: drehen, zoomen, verschieben. Farben aus CSS-Variablen (--raum-*),
  *    neu eingelesen beim Umschalten hell/dunkel ("darstellungswechsel").
+ *  - Jede Maschine hat eine Signalampel (grün läuft, orange Störung, rot Stillstand).
+ *  - Dunkelmodus = Nacht: Straßenlaternen, Fenster und Hallenlampen leuchten (mit Lichtkegeln).
+ *  - neutral (Störung melden): keine Störungszahlen und -farben, Ampeln aus.
  *  - Bei "Bewegung reduzieren" laufen keine Figuren und die Kamera springt statt zu fliegen.
  * Beschriftungen (Hallen, Störungszahlen) sind echte Knöpfe (HTML) – bedienbar mit
  * Tastatur und Screenreader.
@@ -26,23 +29,11 @@ import * as THREE from 'three';
 import { werkGestaltung, zufall } from '@/lib/karten/werkGestaltung';
 import { stufe, offenText } from '../stufe';
 import { useT } from '@/components/SpracheKontext';
-import { MaschinenForm } from './Maschine3D';
-
-const FARBEN = ['umgebung', 'gelaende', 'strasse', 'markierung', 'wand', 'fenster', 'tor', 'dach-0', 'dach-1', 'dach-2', 'dach-3',
-  'hallenboden', 'linie', 'maschine', 'maschine-dunkel', 'signal', 'glas', 'baum', 'stamm', 'buero', 'tank',
-  'person-0', 'person-1', 'person-2', 'haut'];
-
-/** Farben aus den CSS-Variablen lesen (hell bzw. dunkel) */
-function farbenLesen() {
-  const stil = getComputedStyle(document.documentElement);
-  const f = {};
-  FARBEN.forEach((n) => { f[n] = stil.getPropertyValue(`--raum-${n}`).trim() || '#999999'; });
-  ['rot', 'orange', 'blau', 'gruen', 'akzent'].forEach((n) => { f[n] = stil.getPropertyValue(`--${n}`).trim() || '#888888'; });
-  return f;
-}
+import { MaschineMitAmpel } from './Maschine3D';
+import { useRaum } from './farben';
 
 /** Farbe einer Störungsstufe */
-const stufenFarbe = (f, offen, prio) => ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)];
+const stufenFarbe = (f, offen, prio, neutral = false) => (neutral ? f.linie : ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)]);
 
 // Für durchsichtige Wände: keine Treffer beim Klicken (sonst kommt man nicht an die Maschinen)
 const KEIN_STRAHL = () => null;
@@ -94,12 +85,28 @@ function Kamera({ ziel, bewegt, steuerung }) {
 /* ---------------------------------------------------------------------------
  * Kleine Bausteine
  * ------------------------------------------------------------------------- */
-function Quader({ p, g, farbe, schatten = true, ...rest }) {
+function Quader({ p, g, farbe, schatten = true, leuchten = 0, lichtFarbe = null, ...rest }) {
   return (
     <mesh position={p} castShadow={schatten} receiveShadow {...rest}>
       <boxGeometry args={g} />
-      <meshStandardMaterial color={farbe} roughness={0.85} />
+      <meshStandardMaterial color={farbe} roughness={0.85} emissive={lichtFarbe ?? farbe} emissiveIntensity={leuchten} />
     </mesh>
+  );
+}
+
+/** Straßenlaterne: Mast, Ausleger zur Straße hin, Leuchte (nachts an) */
+function Laterne({ x, z, richtung, f }) {
+  const [dx, dz] = richtung;
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 3, 0]} castShadow>
+        <cylinderGeometry args={[0.09, 0.13, 6, 10]} />
+        <meshStandardMaterial color={f['maschine-dunkel']} roughness={0.6} />
+      </mesh>
+      <Quader p={[dx * 0.7, 5.95, dz * 0.7]} g={[Math.abs(dx) * 1.4 + 0.12, 0.12, Math.abs(dz) * 1.4 + 0.12]} farbe={f['maschine-dunkel']} schatten={false} />
+      <Quader p={[dx * 1.35, 5.82, dz * 1.35]} g={[0.7, 0.18, 0.35]} farbe={f.nacht ? f.licht : f.tank}
+              leuchten={f.nacht ? 2 : 0} lichtFarbe={f.licht} schatten={false} />
+    </group>
   );
 }
 
@@ -223,7 +230,7 @@ function gangInHalle(halle, maschinen) {
 /* ---------------------------------------------------------------------------
  * Szene
  * ------------------------------------------------------------------------- */
-function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f, bewegt }) {
+function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f, bewegt, neutral }) {
   const t = useT();
   const gs = useMemo(() => werkGestaltung(standort, gebaeude), [standort, gebaeude]);
   const { B, T } = gs;
@@ -279,12 +286,25 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs, gewaehlt, f]);
 
+  // Straßenlaternen am Rand der Werksstraßen (alle 30 m), Ausleger zur Straße hin
+  const laternen = useMemo(() => {
+    const liste = [];
+    gs.strassen.forEach((st) => {
+      if (st.b > st.t) for (let x = st.x + 8; x < st.x + st.b - 4; x += 30) liste.push({ x: X(x), z: Z(st.y - 1.2), richtung: [0, 1] });
+      else for (let y = st.y + 8; y < st.y + st.t - 4; y += 30) liste.push({ x: X(st.x - 1.2), z: Z(y), richtung: [1, 0] });
+    });
+    return liste;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs]);
+  const nacht = f.nacht;
+
   const schatten = Math.max(B, T) * 0.7;
   return (
     <>
-      <hemisphereLight args={['#ffffff', f.gelaende, 0.85]} />
-      <ambientLight intensity={0.25} />
-      <directionalLight position={[B * 0.35, 140, T * 0.55]} intensity={1.7} castShadow
+      {/* Tag: Sonne. Nacht (Dunkelmodus): schwaches, bläuliches Mondlicht – Laternen und Hallen leuchten */}
+      <hemisphereLight args={[nacht ? '#8fa3c8' : '#ffffff', f.gelaende, nacht ? 0.55 : 0.85]} />
+      <ambientLight intensity={nacht ? 0.2 : 0.25} />
+      <directionalLight position={[B * 0.35, 140, T * 0.55]} intensity={nacht ? 0.6 : 1.7} color={nacht ? '#aabbff' : '#ffffff'} castShadow
                         shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}
                         shadow-camera-left={-schatten} shadow-camera-right={schatten}
                         shadow-camera-top={schatten} shadow-camera-bottom={-schatten} shadow-camera-far={400} />
@@ -310,6 +330,13 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       ) : null))}
       <Quader p={[X(gs.tor.x + gs.tor.b / 2), 0.6, Z(T - 1)]} g={[gs.tor.b, 1.2, 0.3]} farbe={f.tor} />
 
+      {laternen.map((l, i) => <Laterne key={`l${i}`} {...l} f={f} />)}
+      {/* Nachts werfen einige Laternen Licht auf die Straße (nicht alle – jede Lichtquelle kostet Rechenzeit) */}
+      {nacht && laternen.filter((_, i) => i % 2 === 0).slice(0, 10).map((l, i) => (
+        <pointLight key={`ll${i}`} position={[l.x + l.richtung[0] * 1.4, 5.4, l.z + l.richtung[1] * 1.4]} color={f.licht}
+                    intensity={120} distance={30} decay={2} />
+      ))}
+
       {/* Deko: Bürogebäude, Tanks/Silos, Bäume */}
       {gs.deko.map((d, i) => {
         if (d.art === 'buero') {
@@ -318,7 +345,8 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
             <group key={i} position={[X(d.x + d.b / 2), 0, Z(d.y + d.t / 2)]}>
               <Quader p={[0, h / 2, 0]} g={[d.b, h, d.t]} farbe={f.buero} />
               {Array.from({ length: d.etagen }, (_, e) => (
-                <Quader key={e} p={[0, 1.9 + e * 3.6, 0]} g={[d.b + 0.08, 1.2, d.t + 0.08]} farbe={f.fenster} schatten={false} />
+                <Quader key={e} p={[0, 1.9 + e * 3.6, 0]} g={[d.b + 0.08, 1.2, d.t + 0.08]} farbe={f.fenster} schatten={false}
+                        leuchten={nacht && e % 2 === 0 ? 0.8 : 0} lichtFarbe={f.licht} />
               ))}
               <Quader p={[0, h + 0.2, 0]} g={[d.b + 0.4, 0.4, d.t + 0.4]} farbe={f['maschine-dunkel']} />
             </group>
@@ -351,7 +379,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
         const h = gs.hallen[g.id];
         const offen = gewaehlt?.id === g.id;
         const hervor = hover === `g${g.id}`;
-        const farbe = stufenFarbe(f, g.offen, g.hoechste_prioritaet);
+        const farbe = stufenFarbe(f, g.offen, g.hoechste_prioritaet, neutral);
         return (
           <group key={g.id} position={[X(h.x + h.b / 2), 0, Z(h.y + h.t / 2)]}>
             <mesh position={[0, h.hoehe / 2, 0]} castShadow={!offen} receiveShadow
@@ -366,26 +394,27 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
             {!offen && (
               <>
                 {/* Fensterband, Rolltor, Dach, Streifen in der Störungsfarbe */}
-                <Quader p={[0, h.hoehe * 0.72, 0]} g={[h.b + 0.1, 1.1, h.t + 0.1]} farbe={f.fenster} schatten={false} />
+                <Quader p={[0, h.hoehe * 0.72, 0]} g={[h.b + 0.1, 1.1, h.t + 0.1]} farbe={f.fenster} schatten={false}
+                        leuchten={nacht ? 0.9 : 0} lichtFarbe={f.licht} />
                 <Quader p={[0, 2.4, h.t / 2 + 0.05]} g={[Math.min(6, h.b * 0.3), 4.8, 0.2]} farbe={f.tor} schatten={false} />
                 <Quader p={[0, 0.25, 0]} g={[h.b + 0.5, 0.5, h.t + 0.5]} farbe={farbe} schatten={false} />
                 <Dach form={gs.dach} b={h.b} t={h.t} hoehe={h.hoehe} farbe={dachFarbe} />
               </>
             )}
             {offen && (
-              <HallenInneres halle={g} h={h} f={f} bewegt={bewegt} maschineId={maschineId}
+              <HallenInneres halle={g} h={h} f={f} bewegt={bewegt} maschineId={maschineId} neutral={neutral}
                              maschinen={maschinen.filter((m) => m.gebaeude_id === g.id)}
                              onMaschine={onMaschine} setHover={setHover} hover={hover} klick={klick} />
             )}
             {/* Beschriftung als Knopf (auch per Tastatur bedienbar); in einer Halle nur die anderen kurz */}
             {!offen && bereit && (
               <Html position={[0, h.hoehe + (gs.dach === 'flach' ? 2.5 : Math.min(h.b, h.t) * 0.12 + 2.5), 0]} center zIndexRange={[4, 1]}>
-                <button type="button" className={`raum-halle stufe-${stufe(g.offen, g.hoechste_prioritaet)}${gewaehlt ? ' klein' : ''}`}
-                        data-ort={`g-${g.id}`} aria-label={`${g.bezeichnung}: ${offenText(g.offen, t)}`}
+                <button type="button" className={`raum-halle stufe-${neutral ? 'neutral' : stufe(g.offen, g.hoechste_prioritaet)}${gewaehlt ? ' klein' : ''}`}
+                        data-ort={`g-${g.id}`} aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen, t)}`}
                         onClick={() => onGebaeude(g)} onMouseEnter={() => setHover(`g${g.id}`)} onMouseLeave={() => setHover(null)}>
                   <strong>{g.kuerzel}</strong>
                   {!gewaehlt && <span className="raum-halle-name">{g.bezeichnung.split('–').pop().trim()}</span>}
-                  <span className="zaehl-marke">{g.offen > 0 ? g.offen : <i className="bi bi-check-lg" />}</span>
+                  {!neutral && <span className="zaehl-marke">{g.offen > 0 ? g.offen : <i className="bi bi-check-lg" />}</span>}
                 </button>
               </Html>
             )}
@@ -399,14 +428,30 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
 }
 
 /** Innenleben der gewählten Halle (Koordinaten relativ zur Hallenmitte) */
-function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine, hover, setHover, klick }) {
+function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine, hover, setHover, klick, neutral }) {
   const t = useT();
   const ox = -h.b / 2;
   const oz = -h.t / 2;
   const bereiche = halle.bereiche ?? [];
+  const lichtbaender = Math.max(2, Math.round(h.t / 9));   // Lichtbänder unter der Decke
   return (
     <>
       <Flaeche x={0} z={0} b={h.b} t={h.t} farbe={f.hallenboden} y={0.03} />
+      {/* Hallenbeleuchtung (nur nachts, also im Dunkelmodus): Reihen einzelner Leuchten unter der Decke
+          und warmes Licht in der Halle. Tagsüber ist das Dach offen – dann blieben nur schwebende Lampen. */}
+      {f.nacht && Array.from({ length: lichtbaender }, (_, i) => (
+        Array.from({ length: Math.max(2, Math.floor(h.b / 7)) }, (__, j) => {
+          const proReihe = Math.max(2, Math.floor(h.b / 7));
+          return (
+            <Quader key={`lb${i}-${j}`} p={[ox + ((j + 0.5) * h.b) / proReihe, h.hoehe - 0.7, oz + ((i + 0.5) * h.t) / lichtbaender]}
+                    g={[2.4, 0.1, 0.35]} farbe={f.licht} leuchten={1.6} lichtFarbe={f.licht} schatten={false} />
+          );
+        })
+      ))}
+      {f.nacht && [-0.25, 0.25].flatMap((ax) => [-0.25, 0.25].map((az) => (
+        <pointLight key={`hl${ax}${az}`} position={[ax * h.b, h.hoehe - 1.2, az * h.t]} color={f.licht}
+                    intensity={260} distance={Math.max(h.b, h.t) * 1.2} decay={2} />
+      )))}
       {bereiche.map((b, i) => (
         <group key={b.name}>
           {/* Bereichsgrenzen als Bodenmarkierung */}
@@ -422,7 +467,8 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
         const W = Math.min(m.breite_m, m.tiefe_m);
         const gewaehlt = m.id === maschineId;
         const hervor = hover === `m${m.id}`;
-        const farbe = stufenFarbe(f, m.offen, m.hoechste_prioritaet);
+        const farbe = stufenFarbe(f, m.offen, m.hoechste_prioritaet, neutral);
+        const mitStoerung = !neutral && m.offen > 0;
         return (
           <group key={m.id} position={[ox + m.pos_x_m + m.breite_m / 2, 0, oz + m.pos_y_m + m.tiefe_m / 2]}
                  onClick={(e) => klick(e, () => onMaschine(m))}
@@ -430,13 +476,19 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
             {/* Boden unter der Maschine: Störungsfarbe, gewählt = Akzentfarbe */}
             <mesh position={[0, 0.05, 0]} rotation-x={-Math.PI / 2}>
               <planeGeometry args={[m.breite_m + 0.8, m.tiefe_m + 0.8]} />
-              <meshBasicMaterial color={gewaehlt ? f.akzent : m.offen > 0 ? farbe : f.linie}
-                                 transparent opacity={gewaehlt ? 0.7 : m.offen > 0 ? 0.5 : hervor ? 0.45 : 0.22} />
+              <meshBasicMaterial color={gewaehlt ? f.akzent : mitStoerung ? farbe : f.linie}
+                                 transparent opacity={gewaehlt ? 0.7 : mitStoerung ? 0.5 : hervor ? 0.45 : 0.22} />
             </mesh>
             <group rotation-y={m.tiefe_m > m.breite_m ? Math.PI / 2 : 0} scale={hervor || gewaehlt ? 1.04 : 1}>
-              <MaschinenForm typ={m.typ} L={L} W={W} f={f} bewegt={bewegt} />
+              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} neutral={neutral} />
             </group>
-            {(m.offen > 0 || gewaehlt) && (
+            {/* Name beim Darüberfahren */}
+            {hervor && !gewaehlt && (
+              <Html position={[0, 3.6, 0]} center zIndexRange={[4, 1]} style={{ pointerEvents: 'none' }}>
+                <span className="raum-name">{m.bezeichnung} · {m.anlagennummer}</span>
+              </Html>
+            )}
+            {(mitStoerung || gewaehlt) && !hervor && (
               <Html position={[0, 4.6, 0]} center zIndexRange={[4, 1]}>
                 <button type="button" className={`raum-marke stufe-${stufe(m.offen, m.hoechste_prioritaet)}${gewaehlt ? ' gewaehlt' : ''}`}
                         aria-label={`${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen, t)}`}
@@ -454,16 +506,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
 }
 
 export default function Werk3D(props) {
-  const [f, setF] = useState(farbenLesen);
-  const [bewegt, setBewegt] = useState(true);
-  useEffect(() => {
-    const neu = () => setF(farbenLesen());
-    window.addEventListener('darstellungswechsel', neu);
-    const reduziert = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setBewegt(!reduziert.matches);
-    return () => window.removeEventListener('darstellungswechsel', neu);
-  }, []);
-
+  const { f, bewegt } = useRaum();
   return (
     <div className="raum">
       {/* offsetSize: Größe ohne CSS-Transform messen (die Ebene wird beim Zoomen skaliert) */}

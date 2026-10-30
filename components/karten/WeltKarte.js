@@ -91,15 +91,16 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
     );
   };
 
-  /** Umrisse: übrige Länder grau, Länder des Unternehmens getönt und anklickbar */
-  const umrisse = (pfade) => (
+  /** Umrisse: übrige Länder grau, Länder des Unternehmens getönt und anklickbar.
+   *  data-flaeche: Daran misst die Zoom-Karte die Fläche, aus der das Land herauswächst. */
+  const umrisse = (pfade, mitFlaeche) => (
     <>
       <path d={pfade.rest} className="welt-land" />
       {Object.entries(pfade).filter(([k]) => k !== 'rest' && !firma.has(k))
         .map(([k, d]) => <path key={k} d={d} className="welt-land" />)}
       {laender.map((land) => pfade[land.kuerzel] && (
         <path key={land.kuerzel} d={pfade[land.kuerzel]} className={`welt-firma stufe-${farbe(land)}`}
-              onClick={(e) => onWaehle?.(land, e)} />
+              data-flaeche={mitFlaeche(land) ? `land-${land.kuerzel}` : undefined} onClick={(e) => onWaehle?.(land, e)} />
       ))}
     </>
   );
@@ -110,7 +111,7 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
         <defs>
           <clipPath id="lupe-ausschnitt"><circle cx={LUPE.cx} cy={LUPE.cy} r={LUPE.r} /></clipPath>
         </defs>
-        {umrisse(WELT_PFADE)}
+        {umrisse(WELT_PFADE, (l) => !mitLupe || !inLupe(l))}
 
         {/* Feine Linie von der Markierung zur Mitte des Landes, falls verschoben */}
         {aussen.map((land) => {
@@ -129,7 +130,7 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
             <circle cx={LUPE.quelle.cx} cy={LUPE.quelle.cy} r={LUPE.quelle.r} className="lupe-quelle" />
             {tangenten(LUPE, LUPE.quelle).map((l, i) => <line key={i} {...l} className="lupe-linie" />)}
             <circle cx={LUPE.cx} cy={LUPE.cy} r={LUPE.r} className="lupe-flaeche" />
-            <g clipPath="url(#lupe-ausschnitt)">{umrisse({ ...LUPE.laender, rest: LUPE.rest })}</g>
+            <g clipPath="url(#lupe-ausschnitt)">{umrisse({ ...LUPE.laender, rest: LUPE.rest }, inLupe)}</g>
             <circle cx={LUPE.cx} cy={LUPE.cy} r={LUPE.r} className="lupe-rand" />
           </g>
         )}
