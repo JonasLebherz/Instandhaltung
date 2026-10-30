@@ -91,10 +91,10 @@ function Roboter({ p, groesse, f, aktiv }) {
  * Signalampel (Signalsäule) wie an echten Maschinen: rot oben, orange, grün unten.
  * Die passende Leuchte strahlt, die anderen sind dunkel. zustand = null: alle aus (beim Melden).
  */
-export function Ampel({ p, zustand, f, hoehe = 2.4 }) {
+export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1 }) {
   const leuchten = [['rot', 0.38], ['orange', 0.2], ['gruen', 0.02]];
   return (
-    <group position={p}>
+    <group position={p} scale={groesse}>
       <Rolle p={[0, (hoehe - 0.55) / 2, 0]} r={0.035} l={hoehe - 0.55} farbe={f['maschine-dunkel']} />
       {leuchten.map(([name, y]) => {
         const an = zustand === name;
@@ -102,10 +102,17 @@ export function Ampel({ p, zustand, f, hoehe = 2.4 }) {
           <mesh key={name} position={[0, hoehe - 0.55 + y + 0.09, 0]}>
             <cylinderGeometry args={[0.1, 0.1, 0.17, 18]} />
             <meshStandardMaterial color={f[`ampel-${name}`]} emissive={f[`ampel-${name}`]}
-                                  emissiveIntensity={an ? 2.4 : 0} transparent opacity={an ? 1 : 0.35} roughness={0.3} />
+                                  emissiveIntensity={an ? 2.6 : 0} transparent opacity={an ? 1 : 0.3} roughness={0.3} />
           </mesh>
         );
       })}
+      {/* Leuchtschein um die aktive Leuchte – so erkennt man den Zustand auch von weitem */}
+      {zustand && (
+        <mesh position={[0, hoehe - 0.55 + { rot: 0.38, orange: 0.2, gruen: 0.02 }[zustand] + 0.09, 0]}>
+          <sphereGeometry args={[0.3, 16, 12]} />
+          <meshBasicMaterial color={f[`ampel-${zustand}`]} transparent opacity={0.3} depthWrite={false} />
+        </mesh>
+      )}
       <Rolle p={[0, hoehe + 0.05, 0]} r={0.1} l={0.06} farbe={f['maschine-dunkel']} />
     </group>
   );
@@ -253,13 +260,158 @@ export function MaschinenForm({ typ, L, W, f, laeuft }) {
   }
 }
 
-/** Maschine mit Ampel an der Ecke (lokale Achsen wie MaschinenForm) */
-export function MaschineMitAmpel({ m, L, W, f, bewegt, neutral = false }) {
-  const zustand = neutral ? null : ampelZustand(m);
+/** Leuchtpunkt, der flackert (Schweißfunke, Laserpunkt) */
+function Funke({ p, farbe, aktiv, groesse = 0.08 }) {
+  const ref = useRef(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.visible = aktiv && Math.sin(clock.elapsedTime * 37) > -0.3;
+    ref.current.scale.setScalar(1 + Math.abs(Math.sin(clock.elapsedTime * 23)) * 0.6);
+  });
+  return (
+    <mesh ref={ref} position={p}>
+      <sphereGeometry args={[groesse, 10, 8]} />
+      <meshBasicMaterial color={farbe} />
+    </mesh>
+  );
+}
+
+/**
+ * Zusätzliche Einzelheiten für die Detailansicht im Infofenster: Bedienpult mit Bildschirm und
+ * Not-Halt, Warnstreifen, Kabelkanal und je Typ ein paar typische Teile.
+ */
+function Details({ typ, L, W, f, laeuft }) {
+  const d = f['maschine-dunkel'];
+  const s = f.signal;
+  const streifen = Math.max(2, Math.floor((L * 0.85) / 0.3));
+  let typisch = null;
+  switch (typ) {
+    case 'Fräsen':        // Werkzeugmagazin an der Seite, dreht sich beim Werkzeugwechsel
+      typisch = (
+        <Bewegt p={[-L * 0.47, 1.6, -W * 0.05]} art="drehen" achse="x" tempo={0.6} aktiv={laeuft}>
+          <Rolle p={[0, 0, 0]} r={W * 0.28} l={0.18} achse="x" farbe={k(f)} />
+          {Array.from({ length: 10 }, (_, i) => (
+            <Kiste key={i} p={[-0.12, Math.cos((i / 10) * Math.PI * 2) * W * 0.22, Math.sin((i / 10) * Math.PI * 2) * W * 0.22]} g={[0.18, 0.06, 0.06]} farbe={d} />
+          ))}
+        </Bewegt>
+      );
+      break;
+    case 'Drehen':        // Späneförderer hinten (schräg)
+      typisch = (
+        <group position={[L * 0.1, 0.7, -W * 0.42]} rotation-z={0.25}>
+          <Kiste p={[0, 0, 0]} g={[L * 0.6, 0.25, 0.3]} farbe={d} />
+          <Kiste p={[L * 0.31, 0.25, 0]} g={[0.35, 0.3, 0.35]} farbe={s} />
+        </group>
+      );
+      break;
+    case 'Spritzguss':    // Granulattrockner oben, Werkzeughälften
+      typisch = (
+        <>
+          <Rolle p={[L * 0.36, 2.75, 0]} r={W * 0.16} l={0.7} farbe={f.glas} />
+          <Kiste p={[-L * 0.05, 1.35, 0]} g={[0.18, 0.7, W * 0.45]} farbe={f.blau} />
+          <Kiste p={[-L * 0.1, 1.35, 0]} g={[0.18, 0.7, W * 0.45]} farbe={f.rot} />
+        </>
+      );
+      break;
+    case 'Laserschneiden': // Blechtafel und roter Laserpunkt
+      typisch = (
+        <>
+          <Kiste p={[0, 0.89, 0]} g={[L * 0.7, 0.03, W * 0.6]} farbe={f.tank} schatten={false} />
+          <Funke p={[0, 0.95, W * 0.1]} farbe={f['ampel-rot']} aktiv={laeuft} />
+        </>
+      );
+      break;
+    case 'Schweißen':     // Schutzzaun und Schweißfunken
+      typisch = (
+        <>
+          {[[-1, 0], [0, -1], [0, 1]].map(([x, z]) => (
+            <mesh key={`${x}${z}`} position={[x * L * 0.5, 1, z * W * 0.5]} rotation-y={x ? Math.PI / 2 : 0}>
+              <planeGeometry args={[x ? W : L, 2]} />
+              <meshStandardMaterial color={s} transparent opacity={0.22} side={2} />
+            </mesh>
+          ))}
+          <Funke p={[L * 0.12, 1.02, 0]} farbe={f['ampel-orange']} aktiv={laeuft} groesse={0.1} />
+        </>
+      );
+      break;
+    case 'Pressen':       // Hydraulikzylinder oben, Schutzgitter vorn
+      typisch = (
+        <>
+          {[-0.2, 0.2].map((x) => <Rolle key={x} p={[L * x, 4.4, 0]} r={0.22} l={0.8} farbe={f.tank} />)}
+          <mesh position={[0, 1.9, W * 0.44]}>
+            <planeGeometry args={[L * 0.6, 1.8]} />
+            <meshStandardMaterial color={s} transparent opacity={0.25} side={2} />
+          </mesh>
+        </>
+      );
+      break;
+    case 'Fördertechnik': // Rollen an der Seite, Lichtschranke
+      typisch = (
+        <>
+          {Array.from({ length: Math.floor(L / 0.5) }, (_, i) => (
+            <Rolle key={i} p={[-L / 2 + 0.25 + i * 0.5, 0.94, W * 0.31]} r={0.05} l={0.06} achse="z" farbe={f.tank} />
+          ))}
+          <Kiste p={[L * 0.3, 1.25, W * 0.36]} g={[0.06, 0.8, 0.06]} farbe={s} />
+          <Kiste p={[L * 0.3, 1.25, -W * 0.36]} g={[0.06, 0.8, 0.06]} farbe={s} />
+        </>
+      );
+      break;
+    case 'Lackieren':     // Sichtfenster
+      typisch = <Kiste p={[-L * 0.15, 1.6, W * 0.48]} g={[L * 0.35, 0.8, 0.04]} farbe={f.glas} schatten={false} />;
+      break;
+    case 'Montage':       // Bildschirm am Arm, Werkzeugwand
+      typisch = (
+        <>
+          <Kiste p={[0, 1.35, -W * 0.4]} g={[L * 0.8, 0.9, 0.04]} farbe={d} />
+          {[-0.3, -0.1, 0.1, 0.3].map((x) => <Kiste key={x} p={[L * x, 1.4, -W * 0.37]} g={[0.06, 0.35, 0.03]} farbe={s} />)}
+        </>
+      );
+      break;
+    case 'Druckluft':     // Manometer und Kondensatbehälter
+      typisch = (
+        <>
+          <Rolle p={[-L * 0.18, 1.75, 0]} r={0.12} l={0.05} achse="z" farbe={f.markierung} />
+          <Rolle p={[L * 0.05, 0.3, W * 0.3]} r={0.12} l={0.6} farbe={f.tank} />
+        </>
+      );
+      break;
+    default:
+  }
   return (
     <>
-      <MaschinenForm typ={m.typ} L={L} W={W} f={f} laeuft={bewegt && zustand !== 'rot'} />
-      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} />
+      {/* Bedienpult mit Bildschirm und Not-Halt */}
+      <group position={[L * 0.38, 0, W / 2 + 0.4]}>
+        <Kiste p={[0, 0.55, 0]} g={[0.1, 1.1, 0.1]} farbe={d} />
+        <Kiste p={[0, 1.25, 0]} g={[0.56, 0.4, 0.1]} farbe={d} />
+        <mesh position={[-0.05, 1.27, 0.052]}>
+          <planeGeometry args={[0.36, 0.26]} />
+          <meshStandardMaterial color={f.akzent} emissive={f.akzent} emissiveIntensity={laeuft ? 0.9 : 0.25} />
+        </mesh>
+        <Rolle p={[0.2, 1.2, 0.07]} r={0.045} l={0.05} achse="z" farbe={f['ampel-rot']} />
+      </group>
+      {/* Warnstreifen gelb/schwarz am Sockel */}
+      {Array.from({ length: streifen }, (_, i) => (
+        <Kiste key={i} p={[-L * 0.425 + (i + 0.5) * ((L * 0.85) / streifen), 0.07, W * 0.44]} g={[(L * 0.85) / streifen, 0.14, 0.02]}
+               farbe={i % 2 ? d : s} schatten={false} />
+      ))}
+      {/* Kabelkanal hinten am Boden */}
+      <Kiste p={[0, 0.06, -W * 0.5 - 0.1]} g={[L * 0.9, 0.12, 0.16]} farbe={d} schatten={false} />
+      {typisch}
+    </>
+  );
+}
+
+const k = (f) => f.maschine;
+
+/** Maschine mit Ampel an der Ecke (lokale Achsen wie MaschinenForm). detail: mehr Einzelheiten (Infofenster). */
+export function MaschineMitAmpel({ m, L, W, f, bewegt, neutral = false, detail = false, ampelGroesse = 1 }) {
+  const zustand = neutral ? null : ampelZustand(m);
+  const laeuft = bewegt && zustand !== 'rot';
+  return (
+    <>
+      <MaschinenForm typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} />
+      {detail && <Details typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} />}
+      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} />
     </>
   );
 }

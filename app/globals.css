@@ -123,12 +123,13 @@
     --schatten-hover: 0 16px 44px rgba(0, 0, 0, .6);
 
 
-    --raum-umgebung: #18191c; --raum-gelaende: #20242a; --raum-strasse: #33363d; --raum-markierung: #5a5f69;
-    --raum-wand: #3b3f47; --raum-fenster: #4d6585; --raum-tor: #262930;
-    --raum-dach-0: #566070; --raum-dach-1: #6b5d50; --raum-dach-2: #4f6358; --raum-dach-3: #5c5d7a;
-    --raum-hallenboden: #2a2d33; --raum-linie: #4b515b;
-    --raum-maschine: #6f7580; --raum-maschine-dunkel: #2b2e35; --raum-signal: #e0a526; --raum-glas: #5d7fa6;
-    --raum-baum: #3f6b47; --raum-stamm: #5a4634; --raum-buero: #3d3a35; --raum-tank: #4d535c;
+    /* Nacht: dunkler als am Tag, aber Hallen und Maschinen bleiben gut erkennbar */
+    --raum-umgebung: #20242a; --raum-gelaende: #323a44; --raum-strasse: #4a515b; --raum-markierung: #8e959f;
+    --raum-wand: #727b88; --raum-fenster: #7393bb; --raum-tor: #3d434c;
+    --raum-dach-0: #7c889b; --raum-dach-1: #94857a; --raum-dach-2: #74907e; --raum-dach-3: #8586a6;
+    --raum-hallenboden: #444a53; --raum-linie: #68707b;
+    --raum-maschine: #9aa1ac; --raum-maschine-dunkel: #424852; --raum-signal: #e6ad2e; --raum-glas: #86a9d1;
+    --raum-baum: #548a5e; --raum-stamm: #745c46; --raum-buero: #66625a; --raum-tank: #78808b;
     --raum-person-0: #ff9f0a; --raum-person-1: #2997ff; --raum-person-2: #30d158; --raum-haut: #c49a7a;
     --raum-ampel-rot: #ff453a; --raum-ampel-orange: #ff9f0a; --raum-ampel-gruen: #30d158; --raum-licht: #ffcf7a;
     color-scheme: dark;

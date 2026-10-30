@@ -33,3 +33,18 @@ export function useRaum() {
   }, []);
   return { f, bewegt };
 }
+
+/**
+ * Ist das Element (Canvas) im sichtbaren Bereich? Sonst wird nicht gezeichnet –
+ * spart Rechenzeit und Akku, z. B. wenn man auf der Seite weiter nach unten scrollt.
+ */
+export function useSichtbar(ref) {
+  const [sichtbar, setSichtbar] = useState(true);
+  useEffect(() => {
+    if (!ref.current || typeof IntersectionObserver === 'undefined') return undefined;
+    const beobachter = new IntersectionObserver(([e]) => setSichtbar(e.isIntersecting));
+    beobachter.observe(ref.current);
+    return () => beobachter.disconnect();
+  }, [ref]);
+  return sichtbar;
+}

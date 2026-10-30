@@ -30,7 +30,7 @@ import { werkGestaltung, zufall } from '@/lib/karten/werkGestaltung';
 import { stufe, offenText } from '../stufe';
 import { useT } from '@/components/SpracheKontext';
 import { MaschineMitAmpel } from './Maschine3D';
-import { useRaum } from './farben';
+import { useRaum, useSichtbar } from './farben';
 
 /** Farbe einer Störungsstufe */
 const stufenFarbe = (f, offen, prio, neutral = false) => (neutral ? f.linie : ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)]);
@@ -302,10 +302,10 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
   return (
     <>
       {/* Tag: Sonne. Nacht (Dunkelmodus): schwaches, bläuliches Mondlicht – Laternen und Hallen leuchten */}
-      <hemisphereLight args={[nacht ? '#8fa3c8' : '#ffffff', f.gelaende, nacht ? 0.55 : 0.85]} />
-      <ambientLight intensity={nacht ? 0.2 : 0.25} />
-      <directionalLight position={[B * 0.35, 140, T * 0.55]} intensity={nacht ? 0.6 : 1.7} color={nacht ? '#aabbff' : '#ffffff'} castShadow
-                        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}
+      <hemisphereLight args={[nacht ? '#a9b9da' : '#ffffff', f.gelaende, nacht ? 0.95 : 0.85]} />
+      <ambientLight intensity={nacht ? 0.3 : 0.25} />
+      <directionalLight position={[B * 0.35, 140, T * 0.55]} intensity={nacht ? 0.95 : 1.7} color={nacht ? '#aabbff' : '#ffffff'} castShadow
+                        shadow-mapSize={[1024, 1024]} shadow-bias={-0.0006}
                         shadow-camera-left={-schatten} shadow-camera-right={schatten}
                         shadow-camera-top={schatten} shadow-camera-bottom={-schatten} shadow-camera-far={400} />
       <Kamera ziel={ziel} bewegt={bewegt} steuerung={steuerung} />
@@ -332,7 +332,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
 
       {laternen.map((l, i) => <Laterne key={`l${i}`} {...l} f={f} />)}
       {/* Nachts werfen einige Laternen Licht auf die Straße (nicht alle – jede Lichtquelle kostet Rechenzeit) */}
-      {nacht && laternen.filter((_, i) => i % 2 === 0).slice(0, 10).map((l, i) => (
+      {nacht && laternen.filter((_, i) => i % 2 === 0).slice(0, 6).map((l, i) => (
         <pointLight key={`ll${i}`} position={[l.x + l.richtung[0] * 1.4, 5.4, l.z + l.richtung[1] * 1.4]} color={f.licht}
                     intensity={120} distance={30} decay={2} />
       ))}
@@ -448,10 +448,10 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
           );
         })
       ))}
-      {f.nacht && [-0.25, 0.25].flatMap((ax) => [-0.25, 0.25].map((az) => (
-        <pointLight key={`hl${ax}${az}`} position={[ax * h.b, h.hoehe - 1.2, az * h.t]} color={f.licht}
-                    intensity={260} distance={Math.max(h.b, h.t) * 1.2} decay={2} />
-      )))}
+      {f.nacht && [-0.25, 0.25].map((ax) => (
+        <pointLight key={`hl${ax}`} position={[ax * h.b, h.hoehe - 1.2, 0]} color={f.licht}
+                    intensity={380} distance={Math.max(h.b, h.t) * 1.3} decay={2} />
+      ))}
       {bereiche.map((b, i) => (
         <group key={b.name}>
           {/* Bereichsgrenzen als Bodenmarkierung */}
@@ -480,7 +480,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
                                  transparent opacity={gewaehlt ? 0.7 : mitStoerung ? 0.5 : hervor ? 0.45 : 0.22} />
             </mesh>
             <group rotation-y={m.tiefe_m > m.breite_m ? Math.PI / 2 : 0} scale={hervor || gewaehlt ? 1.04 : 1}>
-              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} neutral={neutral} />
+              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} neutral={neutral} ampelGroesse={2.3} />
             </group>
             {/* Name beim Darüberfahren */}
             {hervor && !gewaehlt && (
@@ -507,10 +507,12 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
 
 export default function Werk3D(props) {
   const { f, bewegt } = useRaum();
+  const rahmen = useRef(null);
+  const sichtbar = useSichtbar(rahmen);   // außerhalb des Bildschirms wird nicht gezeichnet
   return (
-    <div className="raum">
+    <div className="raum" ref={rahmen}>
       {/* offsetSize: Größe ohne CSS-Transform messen (die Ebene wird beim Zoomen skaliert) */}
-      <Canvas shadows dpr={[1, 2]} frameloop={bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
+      <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar ? 'never' : bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
               camera={{ fov: 38, near: 0.5, far: 4000, position: [150, 200, 220] }} gl={{ antialias: true, alpha: true }}>
         <Szene {...props} f={f} bewegt={bewegt} />
       </Canvas>

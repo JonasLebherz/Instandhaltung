@@ -60,20 +60,26 @@ const stufe01 = (x, von, bis) => Math.min(1, Math.max(0, (x - von) / (bis - von)
 /**
  * Bilder einer Kamerafahrt zwischen übergeordneter Ebene (Eltern) und Unterebene (Kind).
  * A = angeklickte Fläche in der Elternebene, B = Inhalt der Kindebene (Mitte x/y, Breite w, Höhe h).
- * Der Maßstab ändert sich gleichmäßig (logarithmisch) – so wirkt es wie ein Flug auf die Erde zu.
+ *
+ * Reiner Zoom um einen festen Punkt Z: Es gibt genau einen Punkt auf dem Bildschirm, der
+ * beim Vergrößern stehen bleibt – er liegt dicht an der angeklickten Stelle. Dadurch wird man
+ * in das Land "hineingezogen", statt dass die Karte seitlich wegrutscht. Der Maßstab ändert
+ * sich gleichmäßig (logarithmisch), wie bei einem Flug auf die Erde zu.
  */
-function kamerafahrt(A, B, rein, schritte = 24) {
+function kamerafahrt(A, B, rein, schritte = 30) {
   const s = Math.min(A.w / B.w, A.h / B.h);      // so klein beginnt die Kindebene (passt genau in A)
+  // Fester Punkt der Abbildung Kind → Eltern (x ↦ s·x + A − s·B)
+  const zx = s < 0.999 ? (A.x - s * B.x) / (1 - s) : B.x;
+  const zy = s < 0.999 ? (A.y - s * B.y) / (1 - s) : B.y;
+  const um = (k) => `translate(${zx * (1 - k)}px, ${zy * (1 - k)}px) scale(${k})`;   // Skalierung um Z
   const kind = [];
   const eltern = [];
   for (let i = 0; i <= schritte; i += 1) {
     const zeit = i / schritte;
     const p = rein ? weich(zeit) : 1 - weich(zeit);
     const k = s ** (1 - p);
-    const cx = A.x + (B.x - A.x) * p;
-    const cy = A.y + (B.y - A.y) * p;
-    kind.push({ offset: zeit, transform: `translate(${cx - k * B.x}px, ${cy - k * B.y}px) scale(${k})` });
-    eltern.push({ offset: zeit, transform: `translate(${cx - (k / s) * A.x}px, ${cy - (k / s) * A.y}px) scale(${k / s})` });
+    kind.push({ offset: zeit, transform: um(k) });
+    eltern.push({ offset: zeit, transform: um(k / s) });
   }
   return { kind, eltern };
 }
@@ -126,12 +132,19 @@ export default function KartenExplorer({
   const land = landVon(ebene);
   const stufeName = ebene.gebaeudeId ? 'gebaeude' : ebene.standortId ? 'werk' : ebene.land ? 'land' : 'welt';
   const raumMoeglich = webgl;
-  // Gebäude und Maschinen des aktuellen Werks (für die 3D-Ansicht)
-  const werkGebaeude = useMemo(() => gebaeude.filter((g) => g.standort_id === ebene.standortId), [gebaeude, ebene.standortId]);
-  const werkMaschinen = useMemo(() => {
-    const ids = new Set(werkGebaeude.map((g) => g.id));
-    return maschinen.filter((m) => ids.has(m.gebaeude_id));
-  }, [maschinen, werkGebaeude]);
+  // Gebäude und Maschinen je Werk (für die 3D-Ansicht) – zwischengespeichert, damit die Szene
+  // beim Neuzeichnen dieselben Listen bekommt und nichts neu berechnet
+  const werkDaten = useMemo(() => {
+    const cache = new Map();
+    return (id) => {
+      if (!cache.has(id)) {
+        const g = gebaeude.filter((x) => x.standort_id === id);
+        const ids = new Set(g.map((x) => x.id));
+        cache.set(id, { gebaeude: g, maschinen: maschinen.filter((m) => ids.has(m.gebaeude_id)) });
+      }
+      return cache.get(id);
+    };
+  }, [gebaeude, maschinen]);
 
   /* ---------- Wechsel zwischen den Ebenen ---------- */
 
@@ -259,8 +272,12 @@ export default function KartenExplorer({
     return <div className={`ebene-inhalt ebene-${art}${hochkant}`} style={{ '--verhaeltnis': verhaeltnis }}>{inhalt}</div>;
   }
 
-  const raum = raumMoeglich && dreiD && (stufeName === 'werk' || stufeName === 'gebaeude');
-  const schluessel = raum ? `raum-${ebene.standortId}` : `${ebene.land ?? 'welt'}-${ebene.standortId ?? 'x'}-${ebene.gebaeudeId ?? 'x'}`;
+  // 3D-Ebene? Schlüssel einer Ebene: Eine 3D-Szene behält ihren Schlüssel für Werk und Halle –
+  // und beim Herauszoomen wird dieselbe Szene zur "alten" Ebene (kein kurzes Aufblitzen von 2D).
+  const istRaum = (e) => raumMoeglich && dreiD && Boolean(e.standortId);
+  const schluesselVon = (e) => (istRaum(e) ? `raum-${e.standortId}` : `${e.land ?? 'welt'}-${e.standortId ?? 'x'}-${e.gebaeudeId ?? 'x'}`);
+  const raum = istRaum(ebene);
+  const schluessel = schluesselVon(ebene);
   const schrittNr = { welt: 1, land: 2, werk: 3, gebaeude: 4 }[stufeName];
   const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? (land ? t(land.name) : t('Weltweit'));
   const hinweis = t(modus === 'auswahl'
@@ -320,19 +337,22 @@ export default function KartenExplorer({
           </div>
         </div>
 
-        {uebergang && (
-          <div ref={altRef} className="explorer-ebene ebene-alt" aria-hidden="true">
-            {ebeneZeichnen(uebergang.von, false)}
+        {/* Alte Ebene (nur während des Zooms) und neue Ebene – mit Schlüssel, damit React eine
+            bestehende Ebene (z. B. die 3D-Szene) beim Rollentausch weiterverwendet statt neu aufzubauen */}
+        {[
+          ...(uebergang && schluesselVon(uebergang.von) !== schluessel ? [{ e: uebergang.von, aktiv: false }] : []),
+          { e: ebene, aktiv: true },
+        ].map(({ e, aktiv }) => (
+          <div key={schluesselVon(e)} ref={aktiv ? neuRef : altRef} aria-hidden={aktiv ? undefined : true}
+               // Beim Herauszoomen sind die Beschriftungen der neuen (zunächst stark vergrößerten) Ebene kurz verborgen
+               className={`explorer-ebene ${aktiv ? 'ebene-neu' : 'ebene-alt'}${istRaum(e) ? ' ebene-raum' : ''}`
+                 + `${aktiv && uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`}>
+            {istRaum(e) ? (
+              <Werk3D standort={standortVon(e)} {...werkDaten(e.standortId)} gebaeudeId={e.gebaeudeId}
+                      maschineId={aktiv ? maschineId : null} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
+            ) : ebeneZeichnen(e, aktiv)}
           </div>
-        )}
-        <div ref={neuRef} key={schluessel}
-             // Beim Herauszoomen sind die Beschriftungen der neuen (zunächst stark vergrößerten) Ebene kurz verborgen
-             className={`explorer-ebene ebene-neu${raum ? ' ebene-raum' : ''}${uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`}>
-          {raum ? (
-            <Werk3D standort={standort} gebaeude={werkGebaeude} maschinen={werkMaschinen} gebaeudeId={ebene.gebaeudeId}
-                    maschineId={maschineId} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
-          ) : ebeneZeichnen(ebene, true)}
-        </div>
+        ))}
 
         {/* Umschalter 2D / 3D (nur für Werk und Halle) */}
         {raumMoeglich && (stufeName === 'werk' || stufeName === 'gebaeude') && (
