@@ -441,7 +441,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       <Quader p={[X(gs.tor.x + gs.tor.b / 2), 0.6, Z(T - 1)]} g={[gs.tor.b, 1.2, 0.3]} farbe={f.tor} />
 
       {laternen.map((l, i) => <Laterne key={`l${i}`} {...l} f={f} durchsichtig={naheGeoeffneterHalle(l)} />)}
-      <Landesdeko standort={standort} gs={gs} f={f} X={X} Z={Z} />
+      <Landesdeko standort={standort} gs={gs} f={f} X={X} Z={Z} gebaeudeId={gewaehlt?.id} />
       {/* Betonflächen rund um die Hallen (Vorplatz, Anlieferung) */}
       {gebaeude.map((g) => {
         const h = gs.hallen[g.id];

@@ -5,7 +5,7 @@
  *  - Fahnen am Tor: Landesflagge, Firmenflagge, Landesflagge; Torschild in Landessprache und -schrift
  *  - Landesstil (LAND_STIL, mitLandStil): Boden, Straßen, Hallenwände, Dächer, Bäume (Baum3D)
  *    und Bürogebäude (Buero3D: Fachwerk, Glasturm, Pagode, Hacienda, Zwiebeltürme, Mansarde, Kuppel, Backstein)
- *  - Flagge an jeder Halle, Sicherheits-Banner in Landessprache (Hallenschmuck)
+ *  - kleine Landesflagge an der Haupthalle (HallenFlagge, ausgeblendet, wenn die Halle geöffnet ist)
  *  - Umgebung: Umland mit Feldern/Bäumen, Landstraße vor dem Tor, Wahrzeichen hinten
  *    (DE Windräder, US Scheune, CN Pagode, IN Tempel, RU Kirche, MX Berge) und das
  *    typische Objekt gegenüber dem Tor: DE Biergarten · MX Taco-Truck mit Kakteen ·
@@ -125,9 +125,9 @@ function Fahne({ x, z, zeichnen, kennung }) {
   const textur = useTextur(zeichnen, 192, 120, [kennung]);
   return (
     <group position={[x, 0, z]}>
-      <Teil p={[0, 6, 0]} g={[0.1, 0.13, 12, 8]} form="zyl" farbe="#c9ced6" />
-      <mesh position={[2, 10.6, 0]} castShadow>
-        <planeGeometry args={[4, 2.5]} />
+      <Teil p={[0, 4.5, 0]} g={[0.07, 0.09, 9, 8]} form="zyl" farbe="#c9ced6" />
+      <mesh position={[1.4, 8, 0]} castShadow>
+        <planeGeometry args={[2.8, 1.75]} />
         <meshStandardMaterial map={textur} side={THREE.DoubleSide} roughness={0.8} />
       </mesh>
     </group>
@@ -300,22 +300,18 @@ function Wasserturm({ f }) {
  * Farben je [hell, dunkel] – das Werk soll auf den ersten Blick "nach dem Land" aussehen.
  * ================================================================== */
 export const LAND_STIL = {
-  DE: { gras: ['#c6dbbb', '#34473a'], wand: ['#dfe2e5', '#6e7681'], dach: ['#a2402f', '#6e3a33'], baum: 'mix', buero: 'fachwerk',
-    banner: 'SICHERHEIT GEHT VOR', umland: ['#b4cc9f', '#2f3f33'], umlandBaeume: ['kegel', 'rund'], feld: [['#ecd648', '#9cbc6a'], ['#6f6a35', '#41543a']] },
+  DE: { gras: ['#c6dbbb', '#34473a'], wand: ['#dfe2e5', '#6e7681'], dach: ['#a2402f', '#6e3a33'], baum: 'mix', buero: 'fachwerk', umland: ['#b4cc9f', '#2f3f33'], umlandBaeume: ['kegel', 'rund'], feld: [['#ecd648', '#9cbc6a'], ['#6f6a35', '#41543a']] },
   US: { gras: ['#bfd8a8', '#3a4a36'], wand: ['#e6dbc8', '#7d776c'], dach: ['#c3c9d0', '#5c636d'], linie: ['#f2c14e', '#d9a826'],
-    baum: 'rund', buero: 'glas', banner: 'SAFETY FIRST', umland: ['#c4d49c', '#36442f'], umlandBaeume: ['rund'], feld: [['#d9c66a', '#8fae5a'], ['#6a6237', '#3f5236']] },
+    baum: 'rund', buero: 'glas', umland: ['#c4d49c', '#36442f'], umlandBaeume: ['rund'], feld: [['#d9c66a', '#8fae5a'], ['#6a6237', '#3f5236']] },
   MX: { gras: ['#e8d3a0', '#6e604a'], strasse: ['#d0bf9b', '#5f584a'], wand: ['#eab274', '#8a6a4a'], dach: ['#c45f37', '#7a4532'],
-    baum: 'kaktus', buero: 'hacienda', banner: 'SEGURIDAD PRIMERO', umland: ['#dcbf8c', '#6b5a43'], umlandBaeume: ['kaktus'], feld: [['#8fb3a0', '#d6bd88'], ['#3f564b', '#5a4b38']] },
-  CN: { gras: ['#cadbc4', '#36443b'], wand: ['#f3f3f1', '#727a85'], dach: ['#3373c4', '#2f5d93'], baum: 'rund', buero: 'pagode',
-    banner: '安全第一', bannerGrund: '#c8102e', bannerSchrift: '#ffd34d', umland: ['#b3cfa6', '#2f4034'], umlandBaeume: ['rund'], feld: [['#7cc766', '#9cc8d8'], ['#3c6236', '#3b5560']] },
+    baum: 'kaktus', buero: 'hacienda', umland: ['#dcbf8c', '#6b5a43'], umlandBaeume: ['kaktus'], feld: [['#8fb3a0', '#d6bd88'], ['#3f564b', '#5a4b38']] },
+  CN: { gras: ['#cadbc4', '#36443b'], wand: ['#f3f3f1', '#727a85'], dach: ['#3373c4', '#2f5d93'], baum: 'rund', buero: 'pagode', umland: ['#b3cfa6', '#2f4034'], umlandBaeume: ['rund'], feld: [['#7cc766', '#9cc8d8'], ['#3c6236', '#3b5560']] },
   IN: { gras: ['#dcc290', '#55493a'], strasse: ['#cbb497', '#5b5245'], wand: ['#f4efe4', '#7b7770'], dach: ['#3a8d66', '#2f6b50'],
-    baum: 'palme', buero: 'kuppel', banner: 'सुरक्षा पहले', bannerGrund: '#ff9933', umland: ['#d6ad79', '#5a4733'], umlandBaeume: ['palme'], feld: [['#f0a238', '#c9b27a'], ['#74522a', '#55493a']] },
-  FR: { gras: ['#cbdcbd', '#38463a'], wand: ['#efe5d3', '#7e786d'], dach: ['#717d8a', '#4d5560'], baum: 'pappel', buero: 'mansarde',
-    banner: "LA SÉCURITÉ D'ABORD", bannerGrund: '#0055a4', umland: ['#bfd2a0', '#344233'], umlandBaeume: ['pappel', 'rund'], feld: [['#9a7ed4', '#86a76c'], ['#4f4370', '#3d5236']] },
+    baum: 'palme', buero: 'kuppel', umland: ['#d6ad79', '#5a4733'], umlandBaeume: ['palme'], feld: [['#f0a238', '#c9b27a'], ['#74522a', '#55493a']] },
+  FR: { gras: ['#cbdcbd', '#38463a'], wand: ['#efe5d3', '#7e786d'], dach: ['#717d8a', '#4d5560'], baum: 'pappel', buero: 'mansarde', umland: ['#bfd2a0', '#344233'], umlandBaeume: ['pappel', 'rund'], feld: [['#9a7ed4', '#86a76c'], ['#4f4370', '#3d5236']] },
   RU: { gras: ['#eef2f6', '#5d6670'], strasse: ['#c3c9d1', '#474c55'], wand: ['#c4d0db', '#66707c'], dach: ['#3b7d50', '#2f5a3d'],
-    baum: 'birke', buero: 'zwiebel', banner: 'БЕЗОПАСНОСТЬ ПРЕЖДЕ ВСЕГО', bannerGrund: '#d52b1e', umland: ['#f6f8fb', '#6c7580'], umlandBaeume: ['birke', 'kegel'] },
-  PL: { gras: ['#c4d9b8', '#34463a'], wand: ['#f0e9df', '#787470'], dach: ['#b53a2c', '#7a3530'], baum: 'kegel', buero: 'backstein',
-    banner: 'BEZPIECZEŃSTWO PRZEDE WSZYSTKIM', bannerGrund: '#dc143c', umland: ['#b9d0a1', '#314033'], umlandBaeume: ['kegel'], feld: [['#e6c862', '#a8c070'], ['#6c6234', '#46573a']] },
+    baum: 'birke', buero: 'zwiebel', umland: ['#f6f8fb', '#6c7580'], umlandBaeume: ['birke', 'kegel'] },
+  PL: { gras: ['#c4d9b8', '#34463a'], wand: ['#f0e9df', '#787470'], dach: ['#b53a2c', '#7a3530'], baum: 'kegel', buero: 'backstein', umland: ['#b9d0a1', '#314033'], umlandBaeume: ['kegel'], feld: [['#e6c862', '#a8c070'], ['#6c6234', '#46573a']] },
 };
 
 /** Farben der Szene mit dem Landesstil überschreiben */
@@ -551,36 +547,18 @@ export function Buero3D({ stil, d, f }) {
   }
 }
 
-/** Landesflagge an der Front jeder Halle (Flachdach: zusätzlich groß auf dem Dach der größten Halle)
- *  und ein Sicherheits-Banner in Landessprache an der zweiten Halle */
-function Hallenschmuck({ gs, land, X, Z, flaggeZeichnen }) {
-  const stil = LAND_STIL[land];
-  const hallen = Object.values(gs.hallen).sort((a, c) => c.b * c.t - a.b * a.t);
-  const flaggenTextur = useTextur(flaggeZeichnen ?? ((g) => g.clearRect(0, 0, 1, 1)), 384, 240, [land, 'gross']);
-  if (!stil || !flaggeZeichnen || !hallen.length) return null;
-  const bannerHalle = hallen[1] ?? hallen[0];
-  return hallen.map((h, i) => {
-    const bannerBreite = Math.min(h.b * 0.36, 22);
-    return (
-      <group key={i} position={[X(h.x + h.b / 2), 0, Z(h.y + h.t / 2)]}>
-        {/* Flagge als großes Tuch an der Front, rechts neben dem Rolltor */}
-        <mesh position={[h.b * 0.27, h.hoehe * 0.38, h.t / 2 + 0.12]}>
-          <planeGeometry args={[Math.min(h.b * 0.34, 20), h.hoehe * 0.58]} />
-          <meshStandardMaterial map={flaggenTextur} roughness={0.7} />
-        </mesh>
-        {i === 0 && gs.dach === 'flach' && (
-          <mesh position={[0, h.hoehe + 0.72, 0]} rotation-x={-Math.PI / 2}>
-            <planeGeometry args={[Math.min(h.b * 0.6, 44), Math.min(h.t * 0.55, 28)]} />
-            <meshStandardMaterial map={flaggenTextur} roughness={0.7} />
-          </mesh>
-        )}
-        {h === bannerHalle && (
-          <Schild p={[-h.b * 0.27, h.hoehe * 0.38, h.t / 2 + 0.14]} b={bannerBreite} h={Math.min(3.4, bannerBreite / 4.5)} text={stil.banner}
-                  grund={stil.bannerGrund ?? '#ffcc00'} schrift={stil.bannerSchrift ?? (stil.bannerGrund ? '#ffffff' : '#1f1f1f')} />
-        )}
-      </group>
-    );
-  });
+/** Kleine Landesflagge an der Front der Haupthalle – ausgeblendet, wenn man in diese Halle hineinschaut */
+function HallenFlagge({ gs, land, X, Z, flaggeZeichnen, gebaeudeId }) {
+  const textur = useTextur(flaggeZeichnen ?? ((g) => g.clearRect(0, 0, 1, 1)), 192, 120, [land, 'halle']);
+  const [id, h] = Object.entries(gs.hallen).sort(([, a], [, c]) => c.b * c.t - a.b * a.t)[0] ?? [];
+  if (!flaggeZeichnen || !h || String(gebaeudeId) === id) return null;
+  const breite = Math.min(h.b * 0.16, 6);
+  return (
+    <mesh position={[X(h.x + h.b / 2) + h.b * 0.3, h.hoehe * 0.45, Z(h.y + h.t) + 0.12]}>
+      <planeGeometry args={[breite, breite * 0.625]} />
+      <meshStandardMaterial map={textur} roughness={0.7} />
+    </mesh>
+  );
 }
 
 /* =====================================================================
@@ -783,7 +761,7 @@ function Umgebung({ standort, gs, f }) {
 }
 
 /** Alle Länder-Merkmale eines Werks. X/Z: Umrechnung der Werkskoordinaten in die Szene */
-export default function Landesdeko({ standort, gs, f, X, Z }) {
+export default function Landesdeko({ standort, gs, f, X, Z, gebaeudeId }) {
   const land = standort.land;
   const zeichnen = FLAGGEN[land];
   const firma = (g, w, h) => {      // Firmenflagge: Akzentfarbe mit Schild-Zeichen
@@ -805,7 +783,7 @@ export default function Landesdeko({ standort, gs, f, X, Z }) {
         <Schild p={[0, 6.6, 0.25]} b={gs.tor.b - 0.6} h={2.4} text={schildText}
                 grund={land === 'CN' ? '#c8102e' : '#1f2a37'} schrift={land === 'CN' ? '#ffd34d' : '#ffffff'} />
       </group>
-      <Hallenschmuck gs={gs} land={land} X={X} Z={Z} flaggeZeichnen={zeichnen} />
+      <HallenFlagge gs={gs} land={land} X={X} Z={Z} flaggeZeichnen={zeichnen} gebaeudeId={gebaeudeId} />
       <Umgebung standort={standort} gs={gs} f={f} />
     </>
   );
