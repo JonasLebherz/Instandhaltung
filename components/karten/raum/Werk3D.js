@@ -9,8 +9,8 @@
  *  - Werk: Gelände als Modellplatte, Straßen, Parkplatz, Bürogebäude, Tanks, Bäume
  *    (Aufbau aus lib/karten/werkGestaltung.js, gleich wie im 2D-Lageplan). Hallen als
  *    Quader in Echtmaßen mit Dach je Werk (flach, Sattel- oder Sheddach).
- *  - Klick auf eine Halle: Die Kamera fliegt hinein, Dach verschwindet, Wände werden
- *    durchsichtig. Innen: Bereiche als Bodenmarkierung, Regale, Maschinen als
+ *  - Klick auf eine Halle: Die Kamera fliegt hinein, Dach, Wände und Anbauten verschwinden
+ *    (freie Sicht). Innen: Bereiche als Bodenmarkierung, Regale, Maschinen als
  *    einfache Formen je Typ (Maschine3D.js), Störungen als farbiger Boden + Zahl.
  *  - Figuren laufen die Werksstraßen bzw. den Gang in der Halle entlang.
  *  - Maus/Finger: drehen, zoomen, verschieben. Farben aus CSS-Variablen (--raum-*),
@@ -33,15 +33,13 @@ import { MaschineMitAmpel } from './Maschine3D';
 import { useRaum, useSichtbar } from './farben';
 import Landesdeko, { LAND_STIL, mitLandStil, Baum3D, Buero3D } from './Landesdeko';
 import Figur from './Figur';
-import Minispiel from './Minispiel';
+import { VerwaltungInnen, VersteckLeiste, dingeFuerRunde } from './Verwaltung';
 import { Auto, Lkw, ParkendeAutos, Gabelstapler, AUTO_FARBEN } from './Fahrzeuge';
 import { Viele, canvasTextur, grasTextur } from './Bausteine';
 
 /** Farbe einer Störungsstufe */
 const stufenFarbe = (f, offen, prio, neutral = false) => (neutral ? f.linie : ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)]);
 
-// Für durchsichtige Wände: keine Treffer beim Klicken (sonst kommt man nicht an die Maschinen)
-const KEIN_STRAHL = () => null;
 const easing = (x) => (x < 0.5 ? 4 * x * x * x : 1 - ((-2 * x + 2) ** 3) / 2);
 
 /* ---------------------------------------------------------------------------
@@ -154,18 +152,16 @@ const parkTextur = () => canvasTextur(30, 80, (g, w, h) => {
 });
 
 /** Straßenlaterne: Mast, Ausleger zur Straße hin, Leuchte (nachts an) */
-function Laterne({ x, z, richtung, f, durchsichtig = false }) {
+function Laterne({ x, z, richtung, f }) {
   const [dx, dz] = richtung;
-  const deckkraft = durchsichtig ? 0.05 : 1;   // an der geöffneten Halle: fast unsichtbar, damit sie nicht im Weg steht
   return (
     <group position={[x, 0, z]}>
-      <mesh position={[0, 3, 0]} castShadow={!durchsichtig}>
+      <mesh position={[0, 3, 0]} castShadow>
         <cylinderGeometry args={[0.09, 0.13, 6, 10]} />
-        <meshStandardMaterial key={durchsichtig ? 'glas' : 'voll'} color={f['maschine-dunkel']} roughness={0.6}
-                              transparent={durchsichtig} opacity={deckkraft} depthWrite={!durchsichtig} />
+        <meshStandardMaterial color={f['maschine-dunkel']} roughness={0.6} />
       </mesh>
-      <Quader p={[dx * 0.7, 5.95, dz * 0.7]} g={[Math.abs(dx) * 1.4 + 0.12, 0.12, Math.abs(dz) * 1.4 + 0.12]} farbe={f['maschine-dunkel']} schatten={false} deckkraft={deckkraft} />
-      <Quader p={[dx * 1.35, 5.82, dz * 1.35]} g={[0.7, 0.18, 0.35]} farbe={f.nacht ? f.licht : f.tank} deckkraft={deckkraft}
+      <Quader p={[dx * 0.7, 5.95, dz * 0.7]} g={[Math.abs(dx) * 1.4 + 0.12, 0.12, Math.abs(dz) * 1.4 + 0.12]} farbe={f['maschine-dunkel']} schatten={false} />
+      <Quader p={[dx * 1.35, 5.82, dz * 1.35]} g={[0.7, 0.18, 0.35]} farbe={f.nacht ? f.licht : f.tank}
               leuchten={f.nacht ? 2 : 0} lichtFarbe={f.licht} schatten={false} />
     </group>
   );
@@ -240,8 +236,20 @@ function Dach({ form, b, t, hoehe, farbe, glas }) {
           <Quader key={a} p={b >= t ? [0, hoehe + 0.58, a * t] : [a * b, hoehe + 0.58, 0]}
                   g={b >= t ? [b * 0.72, 0.18, 1.3] : [1.3, 0.18, t * 0.72]} farbe={glas} schatten={false} />
         ))}
-        <Quader p={[b * 0.2, hoehe + 0.9, -t * 0.15]} g={[3, 1.2, 2.2]} farbe={farbe} />
-        <Quader p={[-b * 0.25, hoehe + 0.8, t * 0.18]} g={[2.4, 1, 2.4]} farbe={farbe} />
+        {/* Attika: niedrige Brüstung am Dachrand */}
+        {[[0, -1], [0, 1], [-1, 0], [1, 0]].map(([x, z]) => (
+          <Quader key={`at${x}${z}`} p={[x * (b / 2 + 0.2), hoehe + 0.75, z * (t / 2 + 0.2)]} g={x ? [0.25, 0.5, t + 0.65] : [b + 0.65, 0.5, 0.25]}
+                  farbe={farbe} schatten={false} />
+        ))}
+        {/* Lüftungsgeräte mit Ventilatoren */}
+        <Quader p={[b * 0.2, hoehe + 1.1, -t * 0.15]} g={[3, 1.2, 2.2]} farbe={glas} />
+        <Quader p={[-b * 0.25, hoehe + 1.0, t * 0.18]} g={[2.4, 1, 2.4]} farbe={glas} />
+        {[[b * 0.2 - 0.7, -t * 0.15, 1.7], [b * 0.2 + 0.7, -t * 0.15, 1.7], [-b * 0.25, t * 0.18, 1.5]].map(([x, z, y]) => (
+          <mesh key={`lf${x}`} position={[x, hoehe + y + 0.02, z]}>
+            <cylinderGeometry args={[0.5, 0.5, 0.08, 16]} />
+            <meshStandardMaterial color="#3a3f47" roughness={0.6} />
+          </mesh>
+        ))}
       </group>
     );
   }
@@ -324,45 +332,67 @@ function Solar({ h, map }) {
 }
 
 /** Anbau an einer Halle (lx/lz: Mitte relativ zur Hallenmitte) */
-function Anbau({ a, lx, lz, f, offen, dachFarbe, wand }) {
-  const deckkraft = offen ? 0.08 : 1;
+function Anbau({ a, lx, lz, f, dachFarbe, wand }) {
   if (a.art === 'hochteil') {
     // höherer Hallenteil: etwas größer als die Halle selbst, damit die Wände nicht flimmern
     return (
       <group position={[lx, 0, lz]}>
-        <mesh position={[0, a.hoehe / 2, 0]} castShadow={!offen} receiveShadow raycast={offen ? KEIN_STRAHL : THREE.Mesh.prototype.raycast}>
+        <mesh position={[0, a.hoehe / 2, 0]} castShadow receiveShadow>
           <boxGeometry args={[a.b + 0.2, a.hoehe, a.t + 0.3]} />
-          <meshStandardMaterial key={offen ? 'glas' : 'voll'} color={f.wand} map={wand} roughness={0.8}
-                                transparent={offen} opacity={deckkraft} depthWrite={!offen} />
+          <meshStandardMaterial color={f.wand} map={wand} roughness={0.8} />
         </mesh>
-        {!offen && (
-          <>
-            <Quader p={[0, a.hoehe * 0.8, 0]} g={[a.b + 0.3, 1, a.t + 0.4]} farbe={f.fenster} schatten={false} leuchten={f.nacht ? 0.9 : 0} lichtFarbe={f.licht} />
-            <Quader p={[0, a.hoehe + 0.25, 0]} g={[a.b + 0.6, 0.5, a.t + 0.7]} farbe={dachFarbe} />
-          </>
-        )}
+        <Quader p={[0, a.hoehe * 0.8, 0]} g={[a.b + 0.3, 1, a.t + 0.4]} farbe={f.fenster} schatten={false} leuchten={f.nacht ? 0.9 : 0} lichtFarbe={f.licht} />
+        <Quader p={[0, a.hoehe + 0.25, 0]} g={[a.b + 0.6, 0.5, a.t + 0.7]} farbe={dachFarbe} />
       </group>
     );
   }
   const buero = a.art === 'kopfbau';
   return (
     <group position={[lx, 0, lz]}>
-      <Quader p={[0, a.hoehe / 2, 0]} g={[a.b, a.hoehe, a.t]} farbe={buero ? f.buero : f.wand} deckkraft={deckkraft}
-              raycast={offen ? KEIN_STRAHL : THREE.Mesh.prototype.raycast} />
-      {!offen && (
-        <>
-          {buero
-            ? Array.from({ length: a.etagen }, (_, e) => (
-              <Quader key={e} p={[0, 1.9 + e * 3.6, 0]} g={[a.b + 0.08, 1.3, a.t + 0.08]} farbe={f.fenster} schatten={false}
-                      leuchten={f.nacht && e % 2 === 0 ? 0.8 : 0} lichtFarbe={f.licht} />
-            ))
-            : <Quader p={[0, a.hoehe * 0.6, 0]} g={[a.b + 0.08, 0.9, a.t + 0.08]} farbe={f.fenster} schatten={false} />}
-          <Quader p={[0, a.hoehe + 0.2, 0]} g={[a.b + 0.4, 0.4, a.t + 0.4]} farbe={f['maschine-dunkel']} />
-          {/* Eingang (Glas) an der Vorderseite */}
-          {buero && <Quader p={[0, 1.4, a.t / 2 + 0.06]} g={[2.6, 2.8, 0.1]} farbe={f.glas} schatten={false} />}
-        </>
-      )}
+      <Quader p={[0, a.hoehe / 2, 0]} g={[a.b, a.hoehe, a.t]} farbe={buero ? f.buero : f.wand} />
+      {buero
+        ? Array.from({ length: a.etagen }, (_, e) => (
+          <Quader key={e} p={[0, 1.9 + e * 3.6, 0]} g={[a.b + 0.08, 1.3, a.t + 0.08]} farbe={f.fenster} schatten={false}
+                  leuchten={f.nacht && e % 2 === 0 ? 0.8 : 0} lichtFarbe={f.licht} />
+        ))
+        : <Quader p={[0, a.hoehe * 0.6, 0]} g={[a.b + 0.08, 0.9, a.t + 0.08]} farbe={f.fenster} schatten={false} />}
+      <Quader p={[0, a.hoehe + 0.2, 0]} g={[a.b + 0.4, 0.4, a.t + 0.4]} farbe={f['maschine-dunkel']} />
+      {/* Eingang (Glas) an der Vorderseite */}
+      {buero && <Quader p={[0, 1.4, a.t / 2 + 0.06]} g={[2.6, 2.8, 0.1]} farbe={f.glas} schatten={false} />}
     </group>
+  );
+}
+
+/** Vor dem Verwaltungsgebäude: zwei Bänke, Mülleimer, Fahrradständer mit Rädern (lokal zur Gebäudemitte, vorn = +z) */
+function VorDemBuero({ d, f }) {
+  const z0 = d.t / 2 + 2.2;
+  const teile = useMemo(() => {
+    const holz = [];
+    const metall = [];
+    const raeder = [];
+    [-0.3, 0.3].forEach((a) => {
+      const x = a * d.b;
+      holz.push({ p: [x, 0.45, z0], g: [1.8, 0.06, 0.45] }, { p: [x, 0.75, z0 + 0.22], g: [1.8, 0.35, 0.05] });
+      [-0.8, 0.8].forEach((dx) => metall.push({ p: [x + dx, 0.22, z0], g: [0.06, 0.44, 0.45] }));
+      metall.push({ p: [x + 1.3, 0.45, z0], g: [0.45, 0.9, 0.45] });
+    });
+    // Fahrradständer (Bügel) mit drei Rädern rechts vor dem Eingang
+    for (let i = 0; i < 4; i += 1) {
+      const x = d.b * 0.5 - 0.6 - i * 0.8;
+      metall.push({ p: [x, 0.4, z0 + 1.2], g: [0.05, 0.8, 0.7] });
+      if (i < 3) {
+        [-0.5, 0.5].forEach((dz) => raeder.push({ p: [x + 0.35, 0.35, z0 + 1.2 + dz], g: [0.68, 0.68, 0.68], r: [0, Math.PI / 2, 0] }));
+        metall.push({ p: [x + 0.35, 0.55, z0 + 1.2], g: [0.04, 0.05, 1.0], farbe: [f.blau, f['ampel-rot'], f['maschine-dunkel']][i] });
+      }
+    }
+    return { holz, metall, raeder };
+  }, [d.b, z0, f]);
+  return (
+    <>
+      <Viele teile={teile.holz} farbe="#a0764d" schatten={false} />
+      <Viele teile={teile.metall} farbe={f['maschine-dunkel']} schatten={false} metall={0.4} />
+      <Viele teile={teile.raeder} form="ring" farbe="#1b1c1f" schatten={false} />
+    </>
   );
 }
 
@@ -501,7 +531,7 @@ function bueroTeile(r, f) {
   };
 }
 
-/** Brückenkran unter der Decke: Kranbahn an den Längswänden, Brücke fährt längs, Katze mit Haken quer */
+/** Brückenkran unter der Decke: Brücke fährt längs (Kranbahn mit den Wänden ausgeblendet), Katze mit Haken quer */
 function Hallenkran({ L, S, hoehe, f, bewegt }) {
   const bruecke = useRef(null);
   const katze = useRef(null);
@@ -514,7 +544,6 @@ function Hallenkran({ L, S, hoehe, f, bewegt }) {
   const y = hoehe - 1.4;
   return (
     <>
-      {[-1, 1].map((z) => <Quader key={z} p={[0, y, z * (S / 2 - 0.6)]} g={[L - 0.6, 0.4, 0.25]} farbe={f.tank} schatten={false} deckkraft={0.4} />)}
       <group ref={bruecke} position={[L * 0.1, y + 0.5, 0]}>
         <Quader p={[0, 0, 0]} g={[0.7, 0.8, S - 1.1]} farbe={f.signal} schatten={false} />
         {[-1, 1].map((z) => <Quader key={z} p={[0, -0.15, z * (S / 2 - 0.6)]} g={[2.2, 0.45, 0.55]} farbe={f.signal} schatten={false} />)}
@@ -544,7 +573,7 @@ function gangInHalle(halle, maschinen) {
 /* ---------------------------------------------------------------------------
  * Szene
  * ------------------------------------------------------------------------- */
-function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, verwaltung, onVerwaltung }) {
+function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, verwaltung, onVerwaltung, onFund }) {
   const t = useT();
   // Boden, Straßen, Wände und Dächer in den Farben des Landes (Wüste in Mexiko, Schnee in Russland …)
   const f = useMemo(() => mitLandStil(fBasis, standort.land), [fBasis, standort.land]);
@@ -565,10 +594,10 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
   const richtung = new THREE.Vector3(0.42, 0.78, 0.82).normalize();
   const buero = gs.deko.find((d) => d.art === 'buero');
   const ziel = useMemo(() => {
-    // Easter Egg: Kamera fliegt nah an das Verwaltungsgebäude heran (dort wartet das Minispiel)
+    // Easter Egg: Kamera fliegt nah an das geöffnete Verwaltungsgebäude heran (Versteckspiel)
     if (verwaltung && buero) {
-      const mitte = [X(buero.x + buero.b / 2), buero.etagen * 1.8, Z(buero.y + buero.t / 2)];
-      const abstand = Math.max(buero.b, buero.t) * 1.5 + 16;
+      const mitte = [X(buero.x + buero.b / 2), 0, Z(buero.y + buero.t / 2)];
+      const abstand = Math.max(buero.b, buero.t * 1.4) * 1.3 + 8;
       return { schluessel: 'verwaltung', target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand) };
     }
     if (gewaehlt) {
@@ -582,7 +611,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     const mitte = [0, 0, 8];
     return { schluessel: 'werk', target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gewaehlt, gs, verwaltung]);
+  }, [gewaehlt, gs, Boolean(verwaltung)]);
 
   useEffect(() => { document.body.style.cursor = hover ? 'pointer' : ''; return () => { document.body.style.cursor = ''; }; }, [hover]);
 
@@ -601,8 +630,13 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     const z = zufall(`${standort.kuerzel}-figuren`);
     const liste = [];
     gs.strassen.filter((s) => s.t <= 6 && s.b > s.t).slice(0, 2).forEach((s, i) => {
-      [0, 1].forEach((j) => liste.push({ a: [X(s.x + 3), Z(s.y + 3)], b: [X(s.x + s.b - 3), Z(s.y + 3)], farbe: f[`person-${(i + j) % 3}`], phase: z(), tempo: 1 + z() * 0.5 }));
+      [0, 1].forEach((j) => liste.push({ a: [X(s.x + 3), Z(s.y - 0.8)], b: [X(s.x + s.b - 3), Z(s.y - 0.8)], farbe: f[`person-${(i + j) % 3}`], phase: z(), tempo: 1 + z() * 0.5 }));
     });
+    // vom Parkplatz zum Tor
+    [0, 1].forEach((j) => liste.push({
+      a: [X(gs.parkplatz.x + gs.parkplatz.b * (0.3 + j * 0.4)), Z(gs.parkplatz.y - 1)], b: [X(gs.tor.x + gs.tor.b / 2 + j * 2), Z(gs.parkplatz.y - 1.5)],
+      farbe: f[`person-${j + 1}`], phase: z(), tempo: 0.9 + z() * 0.3,
+    }));
     if (gewaehlt) {
       const h = gs.hallen[gewaehlt.id];
       const gang = gangInHalle(gewaehlt, maschinen.filter((m) => m.gebaeude_id === gewaehlt.id));
@@ -616,6 +650,13 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs, gewaehlt, f]);
 
+  // Weg des Gabelstaplers draußen: auf der ersten Längsstraße, rechte Fahrspur
+  const staplerWeg = useMemo(() => {
+    const s = gs.strassen.find((st) => !st.pfad && st.b > st.t && st.t <= 6);
+    return s ? { a: [X(s.x + 8), Z(s.y + 4.3)], b: [X(s.x + s.b - 8), Z(s.y + 4.3)] } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs]);
+
   // Straßenlaternen am Rand der Werksstraßen (alle 30 m), Ausleger zur Straße hin
   const laternen = useMemo(() => {
     const liste = [];
@@ -627,7 +668,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs]);
   const nacht = f.nacht;
-  // Laternen bis 35 m um die geöffnete Halle werden (fast) unsichtbar
+  // Laternen bis 35 m um die geöffnete Halle werden ausgeblendet (sie stünden im Blick)
   const naheGeoeffneterHalle = (l) => {
     if (!gewaehlt) return false;
     const h = gs.hallen[gewaehlt.id];
@@ -738,11 +779,14 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       <Flaeche x={X(gs.parkplatz.x + gs.parkplatz.b / 2)} z={Z(gs.parkplatz.y + gs.parkplatz.t / 2)} b={gs.parkplatz.b} t={gs.parkplatz.t} farbe={f.strasse} />
       <Flaeche x={X(gs.parkplatz.x + gs.parkplatz.b / 2)} z={Z(gs.parkplatz.y + gs.parkplatz.t / 2)} b={gs.parkplatz.b} t={gs.parkplatz.t}
                farbe={f.markierung} map={texturen.park} deckkraft={0.95} y={0.03} />
+      {/* Zebrastreifen über die Zufahrt vor dem Tor */}
+      <Viele teile={Array.from({ length: 9 }, (_, i) => ({ p: [X(gs.tor.x + gs.tor.b / 2), 0.035, Z(gs.zufahrtY + 1 + i)], g: [3.2, 0.01, 0.5] }))}
+             farbe={f.markierung} schatten={false} />
       {/* Geparkte Autos (alle zusammen als Instanzen) */}
       <ParkendeAutos plaetze={autos} />
       <Quader p={[X(gs.tor.x + gs.tor.b / 2), 0.6, Z(T - 1)]} g={[gs.tor.b, 1.2, 0.3]} farbe={f.tor} />
 
-      {laternen.map((l, i) => <Laterne key={`l${i}`} {...l} f={f} durchsichtig={naheGeoeffneterHalle(l)} />)}
+      {laternen.filter((l) => !naheGeoeffneterHalle(l)).map((l, i) => <Laterne key={`l${i}`} {...l} f={f} />)}
       <Landesdeko standort={standort} gs={gs} f={f} X={X} Z={Z} gebaeudeId={gewaehlt?.id} />
       {/* Betonflächen rund um die Hallen (Vorplatz, Anlieferung) */}
       {gebaeude.map((g) => {
@@ -760,17 +804,27 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
         if (d.art === 'buero') {
           const h = d.etagen * 3.6;
           // Easter Egg: Verwaltung anklickbar (nicht beim Melden und nicht, solange eine Halle offen ist)
+          // Easter Egg: geöffnet (Dach weg, Wände abgeschnitten) mit Einrichtung und Verstecken
+          if (verwaltung) {
+            return (
+              <group key={i} position={[X(d.x + d.b / 2), 0, Z(d.y + d.t / 2)]}>
+                <VerwaltungInnen d={d} f={f} stil={stil?.buero} bewegt={bewegt} arten={verwaltung.arten}
+                                 gefunden={verwaltung.gefunden} tipp={verwaltung.tipp} onFund={onFund} />
+              </group>
+            );
+          }
           const klickbar = Boolean(onVerwaltung) && !neutral && !gewaehlt;
           return (
             <group key={i} position={[X(d.x + d.b / 2), 0, Z(d.y + d.t / 2)]} scale={klickbar && hover === 'verwaltung' ? 1.04 : 1}
                    onClick={klickbar ? (e) => klick(e, onVerwaltung) : undefined}
                    onPointerOver={klickbar ? (e) => { e.stopPropagation(); setHover('verwaltung'); } : undefined}
                    onPointerOut={klickbar ? () => setHover(null) : undefined}>
-              {klickbar && hover === 'verwaltung' && bereit && !verwaltung && (
+              {klickbar && hover === 'verwaltung' && bereit && (
                 <Html position={[0, h + 7, 0]} center zIndexRange={[4, 1]} style={{ pointerEvents: 'none' }}>
                   <span className="raum-name"><i className="bi bi-cup-hot" aria-hidden="true" /> {t('Verwaltung')} · ?</span>
                 </Html>
               )}
+              <VorDemBuero d={d} f={f} />
               {/* Bürogebäude im Baustil des Landes (Fachwerk, Glasturm, Pagode …), sonst schlichter Quader */}
               {stil ? <Buero3D stil={stil.buero} d={d} f={f} /> : (
                 <>
@@ -814,17 +868,16 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
         const farbe = stufenFarbe(f, g.offen, g.hoechste_prioritaet, neutral);
         return (
           <group key={g.id} position={[X(h.x + h.b / 2), 0, Z(h.y + h.t / 2)]}>
-            <mesh position={[0, h.hoehe / 2, 0]} castShadow={!offen} receiveShadow
-                  raycast={offen ? KEIN_STRAHL : THREE.Mesh.prototype.raycast}
-                  onClick={(e) => klick(e, () => onGebaeude(g))}
-                  onPointerOver={(e) => { e.stopPropagation(); setHover(`g${g.id}`); }} onPointerOut={() => setHover(null)}>
-              <boxGeometry args={[h.b, h.hoehe, h.t]} />
-              {/* key: Three.js übernimmt "durchsichtig" nur bei neuem Material */}
-              <meshStandardMaterial key={offen ? 'glas' : 'voll'} color={f.wand} map={wandTexturen.get(g.id)} roughness={0.8} transparent={offen} opacity={offen ? 0.13 : 1}
-                                    depthWrite={!offen} emissive={f.akzent} emissiveIntensity={hervor && !offen ? 0.18 : 0} />
-            </mesh>
+            {/* Geöffnete Halle: Wände, Dach und Anbauten ganz weg – nur Boden und Einrichtung bleiben (freie Sicht) */}
             {!offen && (
               <>
+                <mesh position={[0, h.hoehe / 2, 0]} castShadow receiveShadow
+                      onClick={(e) => klick(e, () => onGebaeude(g))}
+                      onPointerOver={(e) => { e.stopPropagation(); setHover(`g${g.id}`); }} onPointerOut={() => setHover(null)}>
+                  <boxGeometry args={[h.b, h.hoehe, h.t]} />
+                  <meshStandardMaterial color={f.wand} map={wandTexturen.get(g.id)} roughness={0.8}
+                                        emissive={f.akzent} emissiveIntensity={hervor ? 0.18 : 0} />
+                </mesh>
                 {/* Fensterband, Rolltor, Dach, Streifen in der Störungsfarbe */}
                 <Quader p={[0, h.hoehe * 0.72, 0]} g={[h.b + 0.1, 1.3, h.t + 0.1]} farbe={f.fenster} schatten={false}
                         map={texturen.fenster.get(g.id)} leuchten={nacht ? 0.9 : 0} lichtFarbe={f.licht} />
@@ -835,22 +888,23 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
                 {solar.has(g.id) && <Solar h={h} map={texturen.solar} />}
               </>
             )}
-            {/* Anbauten: Flachbau, Kopfbau mit Büros, höherer Hallenteil (bei geöffneter Halle durchsichtig) */}
-            <group onClick={offen ? undefined : (e) => klick(e, () => onGebaeude(g))}
-                   onPointerOver={offen ? undefined : (e) => { e.stopPropagation(); setHover(`g${g.id}`); }}
-                   onPointerOut={offen ? undefined : () => setHover(null)}>
-              {h.anbauten.map((a, i) => (
-                <Anbau key={i} a={a} lx={a.x + a.b / 2 - h.x - h.b / 2} lz={a.y + a.t / 2 - h.y - h.t / 2} f={f} offen={offen}
-                       dachFarbe={dachFarbe} wand={wandTexturen.get(g.id)} />
-              ))}
-            </group>
+            {/* Anbauten: Flachbau, Kopfbau mit Büros, höherer Hallenteil (bei geöffneter Halle ausgeblendet) */}
+            {!offen && (
+              <group onClick={(e) => klick(e, () => onGebaeude(g))}
+                     onPointerOver={(e) => { e.stopPropagation(); setHover(`g${g.id}`); }} onPointerOut={() => setHover(null)}>
+                {h.anbauten.map((a, i) => (
+                  <Anbau key={i} a={a} lx={a.x + a.b / 2 - h.x - h.b / 2} lz={a.y + a.t / 2 - h.y - h.t / 2} f={f}
+                         dachFarbe={dachFarbe} wand={wandTexturen.get(g.id)} />
+                ))}
+              </group>
+            )}
             {offen && (
               <HallenInneres halle={g} h={h} f={f} bewegt={bewegt} maschineId={maschineId} neutral={neutral} boden={texturen.boden}
                              maschinen={maschinen.filter((m) => m.gebaeude_id === g.id)}
                              onMaschine={onMaschine} setHover={setHover} hover={hover} klick={klick} />
             )}
             {/* Beschriftung als Knopf (auch per Tastatur bedienbar); in einer Halle nur die anderen kurz */}
-            {!offen && bereit && (
+            {!offen && bereit && !verwaltung && (
               <Html position={[0, Math.max(h.hoehe + (h.dach === 'flach' ? 2.5 : Math.min(h.b, h.t) * 0.12 + 2.5), ...h.anbauten.map((a) => a.hoehe + 2.5)), 0]} center zIndexRange={[4, 1]}>
                 <button type="button" className={`raum-halle stufe-${neutral ? 'neutral' : stufe(g.offen, g.hoechste_prioritaet)}${gewaehlt ? ' klein' : ''}`}
                         data-ort={`g-${g.id}`} aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen, t)}`}
@@ -866,6 +920,8 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       })}
 
       {figuren.map((p, i) => <Figur key={`${gewaehlt?.id ?? 'w'}-${i}`} {...p} art={i} f={f} bewegt={bewegt} />)}
+      {/* Gabelstapler bringt Paletten über die Werksstraße */}
+      {staplerWeg && <Gabelstapler a={staplerWeg.a} b={staplerWeg.b} f={f} bewegt={bewegt} phase={0.55} tempo={3} />}
       {/* Verkehr auf der Zufahrt: je Spur eine Richtung */}
       {bewegt && [
         { art: 'lkw', spur: 2.6, richtung: 1, tempo: 7, phase: 0.1, farbe: AUTO_FARBEN[5] },
@@ -884,7 +940,6 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
   const ox = -h.b / 2;
   const oz = -h.t / 2;
   const bereiche = halle.bereiche ?? [];
-  const lichtbaender = Math.max(2, Math.round(h.t / 9));   // Lichtbänder unter der Decke
   const gang = gangInHalle(halle, maschinen);
   // Betonboden mit Fugen (Textur je Halle passend zur Größe)
   const bodenMap = useMemo(() => {
@@ -893,21 +948,10 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
     m.needsUpdate = true;
     return m;
   }, [boden, h.b, h.t]);
-  // Stahlstützen innen an der Rück- und linken Wand (alle 6,6 m) – ein Zeichenaufruf für alle.
-  // Vorn und rechts (zur Kamera hin) bewusst keine: sie stünden wie Gitterstäbe vor dem Blick in die Halle.
-  const stuetzen = useMemo(() => {
-    const liste = [];
-    const nx = Math.max(1, Math.round(h.b / WANDFELD));
-    const nz = Math.max(1, Math.round(h.t / WANDFELD));
-    for (let i = 0; i <= nx; i += 1) liste.push({ p: [ox + (i * h.b) / nx, h.hoehe / 2, -(h.t / 2 - 0.2)], g: [0.24, h.hoehe, 0.24] });
-    for (let j = 1; j < nz; j += 1) liste.push({ p: [-(h.b / 2 - 0.2), h.hoehe / 2, oz + (j * h.t) / nz], g: [0.24, h.hoehe, 0.24] });
-    return liste;
-  }, [h.b, h.t, h.hoehe, ox, oz]);
   const mitKran = h.hoehe < 14 && !/lager|logistik|versand|labor|büro/i.test(halle.bezeichnung ?? '');
   return (
     <>
       <Flaeche x={0} z={0} b={h.b} t={h.t} farbe={f.hallenboden} y={0.03} map={bodenMap} />
-      <Viele teile={stuetzen} farbe={f.tank} schatten={false} metall={0.3} deckkraft={0.35} />
       {/* Gehweg im Gang (grüne Linien) und Gabelstapler in der Mitte */}
       {[-1, 1].map((seite) => (
         <Flaeche key={`gw${seite}`} x={ox + (gang.x0 + gang.x1) / 2} z={oz + gang.y + seite * Math.max(0.8, gang.breite / 2 - 0.25)} b={gang.x1 - gang.x0}
@@ -921,17 +965,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
           <Hallenkran L={Math.max(h.b, h.t)} S={Math.min(h.b, h.t)} hoehe={h.hoehe} f={f} bewegt={bewegt} />
         </group>
       )}
-      {/* Hallenbeleuchtung (nur nachts, also im Dunkelmodus): Reihen einzelner Leuchten unter der Decke
-          und warmes Licht in der Halle. Tagsüber ist das Dach offen – dann blieben nur schwebende Lampen. */}
-      {f.nacht && Array.from({ length: lichtbaender }, (_, i) => (
-        Array.from({ length: Math.max(2, Math.floor(h.b / 7)) }, (__, j) => {
-          const proReihe = Math.max(2, Math.floor(h.b / 7));
-          return (
-            <Quader key={`lb${i}-${j}`} p={[ox + ((j + 0.5) * h.b) / proReihe, h.hoehe - 0.7, oz + ((i + 0.5) * h.t) / lichtbaender]}
-                    g={[2.0, 0.05, 0.18]} farbe={f.licht} leuchten={1.6} lichtFarbe={f.licht} schatten={false} deckkraft={0.45} />
-          );
-        })
-      ))}
+      {/* Hallenbeleuchtung (nur nachts, also im Dunkelmodus): warmes Licht in der Halle, ohne sichtbare Leuchten */}
       {f.nacht && [-0.25, 0.25].map((ax) => (
         <pointLight key={`hl${ax}`} position={[ax * h.b, h.hoehe - 1.2, 0]} color={f.licht}
                     intensity={380} distance={Math.max(h.b, h.t) * 1.3} decay={2} />
@@ -993,23 +1027,43 @@ export default function Werk3D(props) {
   const { f, bewegt } = useRaum();
   const rahmen = useRef(null);
   const sichtbar = useSichtbar(rahmen);   // außerhalb des Bildschirms wird nicht gezeichnet
-  // Easter Egg: null | 'flug' (Kamera fliegt zur Verwaltung) | 'offen' (Minispiel)
+  // Easter Egg Versteckspiel: null oder { phase: 'flug' | 'intro' | 'laeuft' | 'fertig', arten, gefunden, start, ende, tipp, tipps }
   const [spiel, setSpiel] = useState(null);
   useEffect(() => {
-    if (spiel !== 'flug') return undefined;
-    const warten = setTimeout(() => setSpiel('offen'), bewegt ? 1150 : 0);
+    if (spiel?.phase !== 'flug') return undefined;
+    const warten = setTimeout(() => setSpiel((s) => s && { ...s, phase: 'intro' }), bewegt ? 1150 : 0);
     return () => clearTimeout(warten);
-  }, [spiel, bewegt]);
+  }, [spiel?.phase, bewegt]);
   useEffect(() => { setSpiel(null); }, [props.gebaeudeId]);
+  // Tipp leuchtet 3 Sekunden
+  useEffect(() => {
+    if (!spiel?.tipp) return undefined;
+    const aus = setTimeout(() => setSpiel((s) => s && { ...s, tipp: null }), 3000);
+    return () => clearTimeout(aus);
+  }, [spiel?.tipp]);
+  const neueRunde = (phase) => ({ phase, arten: dingeFuerRunde(), gefunden: [], start: Date.now(), ende: null, tipp: null, tipps: 0 });
+  const fund = (art) => setSpiel((s) => {
+    if (!s || s.gefunden.includes(art) || s.phase === 'fertig') return s;
+    const start = s.phase === 'laeuft' ? s.start : Date.now();
+    const gefunden = [...s.gefunden, art];
+    const fertig = gefunden.length === s.arten.length;
+    return { ...s, gefunden, start, phase: fertig ? 'fertig' : 'laeuft', ende: fertig ? Date.now() : null, tipp: s.tipp === art ? null : s.tipp };
+  });
+  const tipp = () => setSpiel((s) => {
+    const offen = s?.arten.find((a) => !s.gefunden.includes(a));
+    return offen ? { ...s, tipp: offen, tipps: s.tipps + 1 } : s;
+  });
   return (
     <div className="raum" ref={rahmen}>
       {/* offsetSize: Größe ohne CSS-Transform messen (die Ebene wird beim Zoomen skaliert) */}
       <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar ? 'never' : bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
               camera={{ fov: 38, near: 0.5, far: 4000, position: [150, 200, 220] }} gl={{ antialias: true, alpha: true }}>
-        <Szene {...props} f={f} bewegt={bewegt} verwaltung={Boolean(spiel)} onVerwaltung={props.neutral ? null : () => setSpiel('flug')} />
+        <Szene {...props} f={f} bewegt={bewegt} verwaltung={spiel} onFund={fund}
+               onVerwaltung={props.neutral ? null : () => setSpiel(neueRunde('flug'))} />
       </Canvas>
-      {spiel === 'offen' && (
-        <Minispiel maschinen={props.maschinen ?? []} ort={props.standort.stadt} onSchliessen={() => setSpiel(null)} />
+      {spiel && (
+        <VersteckLeiste spiel={spiel} ort={props.standort.stadt} onStart={() => setSpiel((s) => ({ ...s, phase: 'laeuft', start: Date.now() }))}
+                        onTipp={tipp} onNochmal={() => setSpiel(neueRunde('laeuft'))} onSchliessen={() => setSpiel(null)} />
       )}
     </div>
   );

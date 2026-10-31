@@ -394,6 +394,29 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   }
   await p.click('.buehne-kopf button[aria-label="Herauszoomen"]'); await p.waitForTimeout(1500);
   pruefe('3D: zurück zum Werk ohne Neuladen der Szene', p.url().endsWith('/karte?werk=alb') && (await p.$$eval('.raum canvas', (z) => z.length)) === 1, p.url());
+  // Easter Egg: Verwaltungsgebäude suchen (Schild beim Darüberfahren), anklicken → Versteckspiel
+  await p.waitForTimeout(1500);
+  const flaeche = await (await p.$('.raum canvas')).boundingBox();
+  let verwaltung = null;
+  suche: for (let y = 0.3; y < 0.75; y += 0.03) {
+    for (let x = 0.4; x < 0.85; x += 0.03) {
+      await p.mouse.move(flaeche.x + flaeche.width * x, flaeche.y + flaeche.height * y); await p.waitForTimeout(40);
+      if (await p.$('.raum-name:has(.bi-cup-hot)')) { verwaltung = [x, y]; break suche; }
+    }
+  }
+  pruefe('3D: Verwaltung zeigt beim Darüberfahren ihr Schild', verwaltung !== null);
+  if (verwaltung) {
+    await p.mouse.click(flaeche.x + flaeche.width * verwaltung[0], flaeche.y + flaeche.height * verwaltung[1]);
+    await p.waitForSelector('.versteck-intro', { timeout: 15000 }).catch(() => {});
+    pruefe('Versteckspiel: Verwaltung öffnet sich mit Aufgabe (5 Dinge)', (await p.$$eval('.versteck-intro .versteck-dinge span', (z) => z.length)) === 5
+      && (await p.$$('.raum-halle')).length === 0);
+    await p.click('.versteck-intro .btn-primary'); await p.waitForTimeout(600);
+    await p.click('.versteck .bi-lightbulb');
+    pruefe('Versteckspiel: Zeit läuft, Tipp gesperrt solange er leuchtet', (await p.isVisible('.versteck-zeit')) && (await p.isDisabled('.versteck button:has(.bi-lightbulb)')));
+    await p.screenshot({ path: SHOTS + 'r-versteckspiel.png' });
+    await p.keyboard.press('Escape'); await p.waitForTimeout(1500);
+    pruefe('Versteckspiel: Esc schließt, Werk wieder mit Beschriftungen', !(await p.$('.versteck')) && (await p.$$('.raum-halle')).length === hallenAlb);
+  }
   await p.click('.raum-schalter button:has-text("2D")'); await p.waitForTimeout(800);
   // Melden in 3D: neutral (keine Störungszahlen), Maschine über die Liste wählen
   await p.click('.raum-schalter button:has-text("3D")'); await p.waitForTimeout(300);
