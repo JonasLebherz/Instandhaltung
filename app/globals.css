@@ -73,7 +73,7 @@
 
 
     /* 3D-Ansicht und Werks-Deko (components/karten/raum/) – feste Farben, weil WebGL keine Transparenz-Mischung wie CSS kann */
-    --raum-umgebung: #e6e9ee; --raum-gelaende: #dfe5dc; --raum-strasse: #c9ced6; --raum-markierung: #ffffff;
+    --raum-umgebung: #e6e9ee; --raum-gelaende: #d3dfca; --raum-beton: #e4e5e3; --raum-strasse: #c9ced6; --raum-markierung: #ffffff;
     --raum-wand: #f6f7f9; --raum-fenster: #9db4cf; --raum-tor: #8e96a3;
     --raum-dach-0: #8f9bab; --raum-dach-1: #b39c86; --raum-dach-2: #8ea597; --raum-dach-3: #a3a4c2;
     --raum-hallenboden: #eceef1; --raum-linie: #b9c0ca;
@@ -124,7 +124,7 @@
 
 
     /* Nacht: dunkler als am Tag, aber Hallen und Maschinen bleiben gut erkennbar */
-    --raum-umgebung: #20242a; --raum-gelaende: #323a44; --raum-strasse: #4a515b; --raum-markierung: #8e959f;
+    --raum-umgebung: #20242a; --raum-gelaende: #37443b; --raum-beton: #4f545b; --raum-strasse: #4a515b; --raum-markierung: #8e959f;
     --raum-wand: #727b88; --raum-fenster: #7393bb; --raum-tor: #3d434c;
     --raum-dach-0: #7c889b; --raum-dach-1: #94857a; --raum-dach-2: #74907e; --raum-dach-3: #8586a6;
     --raum-hallenboden: #444a53; --raum-linie: #68707b;

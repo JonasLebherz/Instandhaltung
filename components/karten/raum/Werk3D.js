@@ -31,6 +31,7 @@ import { stufe, offenText } from '../stufe';
 import { useT } from '@/components/SpracheKontext';
 import { MaschineMitAmpel } from './Maschine3D';
 import { useRaum, useSichtbar } from './farben';
+import Landesdeko from './Landesdeko';
 
 /** Farbe einer Störungsstufe */
 const stufenFarbe = (f, offen, prio, neutral = false) => (neutral ? f.linie : ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)]);
@@ -85,26 +86,44 @@ function Kamera({ ziel, bewegt, steuerung }) {
 /* ---------------------------------------------------------------------------
  * Kleine Bausteine
  * ------------------------------------------------------------------------- */
-function Quader({ p, g, farbe, schatten = true, leuchten = 0, lichtFarbe = null, ...rest }) {
+function Quader({ p, g, farbe, schatten = true, leuchten = 0, lichtFarbe = null, deckkraft = 1, ...rest }) {
+  const glas = deckkraft < 1;
   return (
-    <mesh position={p} castShadow={schatten} receiveShadow {...rest}>
+    <mesh position={p} castShadow={schatten && !glas} receiveShadow {...rest}>
       <boxGeometry args={g} />
-      <meshStandardMaterial color={farbe} roughness={0.85} emissive={lichtFarbe ?? farbe} emissiveIntensity={leuchten} />
+      <meshStandardMaterial key={glas ? 'glas' : 'voll'} color={farbe} roughness={0.85} emissive={lichtFarbe ?? farbe} emissiveIntensity={leuchten}
+                            transparent={glas} opacity={deckkraft} depthWrite={!glas} />
     </mesh>
   );
 }
 
+/** Wandverkleidung aus Trapezblech: senkrechte Rippen als kleine Textur (wird je Halle wiederholt) */
+function rippenTextur() {
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 4;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 32, 4);
+  g.fillStyle = '#d4d6da'; g.fillRect(0, 0, 5, 4);
+  g.fillStyle = '#ebedf0'; g.fillRect(5, 0, 3, 4);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
 /** Straßenlaterne: Mast, Ausleger zur Straße hin, Leuchte (nachts an) */
-function Laterne({ x, z, richtung, f }) {
+function Laterne({ x, z, richtung, f, durchsichtig = false }) {
   const [dx, dz] = richtung;
+  const deckkraft = durchsichtig ? 0.22 : 1;   // an der geöffneten Halle: durchsichtig, damit sie nicht im Weg steht
   return (
     <group position={[x, 0, z]}>
-      <mesh position={[0, 3, 0]} castShadow>
+      <mesh position={[0, 3, 0]} castShadow={!durchsichtig}>
         <cylinderGeometry args={[0.09, 0.13, 6, 10]} />
-        <meshStandardMaterial color={f['maschine-dunkel']} roughness={0.6} />
+        <meshStandardMaterial key={durchsichtig ? 'glas' : 'voll'} color={f['maschine-dunkel']} roughness={0.6}
+                              transparent={durchsichtig} opacity={deckkraft} depthWrite={!durchsichtig} />
       </mesh>
-      <Quader p={[dx * 0.7, 5.95, dz * 0.7]} g={[Math.abs(dx) * 1.4 + 0.12, 0.12, Math.abs(dz) * 1.4 + 0.12]} farbe={f['maschine-dunkel']} schatten={false} />
-      <Quader p={[dx * 1.35, 5.82, dz * 1.35]} g={[0.7, 0.18, 0.35]} farbe={f.nacht ? f.licht : f.tank}
+      <Quader p={[dx * 0.7, 5.95, dz * 0.7]} g={[Math.abs(dx) * 1.4 + 0.12, 0.12, Math.abs(dz) * 1.4 + 0.12]} farbe={f['maschine-dunkel']} schatten={false} deckkraft={deckkraft} />
+      <Quader p={[dx * 1.35, 5.82, dz * 1.35]} g={[0.7, 0.18, 0.35]} farbe={f.nacht ? f.licht : f.tank} deckkraft={deckkraft}
               leuchten={f.nacht ? 2 : 0} lichtFarbe={f.licht} schatten={false} />
     </group>
   );
@@ -217,7 +236,7 @@ function Fahrzeug({ art, von, bis, z, richtung, tempo, phase, farbe, f }) {
 /* ---------------------------------------------------------------------------
  * Dach je Werk: flach, Satteldach oder Sheddach (Sägezahn)
  * ------------------------------------------------------------------------- */
-function Dach({ form, b, t, hoehe, farbe }) {
+function Dach({ form, b, t, hoehe, farbe, glas }) {
   const laengs = b >= t;            // Firstrichtung entlang der längeren Seite
   const L = Math.max(b, t);
   const S = Math.min(b, t);
@@ -246,6 +265,11 @@ function Dach({ form, b, t, hoehe, farbe }) {
     return (
       <group>
         <Quader p={[0, hoehe + 0.25, 0]} g={[b + 0.6, 0.5, t + 0.6]} farbe={farbe} />
+        {/* Lichtbänder (Oberlichter) entlang der Halle */}
+        {[-0.22, 0.22].map((a) => (
+          <Quader key={a} p={b >= t ? [0, hoehe + 0.58, a * t] : [a * b, hoehe + 0.58, 0]}
+                  g={b >= t ? [b * 0.72, 0.18, 1.3] : [1.3, 0.18, t * 0.72]} farbe={glas} schatten={false} />
+        ))}
         <Quader p={[b * 0.2, hoehe + 0.9, -t * 0.15]} g={[3, 1.2, 2.2]} farbe={farbe} />
         <Quader p={[-b * 0.25, hoehe + 0.8, t * 0.18]} g={[2.4, 1, 2.4]} farbe={farbe} />
       </group>
@@ -360,6 +384,24 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs]);
   const nacht = f.nacht;
+  // Laternen bis 18 m um die geöffnete Halle werden durchsichtig
+  const naheGeoeffneterHalle = (l) => {
+    if (!gewaehlt) return false;
+    const h = gs.hallen[gewaehlt.id];
+    const dx = Math.max(X(h.x) - l.x, 0, l.x - X(h.x + h.b));
+    const dz = Math.max(Z(h.y) - l.z, 0, l.z - Z(h.y + h.t));
+    return Math.hypot(dx, dz) < 18;
+  };
+  // Trapezblech-Textur je Halle (Wiederholung passend zur Länge)
+  const wandTexturen = useMemo(() => {
+    const basis = rippenTextur();
+    return new Map(gebaeude.map((g) => {
+      const t = basis.clone();
+      t.repeat.set(Math.max(gs.hallen[g.id].b, gs.hallen[g.id].t) / 1.1, 1);
+      t.needsUpdate = true;
+      return [g.id, t];
+    }));
+  }, [gebaeude, gs]);
 
   const schatten = Math.max(B, T) * 0.7;
   return (
@@ -393,7 +435,13 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       ) : null))}
       <Quader p={[X(gs.tor.x + gs.tor.b / 2), 0.6, Z(T - 1)]} g={[gs.tor.b, 1.2, 0.3]} farbe={f.tor} />
 
-      {laternen.map((l, i) => <Laterne key={`l${i}`} {...l} f={f} />)}
+      {laternen.map((l, i) => <Laterne key={`l${i}`} {...l} f={f} durchsichtig={naheGeoeffneterHalle(l)} />)}
+      <Landesdeko standort={standort} gs={gs} f={f} X={X} Z={Z} />
+      {/* Betonflächen rund um die Hallen (Vorplatz, Anlieferung) */}
+      {gebaeude.map((g) => {
+        const h = gs.hallen[g.id];
+        return <Flaeche key={`vp${g.id}`} x={X(h.x + h.b / 2)} z={Z(h.y + h.t / 2)} b={h.b + 10} t={h.t + 9} farbe={f.beton} y={0.012} />;
+      })}
       {/* Nachts werfen einige Laternen Licht auf die Straße (nicht alle – jede Lichtquelle kostet Rechenzeit) */}
       {nacht && laternen.filter((_, i) => i % 2 === 0).slice(0, 6).map((l, i) => (
         <pointLight key={`ll${i}`} position={[l.x + l.richtung[0] * 1.4, 5.4, l.z + l.richtung[1] * 1.4]} color={f.licht}
@@ -451,7 +499,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
                   onPointerOver={(e) => { e.stopPropagation(); setHover(`g${g.id}`); }} onPointerOut={() => setHover(null)}>
               <boxGeometry args={[h.b, h.hoehe, h.t]} />
               {/* key: Three.js übernimmt "durchsichtig" nur bei neuem Material */}
-              <meshStandardMaterial key={offen ? 'glas' : 'voll'} color={f.wand} roughness={0.85} transparent={offen} opacity={offen ? 0.13 : 1}
+              <meshStandardMaterial key={offen ? 'glas' : 'voll'} color={f.wand} map={wandTexturen.get(g.id)} roughness={0.8} transparent={offen} opacity={offen ? 0.13 : 1}
                                     depthWrite={!offen} emissive={f.akzent} emissiveIntensity={hervor && !offen ? 0.18 : 0} />
             </mesh>
             {!offen && (
@@ -461,7 +509,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
                         leuchten={nacht ? 0.9 : 0} lichtFarbe={f.licht} />
                 <Quader p={[0, 2.4, h.t / 2 + 0.05]} g={[Math.min(6, h.b * 0.3), 4.8, 0.2]} farbe={f.tor} schatten={false} />
                 <Quader p={[0, 0.25, 0]} g={[h.b + 0.5, 0.5, h.t + 0.5]} farbe={farbe} schatten={false} />
-                <Dach form={gs.dach} b={h.b} t={h.t} hoehe={h.hoehe} farbe={dachFarbe} />
+                <Dach form={gs.dach} b={h.b} t={h.t} hoehe={h.hoehe} farbe={dachFarbe} glas={f.glas} />
               </>
             )}
             {offen && (
