@@ -2,19 +2,24 @@
 /**
  * components/karten/raum/Landesdeko.js – woran man in 3D erkennt, in welchem Land ein Werk liegt
  *
- *  - Fahnen am Tor: Landesflagge, Firmenflagge, Landesflagge
- *  - Torschild in Landessprache und -schrift ("Werk Albstadt", "上海工厂", "Завод Калуга" …)
- *  - ein typisches Objekt je Land (Platz aus lib/karten/werkGestaltung.js → landPlatz):
- *      DE Biergarten · MX Taco-Truck mit Kakteen · CN Ehrentor mit roten Laternen ·
- *      US Wasserturm · IN Tuk-Tuks und Palmen · FR kleiner Eiffelturm mit Café ·
- *      RU Birken und Kiosk mit Zwiebelturm · PL Pierogi-Stand mit Blumen
+ *  - Fahnen am Tor: Landesflagge, Firmenflagge, Landesflagge; Torschild in Landessprache und -schrift
+ *  - Landesstil (LAND_STIL, mitLandStil): Boden, Straßen, Hallenwände, Dächer, Bäume (Baum3D)
+ *    und Bürogebäude (Buero3D: Fachwerk, Glasturm, Pagode, Hacienda, Zwiebeltürme, Mansarde, Kuppel, Backstein)
+ *  - Flagge an jeder Halle, Sicherheits-Banner in Landessprache (Hallenschmuck)
+ *  - Umgebung: Umland mit Feldern/Bäumen, Landstraße vor dem Tor, Wahrzeichen hinten
+ *    (DE Windräder, US Scheune, CN Pagode, IN Tempel, RU Kirche, MX Berge) und das
+ *    typische Objekt gegenüber dem Tor: DE Biergarten · MX Taco-Truck mit Kakteen ·
+ *    CN Ehrentor mit roten Laternen · US Wasserturm · IN Tuk-Tuks und Palmen ·
+ *    FR kleiner Eiffelturm mit Café · RU Birken und Kiosk mit Zwiebelturm · PL Pierogi-Stand
  *
  * Fahnen und Schrift werden einmal in ein kleines Canvas gezeichnet und als Textur genutzt –
  * keine Bilddateien, keine Schriftdateien (die Schrift kommt vom System, auch Chinesisch usw.).
  * Die Farben der Flaggen sind Nationalfarben und deshalb hier fest hinterlegt.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { zufall } from '@/lib/karten/werkGestaltung';
 
 /* ---------- Canvas → Textur ---------- */
 function useTextur(zeichnen, breite, hoehe, abhaengig) {
@@ -120,9 +125,9 @@ function Fahne({ x, z, zeichnen, kennung }) {
   const textur = useTextur(zeichnen, 192, 120, [kennung]);
   return (
     <group position={[x, 0, z]}>
-      <Teil p={[0, 4.5, 0]} g={[0.07, 0.09, 9, 8]} form="zyl" farbe="#c9ced6" />
-      <mesh position={[1.25, 8.1, 0]} castShadow>
-        <planeGeometry args={[2.4, 1.5]} />
+      <Teil p={[0, 6, 0]} g={[0.1, 0.13, 12, 8]} form="zyl" farbe="#c9ced6" />
+      <mesh position={[2, 10.6, 0]} castShadow>
+        <planeGeometry args={[4, 2.5]} />
         <meshStandardMaterial map={textur} side={THREE.DoubleSide} roughness={0.8} />
       </mesh>
     </group>
@@ -290,6 +295,493 @@ function Wasserturm({ f }) {
   );
 }
 
+/* =====================================================================
+ * Landesstil: Boden, Straßen, Hallen, Dächer, Bäume und Bürogebäude je Land
+ * Farben je [hell, dunkel] – das Werk soll auf den ersten Blick "nach dem Land" aussehen.
+ * ================================================================== */
+export const LAND_STIL = {
+  DE: { gras: ['#c6dbbb', '#34473a'], wand: ['#dfe2e5', '#6e7681'], dach: ['#a2402f', '#6e3a33'], baum: 'mix', buero: 'fachwerk',
+    banner: 'SICHERHEIT GEHT VOR', umland: ['#b4cc9f', '#2f3f33'], umlandBaeume: ['kegel', 'rund'], feld: [['#ecd648', '#9cbc6a'], ['#6f6a35', '#41543a']] },
+  US: { gras: ['#bfd8a8', '#3a4a36'], wand: ['#e6dbc8', '#7d776c'], dach: ['#c3c9d0', '#5c636d'], linie: ['#f2c14e', '#d9a826'],
+    baum: 'rund', buero: 'glas', banner: 'SAFETY FIRST', umland: ['#c4d49c', '#36442f'], umlandBaeume: ['rund'], feld: [['#d9c66a', '#8fae5a'], ['#6a6237', '#3f5236']] },
+  MX: { gras: ['#e8d3a0', '#6e604a'], strasse: ['#d0bf9b', '#5f584a'], wand: ['#eab274', '#8a6a4a'], dach: ['#c45f37', '#7a4532'],
+    baum: 'kaktus', buero: 'hacienda', banner: 'SEGURIDAD PRIMERO', umland: ['#dcbf8c', '#6b5a43'], umlandBaeume: ['kaktus'], feld: [['#8fb3a0', '#d6bd88'], ['#3f564b', '#5a4b38']] },
+  CN: { gras: ['#cadbc4', '#36443b'], wand: ['#f3f3f1', '#727a85'], dach: ['#3373c4', '#2f5d93'], baum: 'rund', buero: 'pagode',
+    banner: '安全第一', bannerGrund: '#c8102e', bannerSchrift: '#ffd34d', umland: ['#b3cfa6', '#2f4034'], umlandBaeume: ['rund'], feld: [['#7cc766', '#9cc8d8'], ['#3c6236', '#3b5560']] },
+  IN: { gras: ['#dcc290', '#55493a'], strasse: ['#cbb497', '#5b5245'], wand: ['#f4efe4', '#7b7770'], dach: ['#3a8d66', '#2f6b50'],
+    baum: 'palme', buero: 'kuppel', banner: 'सुरक्षा पहले', bannerGrund: '#ff9933', umland: ['#d6ad79', '#5a4733'], umlandBaeume: ['palme'], feld: [['#f0a238', '#c9b27a'], ['#74522a', '#55493a']] },
+  FR: { gras: ['#cbdcbd', '#38463a'], wand: ['#efe5d3', '#7e786d'], dach: ['#717d8a', '#4d5560'], baum: 'pappel', buero: 'mansarde',
+    banner: "LA SÉCURITÉ D'ABORD", bannerGrund: '#0055a4', umland: ['#bfd2a0', '#344233'], umlandBaeume: ['pappel', 'rund'], feld: [['#9a7ed4', '#86a76c'], ['#4f4370', '#3d5236']] },
+  RU: { gras: ['#eef2f6', '#5d6670'], strasse: ['#c3c9d1', '#474c55'], wand: ['#c4d0db', '#66707c'], dach: ['#3b7d50', '#2f5a3d'],
+    baum: 'birke', buero: 'zwiebel', banner: 'БЕЗОПАСНОСТЬ ПРЕЖДЕ ВСЕГО', bannerGrund: '#d52b1e', umland: ['#f6f8fb', '#6c7580'], umlandBaeume: ['birke', 'kegel'] },
+  PL: { gras: ['#c4d9b8', '#34463a'], wand: ['#f0e9df', '#787470'], dach: ['#b53a2c', '#7a3530'], baum: 'kegel', buero: 'backstein',
+    banner: 'BEZPIECZEŃSTWO PRZEDE WSZYSTKIM', bannerGrund: '#dc143c', umland: ['#b9d0a1', '#314033'], umlandBaeume: ['kegel'], feld: [['#e6c862', '#a8c070'], ['#6c6234', '#46573a']] },
+};
+
+/** Farben der Szene mit dem Landesstil überschreiben */
+export function mitLandStil(f, land) {
+  const s = LAND_STIL[land];
+  if (!s) return f;
+  const i = f.nacht ? 1 : 0;
+  const neu = { ...f, gelaende: s.gras[i], wand: s.wand[i] };
+  if (s.strasse) neu.strasse = s.strasse[i];
+  if (s.linie) neu.markierung = s.linie[i];
+  ['dach-0', 'dach-1', 'dach-2', 'dach-3'].forEach((k) => { neu[k] = s.dach[i]; });
+  return neu;
+}
+
+/** Dreieckiges Satteldach (Prisma) entlang x */
+function Prisma({ p, b, t, h, farbe }) {
+  const geo = useMemo(() => {
+    const form = new THREE.Shape();
+    form.moveTo(-t / 2, 0); form.lineTo(t / 2, 0); form.lineTo(0, h); form.closePath();
+    const g = new THREE.ExtrudeGeometry(form, { depth: b, bevelEnabled: false });
+    g.translate(0, 0, -b / 2);
+    return g;
+  }, [b, t, h]);
+  return (
+    <mesh geometry={geo} position={p} rotation-y={Math.PI / 2} castShadow receiveShadow>
+      <meshStandardMaterial color={farbe} roughness={0.8} />
+    </mesh>
+  );
+}
+
+/** Baum im Landesstil */
+export function Baum3D({ art, groesse = 1, i = 0, f }) {
+  const stil = art === 'mix' ? (i % 2 ? 'kegel' : 'rund') : art;
+  const stamm = f.stamm;
+  switch (stil) {
+    case 'kegel':   // Kiefer/Tanne
+      return (
+        <group scale={groesse}>
+          <Teil p={[0, 1, 0]} g={[0.22, 0.28, 2, 8]} form="zyl" farbe={stamm} />
+          <Teil p={[0, 3.6, 0]} g={[1.9, 4.2, 10]} form="kegel" farbe="#3e6b47" />
+          <Teil p={[0, 5.4, 0]} g={[1.3, 2.8, 10]} form="kegel" farbe="#447650" />
+        </group>
+      );
+    case 'kaktus':
+      return (
+        <group scale={groesse * 1.3}>
+          <Teil p={[0, 2, 0]} g={[0.4, 0.45, 4, 10]} form="zyl" farbe="#4f8a3c" />
+          <Teil p={[0.6, 1.8, 0]} g={[0.8, 0.26, 0.26]} farbe="#4f8a3c" />
+          <Teil p={[0.95, 2.5, 0]} g={[0.24, 0.26, 1.4, 8]} form="zyl" farbe="#4f8a3c" />
+          <Teil p={[-0.55, 2.6, 0]} g={[0.7, 0.24, 0.24]} farbe="#4f8a3c" />
+          <Teil p={[-0.85, 3.1, 0]} g={[0.2, 0.24, 1.1, 8]} form="zyl" farbe="#4f8a3c" />
+        </group>
+      );
+    case 'palme':
+      return (
+        <group scale={groesse * 1.2} rotation-z={(i % 3 - 1) * 0.08}>
+          <Teil p={[0, 3, 0]} g={[0.16, 0.26, 6, 8]} form="zyl" farbe="#8b6b4e" />
+          {Array.from({ length: 7 }, (_, j) => (
+            <Teil key={j} p={[Math.cos((j / 7) * Math.PI * 2) * 1.1, 5.8, Math.sin((j / 7) * Math.PI * 2) * 1.1]}
+                  drehung={[0, -(j / 7) * Math.PI * 2, -0.45]} g={[2.4, 0.06, 0.45]} farbe="#3f8f3a" />
+          ))}
+        </group>
+      );
+    case 'birke':
+      return (
+        <group scale={groesse}>
+          <Teil p={[0, 2.6, 0]} g={[0.15, 0.2, 5.2, 8]} form="zyl" farbe="#f1f1ec" />
+          {[1.2, 2.3, 3.4].map((y) => <Teil key={y} p={[0, y, 0.16]} g={[0.18, 0.08, 0.04]} farbe="#2b2b2b" />)}
+          <mesh position={[0, 5.4, 0]} scale={[1, 1.4, 1]} castShadow>
+            <sphereGeometry args={[1.3, 12, 10]} />
+            <meshStandardMaterial color={f.nacht ? '#5f7a4c' : '#a6c97f'} roughness={0.9} />
+          </mesh>
+        </group>
+      );
+    case 'pappel':
+      return (
+        <group scale={groesse}>
+          <Teil p={[0, 1, 0]} g={[0.18, 0.24, 2, 8]} form="zyl" farbe={stamm} />
+          <mesh position={[0, 5, 0]} scale={[0.75, 2.6, 0.75]} castShadow>
+            <sphereGeometry args={[1.5, 12, 10]} />
+            <meshStandardMaterial color={f.baum} roughness={0.9} />
+          </mesh>
+        </group>
+      );
+    default:        // runder Laubbaum
+      return (
+        <group scale={groesse}>
+          <Teil p={[0, 1.2, 0]} g={[0.25, 0.3, 2.4, 8]} form="zyl" farbe={stamm} />
+          <Teil p={[0, 3.6, 0]} g={[2.1, 14, 10]} form="kugel" farbe={f.baum} />
+        </group>
+      );
+  }
+}
+
+/** Bürogebäude im Landesstil (Mitte unten, Maße aus werkGestaltung) */
+export function Buero3D({ stil, d, f }) {
+  const { b, t, etagen } = d;
+  const h = etagen * 3.6;
+  const licht = f.nacht ? 0.8 : 0;
+  const fensterbaender = (farbe = f.fenster, breite = b + 0.08, tiefe = t + 0.08) => Array.from({ length: etagen }, (_, e) => (
+    <Teil key={`f${e}`} p={[0, 1.9 + e * 3.6, 0]} g={[breite, 1.2, tiefe]} farbe={farbe} leuchten={e % 2 === 0 ? licht : 0} />
+  ));
+  switch (stil) {
+    case 'fachwerk': {   // weiße Gefache, dunkle Balken, steiles rotes Dach
+      const balken = '#4a2f1d';
+      const felder = Math.max(3, Math.round(b / 2.6));
+      return (
+        <>
+          <Teil p={[0, h / 2, 0]} g={[b, h, t]} farbe="#f6f1e6" />
+          {Array.from({ length: etagen + 1 }, (_, e) => <Teil key={`h${e}`} p={[0, Math.min(h - 0.12, e * 3.6 + 0.12), 0]} g={[b + 0.14, 0.26, t + 0.14]} farbe={balken} />)}
+          {Array.from({ length: felder + 1 }, (_, i) => [1, -1].map((z) => (
+            <Teil key={`v${i}${z}`} p={[-b / 2 + (i * b) / felder, h / 2, z * (t / 2 + 0.07)]} g={[0.24, h, 0.1]} farbe={balken} />
+          )))}
+          {Array.from({ length: felder * etagen }, (_, k) => {
+            const i = k % felder; const e = Math.floor(k / felder);
+            return (k % 2 === 0) && <Teil key={`d${k}`} p={[-b / 2 + ((i + 0.5) * b) / felder, e * 3.6 + 1.8, t / 2 + 0.08]}
+                                          drehung={[0, 0, (i % 2 ? 1 : -1) * 0.95]} g={[0.2, 3.6, 0.08]} farbe={balken} />;
+          })}
+          <Prisma p={[0, h, 0]} b={b + 1} t={t + 1.2} h={Math.max(4, t * 0.6)} farbe="#a2402f" />
+        </>
+      );
+    }
+    case 'glas':        // gläserner Büroturm
+      return (
+        <>
+          <mesh position={[0, (h + 10.8) / 2, 0]} castShadow receiveShadow>
+            <boxGeometry args={[b * 0.8, h + 10.8, t * 0.9]} />
+            <meshStandardMaterial color="#5b8fc7" metalness={0.55} roughness={0.15} emissive="#ffd58a" emissiveIntensity={f.nacht ? 0.25 : 0} />
+          </mesh>
+          {Array.from({ length: etagen + 3 }, (_, e) => <Teil key={e} p={[0, (e + 1) * 3.6, 0]} g={[b * 0.8 + 0.1, 0.2, t * 0.9 + 0.1]} farbe="#e8edf2" />)}
+          <Teil p={[0, h + 11.5, 0]} g={[b * 0.4, 1.4, t * 0.4]} farbe="#9aa3ad" />
+        </>
+      );
+    case 'pagode': {    // chinesischer Stil: rote Säulen, gestufte grüne Dächer mit goldener Spitze
+      return (
+        <>
+          <Teil p={[0, h / 2, 0]} g={[b - 2, h, t - 2]} farbe="#f2ebe0" />
+          {fensterbaender('#b9d0e8', b - 1.9, t - 1.9)}
+          {[-1, -0.33, 0.33, 1].map((x) => <Teil key={x} p={[x * (b / 2 - 1.2), h / 2, t / 2 - 0.4]} g={[0.3, 0.35, h, 10]} form="zyl" farbe="#c8102e" />)}
+          {[0, 1, 2].map((k) => (
+            <group key={k} position={[0, h + k * 2.4, 0]}>
+              <Teil p={[0, 0.25, 0]} g={[b + 2.4 - k * 3, 0.45, t + 2.4 - k * 3]} farbe="#2f5f55" />
+              {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
+                <Teil key={`${x}${z}`} p={[x * ((b + 2.4 - k * 3) / 2), 0.55, z * ((t + 2.4 - k * 3) / 2)]} g={[0.18, 0.7, 6]} form="kegel" farbe="#2f5f55" />
+              ))}
+              {k < 2 && <Teil p={[0, 1.4, 0]} g={[b - 3 - k * 3, 1.9, t - 3 - k * 3]} farbe="#c8102e" />}
+            </group>
+          ))}
+          <Teil p={[0, h + 7.2, 0]} g={[0.35, 2, 10]} form="kegel" farbe="#d4a72c" />
+        </>
+      );
+    }
+    case 'hacienda':    // ockerfarben, Bogengang, flaches Terrakotta-Dach
+      return (
+        <>
+          <Teil p={[0, h / 2, 0]} g={[b, h, t]} farbe="#e9b67a" />
+          {fensterbaender('#9a6a3a')}
+          {Array.from({ length: Math.max(3, Math.floor(b / 3)) }, (_, i) => {
+            const n = Math.max(3, Math.floor(b / 3));
+            const x = -b / 2 + ((i + 0.5) * b) / n;
+            return (
+              <group key={i} position={[x, 0, t / 2 + 0.05]}>
+                <Teil p={[0, 1.2, 0]} g={[1.7, 2.4, 0.1]} farbe="#6b4226" />
+                <mesh position={[0, 2.4, 0.01]}><circleGeometry args={[0.85, 16, 0, Math.PI]} /><meshStandardMaterial color="#6b4226" /></mesh>
+              </group>
+            );
+          })}
+          <Prisma p={[0, h, 0]} b={b + 0.8} t={t + 0.8} h={1.6} farbe="#c45f37" />
+        </>
+      );
+    case 'zwiebel':     // russischer Stil: helle Fassade mit goldenen Zwiebeltürmen
+      return (
+        <>
+          <Teil p={[0, h / 2, 0]} g={[b, h, t]} farbe="#efe6d4" />
+          {fensterbaender()}
+          <Teil p={[0, h + 0.2, 0]} g={[b + 0.3, 0.4, t + 0.3]} farbe="#3b7d50" />
+          {[[-b / 4, 1], [b / 4, 1], [0, 1.45]].map(([x, s], i) => (
+            <group key={i} position={[x, h + 0.4, 0]} scale={s}>
+              <Teil p={[0, 1.2, 0]} g={[1.1, 1.1, 2.4, 14]} form="zyl" farbe="#efe6d4" />
+              <mesh position={[0, 3.2, 0]} scale={[1, 1.35, 1]} castShadow>
+                <sphereGeometry args={[1.3, 18, 14]} />
+                <meshStandardMaterial color={i === 2 ? '#d4a72c' : '#2f6fb5'} metalness={0.5} roughness={0.35} />
+              </mesh>
+              <Teil p={[0, 5.2, 0]} g={[0.22, 1.4, 10]} form="kegel" farbe="#d4a72c" />
+            </group>
+          ))}
+        </>
+      );
+    case 'mansarde':    // französisch: cremefarben, graues Mansarddach mit Gauben
+      return (
+        <>
+          <Teil p={[0, h / 2, 0]} g={[b, h, t]} farbe="#efe3cc" />
+          {fensterbaender()}
+          {/* Mansarddach: vierseitiger Kegelstumpf, erst gedreht (Kanten parallel), dann auf b × t gestreckt */}
+          <group position={[0, h + 1.6, 0]} scale={[b / Math.SQRT2, 1, t / Math.SQRT2]}>
+            <mesh rotation-y={Math.PI / 4} castShadow>
+              <cylinderGeometry args={[0.72, 1.02, 3.2, 4]} />
+              <meshStandardMaterial color="#56606b" roughness={0.6} metalness={0.3} />
+            </mesh>
+          </group>
+          {[-0.3, 0, 0.3].map((x) => <Teil key={x} p={[x * b, h + 1.6, t / 2 - 0.2]} g={[1.2, 1.4, 0.8]} farbe="#efe3cc" />)}
+        </>
+      );
+    case 'kuppel':      // indisch: weißer Bau mit großer Kuppel und Ecktürmchen
+      return (
+        <>
+          <Teil p={[0, h / 2, 0]} g={[b, h, t]} farbe="#f4f1ea" />
+          {fensterbaender('#d9b48a')}
+          <Teil p={[0, h + 0.8, 0]} g={[t * 0.32, t * 0.32, 1.6, 20]} form="zyl" farbe="#f4f1ea" />
+          <mesh position={[0, h + 1.6, 0]} castShadow>
+            <sphereGeometry args={[t * 0.36, 22, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#f7f4ee" roughness={0.5} />
+          </mesh>
+          <Teil p={[0, h + 1.6 + t * 0.36 + 0.6, 0]} g={[0.2, 1.2, 8]} form="kegel" farbe="#d4a72c" />
+          {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
+            <group key={`${x}${z}`} position={[x * (b / 2 - 0.5), 0, z * (t / 2 - 0.5)]}>
+              <Teil p={[0, (h + 3) / 2, 0]} g={[0.45, 0.5, h + 3, 10]} form="zyl" farbe="#f4f1ea" />
+              <Teil p={[0, h + 3.2, 0]} g={[0.6, 12, 8]} form="kugel" farbe="#f7f4ee" />
+            </group>
+          ))}
+        </>
+      );
+    case 'backstein':   // polnischer Backsteinbau
+      return (
+        <>
+          <Teil p={[0, h / 2, 0]} g={[b, h, t]} farbe="#a8513a" />
+          {fensterbaender('#eef0f2')}
+          <Prisma p={[0, h, 0]} b={b + 0.6} t={t + 0.6} h={Math.max(3, t * 0.45)} farbe="#7a2f25" />
+        </>
+      );
+    default:
+      return null;
+  }
+}
+
+/** Landesflagge an der Front jeder Halle (Flachdach: zusätzlich groß auf dem Dach der größten Halle)
+ *  und ein Sicherheits-Banner in Landessprache an der zweiten Halle */
+function Hallenschmuck({ gs, land, X, Z, flaggeZeichnen }) {
+  const stil = LAND_STIL[land];
+  const hallen = Object.values(gs.hallen).sort((a, c) => c.b * c.t - a.b * a.t);
+  const flaggenTextur = useTextur(flaggeZeichnen ?? ((g) => g.clearRect(0, 0, 1, 1)), 384, 240, [land, 'gross']);
+  if (!stil || !flaggeZeichnen || !hallen.length) return null;
+  const bannerHalle = hallen[1] ?? hallen[0];
+  return hallen.map((h, i) => {
+    const bannerBreite = Math.min(h.b * 0.36, 22);
+    return (
+      <group key={i} position={[X(h.x + h.b / 2), 0, Z(h.y + h.t / 2)]}>
+        {/* Flagge als großes Tuch an der Front, rechts neben dem Rolltor */}
+        <mesh position={[h.b * 0.27, h.hoehe * 0.38, h.t / 2 + 0.12]}>
+          <planeGeometry args={[Math.min(h.b * 0.34, 20), h.hoehe * 0.58]} />
+          <meshStandardMaterial map={flaggenTextur} roughness={0.7} />
+        </mesh>
+        {i === 0 && gs.dach === 'flach' && (
+          <mesh position={[0, h.hoehe + 0.72, 0]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[Math.min(h.b * 0.6, 44), Math.min(h.t * 0.55, 28)]} />
+            <meshStandardMaterial map={flaggenTextur} roughness={0.7} />
+          </mesh>
+        )}
+        {h === bannerHalle && (
+          <Schild p={[-h.b * 0.27, h.hoehe * 0.38, h.t / 2 + 0.14]} b={bannerBreite} h={Math.min(3.4, bannerBreite / 4.5)} text={stil.banner}
+                  grund={stil.bannerGrund ?? '#ffcc00'} schrift={stil.bannerSchrift ?? (stil.bannerGrund ? '#ffffff' : '#1f1f1f')} />
+        )}
+      </group>
+    );
+  });
+}
+
+/* =====================================================================
+ * Umgebung: Landschaft rund um das Werk (Felder, Berge, Bäume, Wahrzeichen)
+ * und eine Landstraße vor dem Tor. Das typische Objekt des Landes steht
+ * vor dem Werk auf der anderen Straßenseite – dort ist es immer gut zu sehen.
+ * ================================================================== */
+export const UMLAND_RAND = 28;   // Umland links, rechts und hinten (m)
+export const UMLAND_VORN = 50;   // Umland vor dem Werk: Landstraße + typisches Objekt
+
+/** Flache Bodenfläche (Straße, Feldstreifen) */
+function Boden({ x, z, b, t, farbe, y = 0.01 }) {
+  return (
+    <mesh position={[x, y, z]} rotation-x={-Math.PI / 2} receiveShadow>
+      <planeGeometry args={[b, t]} />
+      <meshStandardMaterial color={farbe} roughness={1} />
+    </mesh>
+  );
+}
+
+/** Feld mit Streifen in zwei Farben (Raps, Mais, Lavendel, Reis …) */
+function Feld({ x, z, b, t, farben, streifen = 9 }) {
+  return Array.from({ length: streifen }, (_, i) => (
+    <Boden key={i} x={x} z={z - t / 2 + ((i + 0.5) * t) / streifen} b={b} t={t / streifen} farbe={farben[i % 2]} y={0.02} />
+  ));
+}
+
+/** Windrad mit drehendem Rotor (Deutschland) */
+function Windrad({ x, z }) {
+  const rotor = useRef(null);
+  useFrame((_, dt) => { if (rotor.current) rotor.current.rotation.z += dt * 0.9; });
+  return (
+    <group position={[x, 0, z]}>
+      <Teil p={[0, 15, 0]} g={[0.45, 0.9, 30, 10]} form="zyl" farbe="#f2f4f6" />
+      <Teil p={[0, 30.3, 0.4]} g={[1.2, 1.2, 3]} farbe="#e8ebee" />
+      <group ref={rotor} position={[0, 30.3, 2]}>
+        {[0, 1, 2].map((k) => (
+          <group key={k} rotation-z={(k * Math.PI * 2) / 3}>
+            <Teil p={[0, 6.5, 0]} g={[0.9, 13, 0.25]} farbe="#ffffff" />
+          </group>
+        ))}
+      </group>
+    </group>
+  );
+}
+
+/** Rote Scheune mit Silo (USA) */
+function Scheune({ x, z }) {
+  return (
+    <group position={[x, 0, z]} rotation-y={0.4}>
+      <Teil p={[0, 3.5, 0]} g={[12, 7, 9]} farbe="#a63a2a" />
+      <Prisma p={[0, 7, 0]} b={12.6} t={9.8} h={4} farbe="#4a2a24" />
+      <Teil p={[0, 2.6, 4.56]} g={[4, 5.2, 0.1]} farbe="#ffffff" />
+      <Teil p={[0, 2.6, 4.6]} g={[3.6, 4.8, 0.1]} farbe="#a63a2a" />
+      {[0.9, -0.9].map((w) => <Teil key={w} p={[0, 2.6, 4.66]} g={[0.3, 5.6, 0.06]} drehung={[0, 0, w]} farbe="#ffffff" />)}
+      <Teil p={[9, 7, 0]} g={[2.6, 2.6, 14, 18]} form="zyl" farbe="#c3ccd6" />
+      <Teil p={[9, 14, 0]} g={[2.6, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2]} form="kugel" farbe="#9aa4b0" />
+    </group>
+  );
+}
+
+/** Berg (Mexiko: kahl und braun, sonst mit Schneekappe) */
+function Berg({ x, z, r, h, farbe, schnee }) {
+  return (
+    <group position={[x, 0, z]}>
+      <Teil p={[0, h / 2, 0]} g={[r, h, 7]} form="kegel" farbe={farbe} />
+      {schnee && <Teil p={[0, h * 0.85, 0]} g={[r * 0.3, h * 0.3, 7]} form="kegel" farbe="#ffffff" />}
+    </group>
+  );
+}
+
+/** Mehrstöckige Pagode (China) */
+function Pagode({ x, z }) {
+  return (
+    <group position={[x, 0, z]}>
+      {[0, 1, 2, 3, 4].map((k) => {
+        const w = 8 - k * 1.3;
+        return (
+          <group key={k} position={[0, k * 4, 0]}>
+            <Teil p={[0, 1.6, 0]} g={[w, 3.2, w]} farbe={k % 2 ? '#f2ebe0' : '#c8102e'} />
+            <Teil p={[0, 3.4, 0]} g={[w + 3, 0.5, w + 3]} farbe="#2f5f55" />
+            {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, c]) => (
+              <Teil key={`${a}${c}`} p={[a * (w + 3) / 2, 3.8, c * (w + 3) / 2]} g={[0.25, 1, 6]} form="kegel" farbe="#2f5f55" />
+            ))}
+          </group>
+        );
+      })}
+      <Teil p={[0, 22, 0]} g={[0.5, 4, 10]} form="kegel" farbe="#d4a72c" />
+    </group>
+  );
+}
+
+/** Tempelturm (Gopuram, Indien): stufenförmig, ockerfarben, goldene Spitze */
+function Tempel({ x, z }) {
+  return (
+    <group position={[x, 0, z]}>
+      {[0, 1, 2, 3, 4, 5].map((k) => (
+        <Teil key={k} p={[0, k * 2.6 + 1.3, 0]} g={[13 - k * 1.8, 2.6, 8 - k * 1.05]} farbe={k % 2 ? '#e3b06a' : '#cf8f4a'} />
+      ))}
+      <Teil p={[0, 16.8, 0]} g={[1.1, 12, 10]} form="kugel" farbe="#d4a72c" />
+      <Teil p={[0, 18.4, 0]} g={[0.3, 1.6, 8]} form="kegel" farbe="#d4a72c" />
+    </group>
+  );
+}
+
+/** Kirche mit Zwiebeltürmen (Russland) */
+function Kirche({ x, z }) {
+  return (
+    <group position={[x, 0, z]}>
+      <Teil p={[0, 4, 0]} g={[11, 8, 9]} farbe="#b5523b" />
+      {[[0, 0, 1.5, '#d4a72c'], [-3.6, -3, 1, '#2f6fb5'], [3.6, -3, 1, '#2f6fb5'], [-3.6, 3, 1, '#2f6fb5'], [3.6, 3, 1, '#2f6fb5']].map(([a, c, g, farbe], i) => (
+        <group key={i} position={[a, 8, c]} scale={g}>
+          <Teil p={[0, 1.6, 0]} g={[1.2, 1.2, 3.2, 14]} form="zyl" farbe="#f2ead8" />
+          <mesh position={[0, 4.1, 0]} scale={[1, 1.35, 1]} castShadow>
+            <sphereGeometry args={[1.45, 18, 14]} />
+            <meshStandardMaterial color={farbe} metalness={0.5} roughness={0.35} />
+          </mesh>
+          <Teil p={[0, 6.3, 0]} g={[0.25, 1.4, 10]} form="kegel" farbe="#d4a72c" />
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** Besonderes Bauwerk im Umland hinten (zweites Erkennungszeichen neben dem typischen Objekt) */
+function Wahrzeichen({ land, x, z }) {
+  switch (land) {
+    case 'DE': return <><Windrad x={x - 9} z={z} /><Windrad x={x + 9} z={z - 4} /></>;
+    case 'US': return <Scheune x={x} z={z} />;
+    case 'CN': return <Pagode x={x} z={z} />;
+    case 'IN': return <Tempel x={x} z={z} />;
+    case 'RU': return <Kirche x={x} z={z} />;
+    default: return null;
+  }
+}
+
+function Umgebung({ standort, gs, f }) {
+  const land = standort.land;
+  const stil = LAND_STIL[land];
+  const { B, T } = gs;
+  const nacht = f.nacht;
+  const breite = B + 2 * UMLAND_RAND;
+  const landstrasse = T / 2 + 9;                // Mitte der Landstraße vor dem Tor (Szenenkoordinaten)
+  const wahrzeichenX = gs.fahnenSeite * B * 0.2;  // hinter den Hallen, hoch genug, um darüber hinaus zu ragen
+  // Bäume am Rand des Umlands (fest je Werk), Platz für Feld (links) und Wahrzeichen (hinten rechts) bleibt frei
+  const baeume = useMemo(() => {
+    const z = zufall(`${standort.kuerzel}-umland`);
+    const liste = [];
+    for (let x = -breite / 2 + 6; x < breite / 2 - 6; x += 9 + z() * 5) {
+      if (Math.abs(x - wahrzeichenX) < 22) continue;     // dort steht das Wahrzeichen
+      liste.push({ x, z: -T / 2 - 8 - z() * 14, groesse: 0.9 + z() * 0.6 });
+    }
+    for (let y = -T / 2; y < T / 2 + 4; y += 10 + z() * 5) {
+      liste.push({ x: B / 2 + 7 + z() * 16, z: y, groesse: 0.9 + z() * 0.6 });
+      if (y < -T / 2 + 6 || y > T * 0.1) liste.push({ x: -B / 2 - 7 - z() * 16, z: y, groesse: 0.9 + z() * 0.6 });
+    }
+    return liste;
+  }, [standort.kuerzel, B, T, breite, wahrzeichenX]);
+  if (!stil) return null;
+  const n = (paar) => paar[nacht ? 1 : 0];
+  const arten = stil.umlandBaeume ?? [stil.baum];
+  // Typisches Objekt: hohe Bauwerke (Wasserturm, Eiffelturm) etwas kleiner, damit sie das Werk nicht verdecken
+  const gross = land === 'US' ? 1.5 : land === 'FR' ? 1.8 : 2.4;
+  const objektX = -gs.fahnenSeite * Math.min(B * 0.2, 34);
+  const objektZ = landstrasse + 4.5 + 2 + 6 * gross;
+  return (
+    <group position-y={-0.25}>
+      {/* Umland als größere Platte unter dem Gelände */}
+      <mesh position={[0, -0.5, (UMLAND_VORN - UMLAND_RAND) / 2]} receiveShadow>
+        <boxGeometry args={[breite, 1, T + UMLAND_RAND + UMLAND_VORN]} />
+        <meshStandardMaterial color={n(stil.umland)} roughness={1} />
+      </mesh>
+      {/* Landstraße mit Mittellinie (USA: doppelt gelb) und Zufahrt zum Tor */}
+      <Boden x={0} z={landstrasse} b={breite} t={9} farbe={f.strasse} />
+      {land === 'US'
+        ? [-0.2, 0.2].map((d) => <Boden key={d} x={0} z={landstrasse + d} b={breite} t={0.16} farbe={f.markierung} y={0.02} />)
+        : Array.from({ length: Math.floor(breite / 9) }, (_, i) => (
+          <Boden key={i} x={-breite / 2 + 4 + i * 9} z={landstrasse} b={3.5} t={0.2} farbe={f.markierung} y={0.02} />
+        ))}
+      <Boden x={gs.tor.x + gs.tor.b / 2 - B / 2} z={T / 2 + 2.3} b={gs.tor.b} t={4.6} farbe={f.strasse} />
+      {/* Feld links vom Werk */}
+      {stil.feld && <Feld x={-B / 2 - UMLAND_RAND / 2} z={-T * 0.12} b={UMLAND_RAND - 6} t={T * 0.55} farben={n(stil.feld)} />}
+      {/* Berge hinten (Mexiko kahl, Russland nicht – dort liegt der Schnee schon auf dem Boden) */}
+      {land === 'MX' && [-0.38, -0.12, 0.18].map((a, i) => (
+        <Berg key={i} x={a * breite} z={-T / 2 - 16} r={11 + i * 2} h={14 + (i % 2) * 6} farbe={nacht ? '#6a5541' : '#c4935f'} />
+      ))}
+      {baeume.map((bm, i) => (
+        <group key={i} position={[bm.x, 0, bm.z]}>
+          <Baum3D art={arten[i % arten.length]} groesse={bm.groesse} i={i} f={f} />
+        </group>
+      ))}
+      <group position={[wahrzeichenX, 0, -T / 2 - 14]} scale={1.4}>
+        <Wahrzeichen land={land} x={0} z={0} />
+      </group>
+      <group position={[objektX, 0, objektZ]} scale={gross}>
+        <Typisch land={land} f={f} nacht={nacht} />
+      </group>
+    </group>
+  );
+}
+
 /** Alle Länder-Merkmale eines Werks. X/Z: Umrechnung der Werkskoordinaten in die Szene */
 export default function Landesdeko({ standort, gs, f, X, Z }) {
   const land = standort.land;
@@ -309,15 +801,12 @@ export default function Landesdeko({ standort, gs, f, X, Z }) {
       ))}
       {/* Torbogen mit Schild in Landessprache */}
       <group position={[X(gs.tor.x + gs.tor.b / 2), 0, Z(gs.T - 3.2)]}>
-        {[-gs.tor.b / 2, gs.tor.b / 2].map((x) => <Teil key={x} p={[x, 3, 0]} g={[0.3, 6, 0.3]} farbe="#3a3f47" />)}
-        <Schild p={[0, 5.4, 0.2]} b={gs.tor.b - 1} h={1.6} text={schildText}
+        {[-gs.tor.b / 2, gs.tor.b / 2].map((x) => <Teil key={x} p={[x, 3.9, 0]} g={[0.4, 7.8, 0.4]} farbe="#3a3f47" />)}
+        <Schild p={[0, 6.6, 0.25]} b={gs.tor.b - 0.6} h={2.4} text={schildText}
                 grund={land === 'CN' ? '#c8102e' : '#1f2a37'} schrift={land === 'CN' ? '#ffd34d' : '#ffffff'} />
       </group>
-      {gs.landPlatz && (
-        <group position={[X(gs.landPlatz.x + gs.landPlatz.b / 2), 0, Z(gs.landPlatz.y + gs.landPlatz.t / 2)]} scale={gs.landGroesse}>
-          <Typisch land={land} f={f} nacht={f.nacht} />
-        </group>
-      )}
+      <Hallenschmuck gs={gs} land={land} X={X} Z={Z} flaggeZeichnen={zeichnen} />
+      <Umgebung standort={standort} gs={gs} f={f} />
     </>
   );
 }

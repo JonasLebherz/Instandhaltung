@@ -31,7 +31,7 @@ import { stufe, offenText } from '../stufe';
 import { useT } from '@/components/SpracheKontext';
 import { MaschineMitAmpel } from './Maschine3D';
 import { useRaum, useSichtbar } from './farben';
-import Landesdeko from './Landesdeko';
+import Landesdeko, { LAND_STIL, mitLandStil, Baum3D, Buero3D } from './Landesdeko';
 
 /** Farbe einer Störungsstufe */
 const stufenFarbe = (f, offen, prio, neutral = false) => (neutral ? f.linie : ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)]);
@@ -317,8 +317,11 @@ function gangInHalle(halle, maschinen) {
 /* ---------------------------------------------------------------------------
  * Szene
  * ------------------------------------------------------------------------- */
-function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f, bewegt, neutral }) {
+function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral }) {
   const t = useT();
+  // Boden, Straßen, Wände und Dächer in den Farben des Landes (Wüste in Mexiko, Schnee in Russland …)
+  const f = useMemo(() => mitLandStil(fBasis, standort.land), [fBasis, standort.land]);
+  const stil = LAND_STIL[standort.land];
   const gs = useMemo(() => werkGestaltung(standort, gebaeude), [standort, gebaeude]);
   const { B, T } = gs;
   const X = (x) => x - B / 2;
@@ -340,8 +343,10 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       const abstand = Math.max(h.b * 1.35, h.t * 1.8) + 8;
       return { schluessel: `g${gewaehlt.id}`, target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand) };
     }
-    const abstand = Math.max(B * 1.4, T * 1.9);
-    return { schluessel: 'werk', target: [0, 0, 0], position: [0, 1, 2].map((i) => richtung.getComponent(i) * abstand) };
+    // etwas nach vorn versetzt und weiter weg, damit Landstraße und typisches Objekt vor dem Werk mit im Bild sind
+    const abstand = Math.max(B * 1.45, T * 2) + 10;
+    const mitte = [0, 0, 8];
+    return { schluessel: 'werk', target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gewaehlt, gs]);
 
@@ -454,12 +459,17 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
           const h = d.etagen * 3.6;
           return (
             <group key={i} position={[X(d.x + d.b / 2), 0, Z(d.y + d.t / 2)]}>
-              <Quader p={[0, h / 2, 0]} g={[d.b, h, d.t]} farbe={f.buero} />
-              {Array.from({ length: d.etagen }, (_, e) => (
-                <Quader key={e} p={[0, 1.9 + e * 3.6, 0]} g={[d.b + 0.08, 1.2, d.t + 0.08]} farbe={f.fenster} schatten={false}
-                        leuchten={nacht && e % 2 === 0 ? 0.8 : 0} lichtFarbe={f.licht} />
-              ))}
-              <Quader p={[0, h + 0.2, 0]} g={[d.b + 0.4, 0.4, d.t + 0.4]} farbe={f['maschine-dunkel']} />
+              {/* Bürogebäude im Baustil des Landes (Fachwerk, Glasturm, Pagode …), sonst schlichter Quader */}
+              {stil ? <Buero3D stil={stil.buero} d={d} f={f} /> : (
+                <>
+                  <Quader p={[0, h / 2, 0]} g={[d.b, h, d.t]} farbe={f.buero} />
+                  {Array.from({ length: d.etagen }, (_, e) => (
+                    <Quader key={e} p={[0, 1.9 + e * 3.6, 0]} g={[d.b + 0.08, 1.2, d.t + 0.08]} farbe={f.fenster} schatten={false}
+                            leuchten={nacht && e % 2 === 0 ? 0.8 : 0} lichtFarbe={f.licht} />
+                  ))}
+                  <Quader p={[0, h + 0.2, 0]} g={[d.b + 0.4, 0.4, d.t + 0.4]} farbe={f['maschine-dunkel']} />
+                </>
+              )}
             </group>
           );
         }
@@ -478,10 +488,9 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
           </group>
         );
       })}
-      {gs.baeume.map((bm) => (
-        <group key={`${bm.x}-${bm.y}`} position={[X(bm.x), 0, Z(bm.y)]} scale={bm.groesse}>
-          <mesh position={[0, 1.2, 0]} castShadow><cylinderGeometry args={[0.25, 0.3, 2.4, 8]} /><meshStandardMaterial color={f.stamm} /></mesh>
-          <mesh position={[0, 3.6, 0]} castShadow><sphereGeometry args={[2.1, 14, 10]} /><meshStandardMaterial color={f.baum} roughness={0.9} /></mesh>
+      {gs.baeume.map((bm, i) => (
+        <group key={`${bm.x}-${bm.y}`} position={[X(bm.x), 0, Z(bm.y)]}>
+          <Baum3D art={stil?.baum ?? 'rund'} groesse={bm.groesse} i={i} f={f} />
         </group>
       ))}
 
