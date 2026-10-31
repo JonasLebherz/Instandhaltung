@@ -32,6 +32,9 @@ import { useT } from '@/components/SpracheKontext';
 import { MaschineMitAmpel } from './Maschine3D';
 import { useRaum, useSichtbar } from './farben';
 import Landesdeko, { LAND_STIL, mitLandStil, Baum3D, Buero3D } from './Landesdeko';
+import Figur from './Figur';
+import { Auto, Lkw, ParkendeAutos, Gabelstapler, AUTO_FARBEN } from './Fahrzeuge';
+import { Viele, canvasTextur } from './Bausteine';
 
 /** Farbe einer Störungsstufe */
 const stufenFarbe = (f, offen, prio, neutral = false) => (neutral ? f.linie : ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)]);
@@ -86,27 +89,15 @@ function Kamera({ ziel, bewegt, steuerung }) {
 /* ---------------------------------------------------------------------------
  * Kleine Bausteine
  * ------------------------------------------------------------------------- */
-function Quader({ p, g, farbe, schatten = true, leuchten = 0, lichtFarbe = null, deckkraft = 1, ...rest }) {
+function Quader({ p, g, farbe, schatten = true, leuchten = 0, lichtFarbe = null, deckkraft = 1, map = null, ...rest }) {
   const glas = deckkraft < 1;
   return (
     <mesh position={p} castShadow={schatten && !glas} receiveShadow {...rest}>
       <boxGeometry args={g} />
-      <meshStandardMaterial key={glas ? 'glas' : 'voll'} color={farbe} roughness={0.85} emissive={lichtFarbe ?? farbe} emissiveIntensity={leuchten}
+      <meshStandardMaterial key={glas ? 'glas' : 'voll'} color={farbe} map={map} roughness={0.85} emissive={lichtFarbe ?? farbe} emissiveIntensity={leuchten}
                             transparent={glas} opacity={deckkraft} depthWrite={!glas} />
     </mesh>
   );
-}
-
-/** Kleine Canvas-Textur (wird wiederholt) */
-function canvasTextur(breite, hoehe, zeichnen) {
-  const c = document.createElement('canvas');
-  c.width = breite; c.height = hoehe;
-  zeichnen(c.getContext('2d'), breite, hoehe);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = THREE.RepeatWrapping;
-  t.wrapT = THREE.RepeatWrapping;
-  return t;
 }
 
 /** Wandverkleidung aus Trapezblech: senkrechte Rippen, alle 6,6 m eine Stütze (Feld = 192 px) */
@@ -118,6 +109,27 @@ function rippenTextur() {
     g.fillStyle = '#b4b8be'; g.fillRect(0, 0, 9, 4);
   });
 }
+
+/** Fensterband: Rahmen (hell) und Scheiben mit Spiegelung, 1 Feld = 1,6 m */
+const fensterTextur = () => canvasTextur(64, 32, (g, w, h) => {
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+  const verlauf = g.createLinearGradient(0, 0, w, h);
+  verlauf.addColorStop(0, '#6f7a86'); verlauf.addColorStop(0.45, '#a9b4c0'); verlauf.addColorStop(0.55, '#8995a2'); verlauf.addColorStop(1, '#5f6a76');
+  g.fillStyle = verlauf; g.fillRect(4, 4, w - 8, h - 8);
+  g.fillStyle = '#ffffff'; g.fillRect(w / 2 - 1.5, 4, 3, h - 8);
+});
+
+/** Hallenboden: Beton mit leichter Struktur und Fugen (1 Feld = 6 m) */
+const bodenTextur = () => canvasTextur(128, 128, (g, w, h) => {
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+  let z = 7;
+  for (let i = 0; i < 900; i += 1) {
+    z = (z * 16807) % 2147483647;
+    g.fillStyle = `rgba(120,125,135,${0.04 + (z % 7) / 120})`;
+    g.fillRect(z % w, Math.floor(z / w) % h, 2, 2);
+  }
+  g.fillStyle = '#c3c8cf'; g.fillRect(0, 0, w, 1.5); g.fillRect(0, 0, 1.5, h);
+});
 
 /** Solarmodule: dunkelblaue Zellen mit hellem Raster (1 Feld = 1 × 1,7 m) */
 const solarTextur = () => canvasTextur(32, 54, (g, w, h) => {
@@ -168,53 +180,6 @@ function Flaeche({ x, z, b, t, farbe, y = 0.02, deckkraft = 1, map = null, drehu
   );
 }
 
-/** Figur mit Beinen, Armen (schwingen beim Gehen), Warnweste und Helm – läuft zwischen a und b hin und her */
-function Person({ a, b, farbe, f, bewegt, phase, tempo }) {
-  const ref = useRef(null);
-  const glieder = useRef([]);          // linkes/rechtes Bein, linker/rechter Arm
-  const laenge = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-  const setzen = (s, zeit) => {
-    const weg = s % (2 * laenge);
-    const d = weg < laenge ? weg : 2 * laenge - weg;
-    const vor = weg < laenge;
-    ref.current.position.set(a[0] + ((b[0] - a[0]) * d) / laenge, 0, a[1] + ((b[1] - a[1]) * d) / laenge);
-    ref.current.rotation.y = Math.atan2((b[0] - a[0]) * (vor ? 1 : -1), (b[1] - a[1]) * (vor ? 1 : -1));
-    const schwung = Math.sin(zeit * tempo * 5.5) * 0.5;
-    glieder.current.forEach((g, i) => { if (g) g.rotation.x = (i % 2 ? -schwung : schwung) * (i < 2 ? 1 : -0.8); });
-  };
-  useEffect(() => { if (ref.current) setzen(phase * laenge * 2, 0); });
-  useFrame(({ clock }) => { if (bewegt && ref.current) setzen(clock.elapsedTime * tempo + phase * laenge * 2, clock.elapsedTime); });
-  const glied = (i, x, y, r, l, farbeGlied) => (
-    <group key={i} position={[x, y, 0]} ref={(el) => { glieder.current[i] = el; }}>
-      <mesh position={[0, -(l / 2 + r), 0]} castShadow>
-        <capsuleGeometry args={[r, l, 3, 8]} />
-        <meshStandardMaterial color={farbeGlied} roughness={0.8} />
-      </mesh>
-    </group>
-  );
-  return (
-    <group ref={ref}>
-      {glied(0, -0.11, 0.86, 0.075, 0.68, f['maschine-dunkel'])}
-      {glied(1, 0.11, 0.86, 0.075, 0.68, f['maschine-dunkel'])}
-      {glied(2, -0.27, 1.4, 0.055, 0.5, farbe)}
-      {glied(3, 0.27, 1.4, 0.055, 0.5, farbe)}
-      {/* Rumpf mit Warnweste */}
-      <mesh position={[0, 1.18, 0]} castShadow>
-        <capsuleGeometry args={[0.19, 0.4, 4, 10]} />
-        <meshStandardMaterial color={farbe} roughness={0.7} />
-      </mesh>
-      <mesh position={[0, 1.66, 0]} castShadow>
-        <sphereGeometry args={[0.13, 14, 10]} />
-        <meshStandardMaterial color={f.haut} roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 1.71, 0]}>
-        <sphereGeometry args={[0.15, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={f.signal} roughness={0.5} />
-      </mesh>
-    </group>
-  );
-}
-
 /**
  * Autos und Lkw fahren ab und zu über die Zufahrt (je Fahrspur eine Richtung).
  * Jedes Fahrzeug hat einen Umlauf, der länger ist als die Straße – in der übrigen Zeit
@@ -230,34 +195,9 @@ function Fahrzeug({ art, von, bis, z, richtung, tempo, phase, farbe, f }) {
     ref.current.visible = s < strecke;
     ref.current.position.x = richtung > 0 ? von + s : bis - s;
   });
-  const lkw = art === 'lkw';
-  const rad = (x, zr, r) => (
-    <mesh key={`${x}${zr}`} position={[x, r, zr]} rotation-x={Math.PI / 2}>
-      <cylinderGeometry args={[r, r, 0.3, 12]} />
-      <meshStandardMaterial color="#202227" roughness={0.9} />
-    </mesh>
-  );
   return (
     <group ref={ref} position={[von, 0, z]} rotation-y={richtung > 0 ? 0 : Math.PI} visible={false}>
-      {lkw ? (
-        <>
-          <Quader p={[-1.6, 2.15, 0]} g={[8.6, 3.1, 2.5]} farbe={f.wand} />
-          <Quader p={[3.8, 1.6, 0]} g={[2.2, 2.6, 2.4]} farbe={farbe} />
-          <Quader p={[4.92, 2.1, 0]} g={[0.05, 1, 2.1]} farbe={f.glas} schatten={false} />
-          {[-4.6, -3.4, 3.8].flatMap((x) => [rad(x, 1.15, 0.5), rad(x, -1.15, 0.5)])}
-        </>
-      ) : (
-        <>
-          <Quader p={[0, 0.7, 0]} g={[4.3, 0.8, 1.8]} farbe={farbe} />
-          <Quader p={[-0.2, 1.38, 0]} g={[2.3, 0.62, 1.6]} farbe={f.glas} />
-          {[-1.35, 1.35].flatMap((x) => [rad(x, 0.85, 0.34), rad(x, -0.85, 0.34)])}
-        </>
-      )}
-      {/* Scheinwerfer vorn (nachts an) */}
-      {[-0.6, 0.6].map((zl) => (
-        <Quader key={zl} p={[lkw ? 4.92 : 2.16, lkw ? 1 : 0.75, zl]} g={[0.05, 0.2, 0.35]} farbe={f.nacht ? f.licht : f.tank}
-                leuchten={f.nacht ? 2.5 : 0} lichtFarbe={f.licht} schatten={false} />
-      ))}
+      {art === 'lkw' ? <Lkw farbe={farbe} f={f} /> : <Auto farbe={farbe} f={f} />}
     </group>
   );
 }
@@ -332,6 +272,13 @@ function Fassade({ h, f }) {
           </group>
         );
       })}
+      {/* Fallrohre an den Ecken */}
+      {[[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([x, z]) => (
+        <mesh key={`fr${x}${z}`} position={[x * (h.b / 2 - 0.4), h.hoehe / 2, z * (h.t / 2 + 0.14)]}>
+          <cylinderGeometry args={[0.09, 0.09, h.hoehe, 8]} />
+          <meshStandardMaterial color={f.tank} roughness={0.4} metalness={0.4} />
+        </mesh>
+      ))}
       {/* Personaltür mit Vordach */}
       <Quader p={[h.b * 0.42, 1.15, vorn + 0.05]} g={[1.1, 2.3, 0.1]} farbe={f['maschine-dunkel']} schatten={false} />
       <Quader p={[h.b * 0.42, 2.65, vorn + 0.6]} g={[2.2, 0.14, 1.2]} farbe={f.tor} schatten={false} />
@@ -421,18 +368,87 @@ function Anbau({ a, lx, lz, f, offen, dachFarbe, wand }) {
 /* ---------------------------------------------------------------------------
  * Einrichtung der Nebenbereiche (wie im 2D-Grundriss): Regale bzw. Schreibtische
  * ------------------------------------------------------------------------- */
-function Einrichtung({ bereich, f, ursprung }) {
+function Einrichtung({ bereich, f, ursprung, hoehe }) {
   const { x, y, b, t, name } = bereich;
   const [ox, oz] = ursprung;
-  if (name === 'Büro & Sozial') {
-    return [0, 1, 2].map((i) => (
-      <Quader key={i} p={[ox + x + (b / 3) * (i + 0.5), 0.4, oz + y + t * 0.65]} g={[1.6, 0.8, 0.8]} farbe={f['maschine-dunkel']} />
-    ));
-  }
-  const reihen = Math.max(2, Math.floor((b - 4) / 4));
-  return Array.from({ length: reihen }, (_, i) => (
-    <Quader key={i} p={[ox + x + 3.2 + i * 4, 1.2, oz + y + 5 + Math.max(4, t - 9) / 2]} g={[1.4, 2.4, Math.max(4, t - 9)]} farbe={f.blau} />
-  ));
+  const teile = useMemo(() => {
+    const holz = '#c9b48f';
+    if (name === 'Büro & Sozial') {
+      // Schreibtische mit Bildschirm und Stuhl in Reihen
+      const tische = [];
+      const schirme = [];
+      const stuehle = [];
+      const proReihe = Math.max(1, Math.floor((b - 1) / 2.4));
+      const reihen = Math.max(1, Math.min(3, Math.floor((t - 1) / 2.6)));
+      for (let r = 0; r < reihen; r += 1) {
+        for (let i = 0; i < proReihe; i += 1) {
+          const px = ox + x + (b / proReihe) * (i + 0.5);
+          const pz = oz + y + (t / reihen) * (r + 0.4);
+          tische.push({ p: [px, 0.74, pz], g: [1.6, 0.05, 0.8], farbe: holz });
+          [-0.7, 0.7].forEach((dx) => tische.push({ p: [px + dx, 0.37, pz], g: [0.05, 0.74, 0.7], farbe: f['maschine-dunkel'] }));
+          schirme.push({ p: [px, 1.05, pz - 0.25], g: [0.6, 0.36, 0.04] });
+          stuehle.push({ p: [px, 0.48, pz + 0.65], g: [0.5, 0.08, 0.5] }, { p: [px, 0.78, pz + 0.88], g: [0.5, 0.55, 0.06] }, { p: [px, 0.24, pz + 0.65], g: [0.06, 0.48, 0.06] });
+        }
+      }
+      return { arten: [[tische, '#ffffff'], [schirme, '#22262c'], [stuehle, f.blau]] };
+    }
+    // Palettenregale: Stützen blau, Traversen orange, Paletten mit Waren
+    const stuetzen = [];
+    const traversen = [];
+    const ware = [];
+    const reihen = Math.max(2, Math.floor((b - 4) / 4));
+    const tiefe = Math.max(4, t - 9);
+    const felder = Math.max(1, Math.round(tiefe / 2.7));
+    const fb = tiefe / felder;
+    const ebenen = [0.05, 1.4, 2.75, 4.1].filter((e) => e < hoehe - 2.5);
+    let z = Math.floor(x * 31 + y * 17 + b) || 1;
+    const zufall = () => { z = (z * 16807) % 2147483647; return (z - 1) / 2147483646; };
+    for (let i = 0; i < reihen; i += 1) {
+      const px = ox + x + 3.2 + i * 4;
+      const z0 = oz + y + 5;
+      const oben = ebenen[ebenen.length - 1] + 1.3;
+      for (let j = 0; j <= felder; j += 1) [-0.65, 0.65].forEach((dx) => stuetzen.push({ p: [px + dx, oben / 2, z0 + j * fb], g: [0.08, oben, 0.08] }));
+      for (let j = 0; j < felder; j += 1) {
+        ebenen.slice(1).forEach((e) => [-0.65, 0.65].forEach((dx) => traversen.push({ p: [px + dx, e, z0 + (j + 0.5) * fb], g: [0.06, 0.12, fb] })));
+        ebenen.forEach((e) => {
+          if (zufall() < 0.2) return;
+          const hw = 0.7 + zufall() * 0.5;
+          const art = zufall();
+          ware.push({ p: [px, e + 0.12, z0 + (j + 0.5) * fb], g: [1.1, 0.14, fb * 0.8], farbe: '#b08a5e' });
+          ware.push({ p: [px, e + 0.2 + hw / 2, z0 + (j + 0.5) * fb], g: [1.0, hw, fb * 0.74], farbe: art < 0.55 ? '#c8a77a' : art < 0.85 ? '#e9edf1' : f.blau });
+        });
+      }
+    }
+    return { arten: [[stuetzen, f.blau], [traversen, f['ampel-orange']], [ware, null]] };
+  }, [x, y, b, t, name, ox, oz, hoehe, f]);
+  return teile.arten.map(([liste, farbe], i) => <Viele key={i} teile={liste} farbe={farbe ?? '#ffffff'} schatten={i !== 1} />);
+}
+
+/** Brückenkran unter der Decke: Kranbahn an den Längswänden, Brücke fährt längs, Katze mit Haken quer */
+function Hallenkran({ L, S, hoehe, f, bewegt }) {
+  const bruecke = useRef(null);
+  const katze = useRef(null);
+  useFrame(({ clock }) => {
+    if (!bewegt || !bruecke.current) return;
+    const zeit = clock.elapsedTime;
+    bruecke.current.position.x = Math.sin(zeit * 0.12) * L * 0.33;
+    katze.current.position.z = Math.sin(zeit * 0.31) * S * 0.28;
+  });
+  const y = hoehe - 1.4;
+  return (
+    <>
+      {[-1, 1].map((z) => <Quader key={z} p={[0, y, z * (S / 2 - 0.6)]} g={[L - 0.6, 0.4, 0.25]} farbe={f.tank} schatten={false} />)}
+      <group ref={bruecke} position={[L * 0.1, y + 0.5, 0]}>
+        <Quader p={[0, 0, 0]} g={[0.7, 0.8, S - 1.1]} farbe={f.signal} schatten={false} />
+        {[-1, 1].map((z) => <Quader key={z} p={[0, -0.15, z * (S / 2 - 0.6)]} g={[2.2, 0.45, 0.55]} farbe={f.signal} schatten={false} />)}
+        <group ref={katze}>
+          <Quader p={[0, 0.55, 0]} g={[1.2, 0.5, 1.1]} farbe={f['maschine-dunkel']} schatten={false} />
+          <Quader p={[0, -1.6, 0]} g={[0.04, 3.2, 0.04]} farbe={f['maschine-dunkel']} schatten={false} />
+          <Quader p={[0, -3.3, 0]} g={[0.32, 0.4, 0.22]} farbe={f.signal} schatten={false} />
+        </group>
+      </group>
+    </>
+  );
 }
 
 /** Gang zwischen den Maschinenreihen finden (größte Lücke quer zur Halle) – dort laufen die Figuren */
@@ -445,7 +461,7 @@ function gangInHalle(halle, maschinen) {
     if (von - ende > beste.breite) beste = { mitte: (ende + von) / 2, breite: von - ende };
     ende = Math.max(ende, bis);
   }
-  return { y: beste.mitte, x0: haupt.x + 2, x1: haupt.x + haupt.b - 2 };
+  return { y: beste.mitte, breite: beste.breite, x0: haupt.x + 2, x1: haupt.x + haupt.b - 2 };
 }
 
 /* ---------------------------------------------------------------------------
@@ -490,7 +506,10 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
   // Belegte Stellplätze (fest je Werk, ändern sich beim Neuzeichnen nicht)
   const autos = useMemo(() => {
     const z = zufall(`${standort.kuerzel}-autos`);
-    return Array.from({ length: Math.floor((gs.parkplatz.b - 4) / 3) }, () => z() < 0.6);
+    return Array.from({ length: Math.floor((gs.parkplatz.b - 4) / 3) }, (_, i) => ({ belegt: z() < 0.6, farbe: AUTO_FARBEN[Math.floor(z() * AUTO_FARBEN.length)], i }))
+      .filter((a) => a.belegt)
+      .map((a) => ({ x: X(gs.parkplatz.x + 3.5 + a.i * 3), z: Z(gs.parkplatz.y + 3), drehung: Math.PI / 2, farbe: a.farbe }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [standort.kuerzel, gs]);
 
   // Figuren: auf den Werksstraßen bzw. im Gang der gewählten Halle
@@ -503,8 +522,9 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     if (gewaehlt) {
       const h = gs.hallen[gewaehlt.id];
       const gang = gangInHalle(gewaehlt, maschinen.filter((m) => m.gebaeude_id === gewaehlt.id));
+      const seitlich = Math.min(1.4, Math.max(0.5, gang.breite / 2 - 0.5));
       [0, 1, 2].forEach((i) => liste.push({
-        a: [X(h.x + gang.x0), Z(h.y + gang.y + (i - 1) * 0.7)], b: [X(h.x + gang.x1), Z(h.y + gang.y + (i - 1) * 0.7)],
+        a: [X(h.x + gang.x0), Z(h.y + gang.y + [-1, 1, -0.6][i] * seitlich)], b: [X(h.x + gang.x1), Z(h.y + gang.y + [-1, 1, -0.6][i] * seitlich)],
         farbe: f[`person-${i % 3}`], phase: z(), tempo: 0.8 + z() * 0.6,
       }));
     }
@@ -556,8 +576,16 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     const park = parkTextur();
     park.repeat.set(gs.parkplatz.b / 3, 1);
     park.offset.set(1 / 3, 0);
-    return { solar: solarTextur(), zaun, park };
-  }, [gs, B, T]);
+    // Fensterband je Halle (Wiederholung passend zur Länge)
+    const fensterBasis = fensterTextur();
+    const fenster = new Map(gebaeude.map((g) => {
+      const t = fensterBasis.clone();
+      t.repeat.set(Math.max(gs.hallen[g.id].b, gs.hallen[g.id].t) / 1.6, 1);
+      t.needsUpdate = true;
+      return [g.id, t];
+    }));
+    return { solar: solarTextur(), zaun, park, fenster, boden: bodenTextur() };
+  }, [gs, B, T, gebaeude]);
 
   // Solarmodule auf etwa jeder zweiten Halle (Flach- und Satteldach)
   const solar = useMemo(() => new Set(gebaeude.filter((g) => gs.hallen[g.id].dach !== 'shed'
@@ -623,12 +651,8 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       <Flaeche x={X(gs.parkplatz.x + gs.parkplatz.b / 2)} z={Z(gs.parkplatz.y + gs.parkplatz.t / 2)} b={gs.parkplatz.b} t={gs.parkplatz.t} farbe={f.strasse} />
       <Flaeche x={X(gs.parkplatz.x + gs.parkplatz.b / 2)} z={Z(gs.parkplatz.y + gs.parkplatz.t / 2)} b={gs.parkplatz.b} t={gs.parkplatz.t}
                farbe={f.markierung} map={texturen.park} deckkraft={0.95} y={0.03} />
-      {autos.map((belegt, i) => (belegt ? (
-        <group key={`auto${i}`} position={[X(gs.parkplatz.x + 3.5 + i * 3), 0, Z(gs.parkplatz.y + 3)]}>
-          <Quader p={[0, 0.45, 0]} g={[1.7, 0.7, 4]} farbe={f[`person-${i % 3}`]} />
-          <Quader p={[0, 1.0, 0.2]} g={[1.5, 0.5, 2]} farbe={f.glas} />
-        </group>
-      ) : null))}
+      {/* Geparkte Autos (alle zusammen als Instanzen) */}
+      <ParkendeAutos plaetze={autos} />
       <Quader p={[X(gs.tor.x + gs.tor.b / 2), 0.6, Z(T - 1)]} g={[gs.tor.b, 1.2, 0.3]} farbe={f.tor} />
 
       {laternen.map((l, i) => <Laterne key={`l${i}`} {...l} f={f} durchsichtig={naheGeoeffneterHalle(l)} />)}
@@ -705,8 +729,8 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
             {!offen && (
               <>
                 {/* Fensterband, Rolltor, Dach, Streifen in der Störungsfarbe */}
-                <Quader p={[0, h.hoehe * 0.72, 0]} g={[h.b + 0.1, 1.1, h.t + 0.1]} farbe={f.fenster} schatten={false}
-                        leuchten={nacht ? 0.9 : 0} lichtFarbe={f.licht} />
+                <Quader p={[0, h.hoehe * 0.72, 0]} g={[h.b + 0.1, 1.3, h.t + 0.1]} farbe={f.fenster} schatten={false}
+                        map={texturen.fenster.get(g.id)} leuchten={nacht ? 0.9 : 0} lichtFarbe={f.licht} />
                 <Quader p={[0, 2.4, h.t / 2 + 0.05]} g={[Math.min(6, h.b * 0.3), 4.8, 0.2]} farbe={f.tor} schatten={false} />
                 <Quader p={[0, 0.25, 0]} g={[h.b + 0.5, 0.5, h.t + 0.5]} farbe={farbe} schatten={false} />
                 <Dach form={h.dach} b={h.b} t={h.t} hoehe={h.hoehe} farbe={dachFarbe} glas={f.glas} />
@@ -724,7 +748,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
               ))}
             </group>
             {offen && (
-              <HallenInneres halle={g} h={h} f={f} bewegt={bewegt} maschineId={maschineId} neutral={neutral}
+              <HallenInneres halle={g} h={h} f={f} bewegt={bewegt} maschineId={maschineId} neutral={neutral} boden={texturen.boden}
                              maschinen={maschinen.filter((m) => m.gebaeude_id === g.id)}
                              onMaschine={onMaschine} setHover={setHover} hover={hover} klick={klick} />
             )}
@@ -744,12 +768,12 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
         );
       })}
 
-      {figuren.map((p, i) => <Person key={`${gewaehlt?.id ?? 'w'}-${i}`} {...p} f={f} bewegt={bewegt} />)}
+      {figuren.map((p, i) => <Figur key={`${gewaehlt?.id ?? 'w'}-${i}`} {...p} art={i} f={f} bewegt={bewegt} />)}
       {/* Verkehr auf der Zufahrt: je Spur eine Richtung */}
       {bewegt && [
-        { art: 'lkw', spur: 2.6, richtung: 1, tempo: 7, phase: 0.1, farbe: f['person-1'] },
-        { art: 'auto', spur: 7.4, richtung: -1, tempo: 11, phase: 0.45, farbe: f['person-0'] },
-        { art: 'auto', spur: 2.6, richtung: 1, tempo: 10, phase: 0.75, farbe: f['person-2'] },
+        { art: 'lkw', spur: 2.6, richtung: 1, tempo: 7, phase: 0.1, farbe: AUTO_FARBEN[5] },
+        { art: 'auto', spur: 7.4, richtung: -1, tempo: 11, phase: 0.45, farbe: AUTO_FARBEN[4] },
+        { art: 'auto', spur: 2.6, richtung: 1, tempo: 10, phase: 0.75, farbe: AUTO_FARBEN[0] },
       ].map((v, i) => (
         <Fahrzeug key={i} {...v} von={X(6)} bis={X(B - 6)} z={Z(gs.zufahrtY + v.spur)} f={f} />
       ))}
@@ -758,15 +782,48 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
 }
 
 /** Innenleben der gewählten Halle (Koordinaten relativ zur Hallenmitte) */
-function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine, hover, setHover, klick, neutral }) {
+function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine, hover, setHover, klick, neutral, boden }) {
   const t = useT();
   const ox = -h.b / 2;
   const oz = -h.t / 2;
   const bereiche = halle.bereiche ?? [];
   const lichtbaender = Math.max(2, Math.round(h.t / 9));   // Lichtbänder unter der Decke
+  const gang = gangInHalle(halle, maschinen);
+  // Betonboden mit Fugen (Textur je Halle passend zur Größe)
+  const bodenMap = useMemo(() => {
+    const m = boden.clone();
+    m.repeat.set(h.b / 6, h.t / 6);
+    m.needsUpdate = true;
+    return m;
+  }, [boden, h.b, h.t]);
+  // Stahlstützen innen an der Rück- und linken Wand (alle 6,6 m) – ein Zeichenaufruf für alle.
+  // Vorn und rechts (zur Kamera hin) bewusst keine: sie stünden wie Gitterstäbe vor dem Blick in die Halle.
+  const stuetzen = useMemo(() => {
+    const liste = [];
+    const nx = Math.max(1, Math.round(h.b / WANDFELD));
+    const nz = Math.max(1, Math.round(h.t / WANDFELD));
+    for (let i = 0; i <= nx; i += 1) liste.push({ p: [ox + (i * h.b) / nx, h.hoehe / 2, -(h.t / 2 - 0.2)], g: [0.24, h.hoehe, 0.24] });
+    for (let j = 1; j < nz; j += 1) liste.push({ p: [-(h.b / 2 - 0.2), h.hoehe / 2, oz + (j * h.t) / nz], g: [0.24, h.hoehe, 0.24] });
+    return liste;
+  }, [h.b, h.t, h.hoehe, ox, oz]);
+  const mitKran = h.hoehe < 14 && !/lager|logistik|versand|labor|büro/i.test(halle.bezeichnung ?? '');
   return (
     <>
-      <Flaeche x={0} z={0} b={h.b} t={h.t} farbe={f.hallenboden} y={0.03} />
+      <Flaeche x={0} z={0} b={h.b} t={h.t} farbe={f.hallenboden} y={0.03} map={bodenMap} />
+      <Viele teile={stuetzen} farbe={f.tank} schatten={false} metall={0.3} />
+      {/* Gehweg im Gang (grüne Linien) und Gabelstapler in der Mitte */}
+      {[-1, 1].map((seite) => (
+        <Flaeche key={`gw${seite}`} x={ox + (gang.x0 + gang.x1) / 2} z={oz + gang.y + seite * Math.max(0.8, gang.breite / 2 - 0.25)} b={gang.x1 - gang.x0}
+                 t={0.12} farbe={f['ampel-gruen']} y={0.045} />
+      ))}
+      {gang.breite >= 2.6 && (
+        <Gabelstapler a={[ox + gang.x0 + 2, oz + gang.y]} b={[ox + gang.x1 - 2, oz + gang.y]} f={f} bewegt={bewegt} phase={0.3} />
+      )}
+      {mitKran && (
+        <group rotation-y={h.b >= h.t ? 0 : Math.PI / 2}>
+          <Hallenkran L={Math.max(h.b, h.t)} S={Math.min(h.b, h.t)} hoehe={h.hoehe} f={f} bewegt={bewegt} />
+        </group>
+      )}
       {/* Hallenbeleuchtung (nur nachts, also im Dunkelmodus): Reihen einzelner Leuchten unter der Decke
           und warmes Licht in der Halle. Tagsüber ist das Dach offen – dann blieben nur schwebende Lampen. */}
       {f.nacht && Array.from({ length: lichtbaender }, (_, i) => (
@@ -789,7 +846,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
           <Flaeche x={ox + b.x + b.b / 2} z={oz + b.y + b.t} b={b.b} t={0.18} farbe={f.signal} y={0.04} />
           <Flaeche x={ox + b.x} z={oz + b.y + b.t / 2} b={0.18} t={b.t} farbe={f.signal} y={0.04} />
           <Flaeche x={ox + b.x + b.b} z={oz + b.y + b.t / 2} b={0.18} t={b.t} farbe={f.signal} y={0.04} />
-          {i > 0 && <Einrichtung bereich={b} f={f} ursprung={[ox, oz]} />}
+          {i > 0 && <Einrichtung bereich={b} f={f} ursprung={[ox, oz]} hoehe={h.hoehe} />}
         </group>
       ))}
       {maschinen.map((m) => {
