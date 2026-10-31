@@ -2037,6 +2037,75 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     opacity: 1; box-shadow: 0 0 8px currentColor;
 }
 .ampel-rot { color: var(--rot); } .ampel-orange { color: var(--orange); } .ampel-gruen { color: var(--gruen); }
+/* Easter Egg „Störungsjagd“ (raum/Minispiel.js): Fenster über der 3D-Ansicht */
+.minispiel {
+    position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; padding: 16px;
+    background: color-mix(in srgb, var(--raum-umgebung) 40%, transparent);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: einblenden .3s ease;
+}
+.minispiel-karte {
+    position: relative; width: min(560px, 100%); max-height: 100%; overflow: auto; padding: 20px;
+    border-radius: 22px; border: 1px solid var(--glas-rand); background: var(--karte-erhoeht); color: var(--text);
+    box-shadow: var(--glas-kante), var(--schatten); backdrop-filter: var(--glas-unschaerfe); -webkit-backdrop-filter: var(--glas-unschaerfe);
+}
+.minispiel-zu {
+    position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: 0; border-radius: 50%;
+    background: var(--fuellung); color: var(--text);
+}
+.minispiel-kopf { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; padding-right: 36px; }
+.minispiel-kopf h2 { margin: 0; font-size: 1.2rem; font-weight: 700; }
+.minispiel-kopf p { margin: 2px 0 0; color: var(--text-leise); font-size: .88rem; }
+.minispiel-symbol {
+    display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px;
+    background: var(--akzent); color: #fff; font-size: 1.3rem;
+}
+.minispiel-start ul { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; font-size: .92rem; }
+.minispiel-start li { display: flex; gap: 10px; align-items: flex-start; }
+.minispiel-punkt { flex-shrink: 0; width: 12px; height: 12px; margin-top: 5px; border-radius: 50%; }
+.minispiel-punkt.orange { background: var(--raum-ampel-orange); }
+.minispiel-punkt.rot { background: var(--raum-ampel-rot); }
+.minispiel-punkt.gruen { background: var(--raum-ampel-gruen); }
+.minispiel-leiste { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.minispiel-zeit { height: 6px; margin-bottom: 12px; overflow: hidden; border-radius: 3px; background: var(--fuellung); }
+.minispiel-zeit span { display: block; height: 100%; background: var(--akzent); transition: width .1s linear; }
+.minispiel-feld { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 480px) { .minispiel-feld { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.minispiel-maschine {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-width: 0; min-height: 86px; padding: 12px 6px 8px; border: 2px solid var(--glas-rand); border-radius: 14px;
+    background: var(--fuellung); color: var(--text); transition: transform .12s, border-color .12s, background .12s;
+}
+.minispiel-maschine:active { transform: scale(.96); }
+.minispiel-icon { font-size: 1.5rem; }
+.minispiel-name { max-width: 100%; overflow: hidden; color: var(--text-leise); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.minispiel-ampel {
+    position: absolute; top: 6px; right: 6px; display: flex; flex-direction: column; gap: 2px; padding: 3px;
+    border-radius: 6px; background: var(--raum-maschine-dunkel);
+}
+.minispiel-ampel i { width: 6px; height: 6px; border-radius: 50%; opacity: .25; }
+.minispiel-ampel i:nth-child(1) { background: var(--raum-ampel-rot); }
+.minispiel-ampel i:nth-child(2) { background: var(--raum-ampel-orange); }
+.minispiel-ampel i:nth-child(3) { background: var(--raum-ampel-gruen); }
+.ist-rot .minispiel-ampel i:nth-child(1), .ist-orange .minispiel-ampel i:nth-child(2), .ist-gruen .minispiel-ampel i:nth-child(3) { opacity: 1; }
+.minispiel-maschine.ist-orange {
+    border-color: var(--raum-ampel-orange); background: color-mix(in srgb, var(--raum-ampel-orange) 14%, var(--fuellung));
+    animation: minispiel-puls .6s ease-in-out infinite alternate;
+}
+.minispiel-maschine.ist-rot { border-color: var(--raum-ampel-rot); background: color-mix(in srgb, var(--raum-ampel-rot) 18%, var(--fuellung)); }
+.minispiel-maschine.ist-rot .minispiel-icon { opacity: .5; }
+.minispiel-maschine.wackelt { animation: minispiel-wackeln .3s; }
+@keyframes minispiel-puls { to { transform: scale(1.04); } }
+@keyframes minispiel-wackeln { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .minispiel-maschine.ist-orange, .minispiel-maschine.wackelt { animation: none; } }
+.minispiel-ende { text-align: center; }
+.minispiel-rang { margin-bottom: 0; font-size: 1.1rem; font-weight: 700; }
+.minispiel-rang span { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 999px; background: var(--akzent); color: #fff; font-size: .85rem; }
+.minispiel-werte { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
+.minispiel-werte div { display: flex; flex-direction: column; padding: 10px; border-radius: 14px; background: var(--fuellung); }
+.minispiel-werte strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.minispiel-werte span { color: var(--text-leise); font-size: .8rem; }
+.minispiel-knoepfe { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
 /* 3D-Modell der Maschine im Infofenster */
 .maschine-detail-3d {
     position: relative; height: 230px; margin: 0 0 14px; border-radius: 14px; overflow: hidden;

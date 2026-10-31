@@ -33,8 +33,9 @@ import { MaschineMitAmpel } from './Maschine3D';
 import { useRaum, useSichtbar } from './farben';
 import Landesdeko, { LAND_STIL, mitLandStil, Baum3D, Buero3D } from './Landesdeko';
 import Figur from './Figur';
+import Minispiel from './Minispiel';
 import { Auto, Lkw, ParkendeAutos, Gabelstapler, AUTO_FARBEN } from './Fahrzeuge';
-import { Viele, canvasTextur } from './Bausteine';
+import { Viele, canvasTextur, grasTextur } from './Bausteine';
 
 /** Farbe einer Störungsstufe */
 const stufenFarbe = (f, offen, prio, neutral = false) => (neutral ? f.linie : ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)]);
@@ -155,7 +156,7 @@ const parkTextur = () => canvasTextur(30, 80, (g, w, h) => {
 /** Straßenlaterne: Mast, Ausleger zur Straße hin, Leuchte (nachts an) */
 function Laterne({ x, z, richtung, f, durchsichtig = false }) {
   const [dx, dz] = richtung;
-  const deckkraft = durchsichtig ? 0.22 : 1;   // an der geöffneten Halle: durchsichtig, damit sie nicht im Weg steht
+  const deckkraft = durchsichtig ? 0.05 : 1;   // an der geöffneten Halle: fast unsichtbar, damit sie nicht im Weg steht
   return (
     <group position={[x, 0, z]}>
       <mesh position={[0, 3, 0]} castShadow={!durchsichtig}>
@@ -324,7 +325,7 @@ function Solar({ h, map }) {
 
 /** Anbau an einer Halle (lx/lz: Mitte relativ zur Hallenmitte) */
 function Anbau({ a, lx, lz, f, offen, dachFarbe, wand }) {
-  const deckkraft = offen ? 0.14 : 1;
+  const deckkraft = offen ? 0.08 : 1;
   if (a.art === 'hochteil') {
     // höherer Hallenteil: etwas größer als die Halle selbst, damit die Wände nicht flimmern
     return (
@@ -366,32 +367,13 @@ function Anbau({ a, lx, lz, f, offen, dachFarbe, wand }) {
 }
 
 /* ---------------------------------------------------------------------------
- * Einrichtung der Nebenbereiche (wie im 2D-Grundriss): Regale bzw. Schreibtische
+ * Einrichtung der Nebenbereiche (wie im 2D-Grundriss): Palettenregale bzw. Hallenbüro
  * ------------------------------------------------------------------------- */
 function Einrichtung({ bereich, f, ursprung, hoehe }) {
   const { x, y, b, t, name } = bereich;
   const [ox, oz] = ursprung;
   const teile = useMemo(() => {
-    const holz = '#c9b48f';
-    if (name === 'Büro & Sozial') {
-      // Schreibtische mit Bildschirm und Stuhl in Reihen
-      const tische = [];
-      const schirme = [];
-      const stuehle = [];
-      const proReihe = Math.max(1, Math.floor((b - 1) / 2.4));
-      const reihen = Math.max(1, Math.min(3, Math.floor((t - 1) / 2.6)));
-      for (let r = 0; r < reihen; r += 1) {
-        for (let i = 0; i < proReihe; i += 1) {
-          const px = ox + x + (b / proReihe) * (i + 0.5);
-          const pz = oz + y + (t / reihen) * (r + 0.4);
-          tische.push({ p: [px, 0.74, pz], g: [1.6, 0.05, 0.8], farbe: holz });
-          [-0.7, 0.7].forEach((dx) => tische.push({ p: [px + dx, 0.37, pz], g: [0.05, 0.74, 0.7], farbe: f['maschine-dunkel'] }));
-          schirme.push({ p: [px, 1.05, pz - 0.25], g: [0.6, 0.36, 0.04] });
-          stuehle.push({ p: [px, 0.48, pz + 0.65], g: [0.5, 0.08, 0.5] }, { p: [px, 0.78, pz + 0.88], g: [0.5, 0.55, 0.06] }, { p: [px, 0.24, pz + 0.65], g: [0.06, 0.48, 0.06] });
-        }
-      }
-      return { arten: [[tische, '#ffffff'], [schirme, '#22262c'], [stuehle, f.blau]] };
-    }
+    if (name === 'Büro & Sozial') return bueroTeile({ x: ox + x, z: oz + y, b, t }, f);
     // Palettenregale: Stützen blau, Traversen orange, Paletten mit Waren
     const stuetzen = [];
     const traversen = [];
@@ -419,9 +401,104 @@ function Einrichtung({ bereich, f, ursprung, hoehe }) {
         });
       }
     }
-    return { arten: [[stuetzen, f.blau], [traversen, f['ampel-orange']], [ware, null]] };
+    return { arten: [[stuetzen, f.blau], [traversen, f['ampel-orange'], { schatten: false }], [ware, null]] };
   }, [x, y, b, t, name, ox, oz, hoehe, f]);
-  return teile.arten.map(([liste, farbe], i) => <Viele key={i} teile={liste} farbe={farbe ?? '#ffffff'} schatten={i !== 1} />);
+  return (
+    <>
+      {teile.teppich && <Flaeche x={teile.teppich.x} z={teile.teppich.z} b={teile.teppich.b} t={teile.teppich.t} farbe={f.linie} y={0.05} />}
+      {teile.arten.map(([liste, farbe, optionen = {}], i) => (
+        <Viele key={i} teile={liste} farbe={farbe ?? '#ffffff'} schatten={optionen.schatten ?? i !== 1} {...optionen} />
+      ))}
+    </>
+  );
+}
+
+/**
+ * Hallenbüro mit Sozialbereich: Glaswände auf Brüstung (Tür zur Hallenmitte), Teppich,
+ * Schreibtisch-Inseln zu je vier Plätzen mit Bildschirmen und Bürostühlen, Pflanzen,
+ * Spinde, Küchenzeile und Tisch für die Pause. Alles als Instanzen (wenige Zeichenaufrufe).
+ * r = Fläche in Hallenkoordinaten (x/z = linke hintere Ecke).
+ */
+function bueroTeile(r, f) {
+  const holz = '#c9b48f';
+  const weiss = '#f2f3f5';
+  const stuhl = f['maschine-dunkel'];
+  const bruestung = [];
+  const glas = [];
+  const rahmen = [];
+  const moebel = [];
+  const kugeln = [];
+  // Wände: Tür in der Seite, die zur Hallenmitte (0, 0) zeigt
+  const mx = r.x + r.b / 2;
+  const mz = r.z + r.t / 2;
+  const tuerSeite = Math.abs(mx) / r.b > Math.abs(mz) / r.t ? (mx > 0 ? 'links' : 'rechts') : (mz > 0 ? 'hinten' : 'vorn');
+  const wand = (x1, z1, x2, z2, seite) => {
+    const laenge = Math.hypot(x2 - x1, z2 - z1);
+    const quer = x1 === x2;
+    const stuecke = seite === tuerSeite ? [[0, laenge / 2 - 0.7], [laenge / 2 + 0.7, laenge]] : [[0, laenge]];
+    stuecke.forEach(([von, bis]) => {
+      const l = bis - von;
+      const m = (von + bis) / 2;
+      const p = quer ? [x1, 0, z1 + m] : [x1 + m, 0, z1];
+      const g = (h) => (quer ? [0.1, h, l] : [l, h, 0.1]);
+      bruestung.push({ p: [p[0], 0.5, p[2]], g: g(1.0) });
+      glas.push({ p: [p[0], 1.9, p[2]], g: g(1.8) });
+      rahmen.push({ p: [p[0], 2.84, p[2]], g: g(0.08) });
+    });
+    for (let d = 0; d <= laenge + 0.01; d += 3) rahmen.push({ p: quer ? [x1, 1.42, z1 + d] : [x1 + d, 1.42, z1], g: [0.06, 2.84, 0.06] });
+  };
+  wand(r.x, r.z, r.x + r.b, r.z, 'hinten');
+  wand(r.x, r.z + r.t, r.x + r.b, r.z + r.t, 'vorn');
+  wand(r.x, r.z, r.x, r.z + r.t, 'links');
+  wand(r.x + r.b, r.z, r.x + r.b, r.z + r.t, 'rechts');
+
+  // Sozialbereich am rechten Ende (wenn genug Platz): Spinde, Küchenzeile, Tisch mit Hockern
+  const sozial = r.b >= 10 ? 3 : 0;
+  if (sozial) {
+    const sx = r.x + r.b - sozial / 2;
+    const spinde = Math.max(2, Math.floor((r.t - 1.4) / 0.6));
+    for (let i = 0; i < Math.min(spinde, 6); i += 1) moebel.push({ p: [r.x + r.b - 0.35, 0.95, r.z + 0.7 + i * 0.6], g: [0.5, 1.9, 0.55], farbe: f.blau });
+    moebel.push({ p: [r.x + r.b - 0.4, 0.45, r.z + r.t - 1.6], g: [0.6, 0.9, 2.2], farbe: weiss });
+    moebel.push({ p: [r.x + r.b - 0.4, 0.92, r.z + r.t - 1.6], g: [0.64, 0.04, 2.24], farbe: holz });
+    moebel.push({ p: [sx - 0.4, 0.74, r.z + r.t / 2], g: [1.0, 0.04, 1.0], farbe: holz });
+    moebel.push({ p: [sx - 0.4, 0.37, r.z + r.t / 2], g: [0.08, 0.74, 0.08], farbe: stuhl });
+    [[-0.75, 0], [0.75, 0], [0, -0.75], [0, 0.75]].forEach(([dx, dz]) => moebel.push({ p: [sx - 0.4 + dx * 0.9, 0.45, r.z + r.t / 2 + dz * 0.9], g: [0.38, 0.06, 0.38], farbe: stuhl }));
+  }
+  // Schreibtisch-Inseln (2 × 2 Plätze, Bildschirme zur Mitte, Stühle außen)
+  const breite = r.b - sozial - 0.8;
+  const nx = Math.max(1, Math.floor(breite / 3.8));
+  const nz = Math.max(1, Math.floor((r.t - 1.2) / 3.9));
+  for (let i = 0; i < nx; i += 1) {
+    for (let j = 0; j < nz; j += 1) {
+      const cx = r.x + 0.4 + (breite / nx) * (i + 0.5);
+      const cz = r.z + 0.6 + ((r.t - 1.2) / nz) * (j + 0.5);
+      [-0.8, 0.8].forEach((dx) => [-1, 1].forEach((seite) => {
+        const dz = seite * 0.4;
+        moebel.push({ p: [cx + dx, 0.74, cz + dz], g: [1.56, 0.04, 0.78], farbe: weiss });
+        moebel.push({ p: [cx + dx + (dx > 0 ? 0.55 : -0.55), 0.36, cz + dz], g: [0.4, 0.7, 0.6], farbe: f.tank });
+        moebel.push({ p: [cx + dx, 1.0, cz + seite * 0.1], g: [0.58, 0.36, 0.03], farbe: '#22262c' });
+        moebel.push({ p: [cx + dx, 1.0, cz + seite * 0.12], g: [0.52, 0.3, 0.01], farbe: f.akzent });
+        moebel.push({ p: [cx + dx, 0.47, cz + seite * 1.12], g: [0.5, 0.07, 0.48], farbe: stuhl });
+        moebel.push({ p: [cx + dx, 0.8, cz + seite * 1.34], g: [0.46, 0.55, 0.06], farbe: stuhl });
+        moebel.push({ p: [cx + dx, 0.22, cz + seite * 1.12], g: [0.06, 0.44, 0.06], farbe: stuhl });
+      }));
+    }
+  }
+  // Pflanzen in den Ecken
+  [[r.x + 0.5, r.z + 0.5], [r.x + r.b - sozial - 0.5, r.z + r.t - 0.5]].forEach(([px, pz]) => {
+    moebel.push({ p: [px, 0.22, pz], g: [0.4, 0.44, 0.4], farbe: '#8b6b4e' });
+    kugeln.push({ p: [px, 0.85, pz], g: [0.75, 0.9, 0.75] });
+  });
+  return {
+    teppich: { x: r.x + r.b / 2, z: r.z + r.t / 2, b: r.b, t: r.t },
+    arten: [
+      [bruestung, f.buero],
+      [glas, f.glas, { deckkraft: 0.22, schatten: false }],
+      [rahmen, f['maschine-dunkel'], { schatten: false }],
+      [moebel, null, { schatten: false }],
+      [kugeln, f.baum, { form: 'kugel', schatten: false }],
+    ],
+  };
 }
 
 /** Brückenkran unter der Decke: Kranbahn an den Längswänden, Brücke fährt längs, Katze mit Haken quer */
@@ -437,7 +514,7 @@ function Hallenkran({ L, S, hoehe, f, bewegt }) {
   const y = hoehe - 1.4;
   return (
     <>
-      {[-1, 1].map((z) => <Quader key={z} p={[0, y, z * (S / 2 - 0.6)]} g={[L - 0.6, 0.4, 0.25]} farbe={f.tank} schatten={false} />)}
+      {[-1, 1].map((z) => <Quader key={z} p={[0, y, z * (S / 2 - 0.6)]} g={[L - 0.6, 0.4, 0.25]} farbe={f.tank} schatten={false} deckkraft={0.4} />)}
       <group ref={bruecke} position={[L * 0.1, y + 0.5, 0]}>
         <Quader p={[0, 0, 0]} g={[0.7, 0.8, S - 1.1]} farbe={f.signal} schatten={false} />
         {[-1, 1].map((z) => <Quader key={z} p={[0, -0.15, z * (S / 2 - 0.6)]} g={[2.2, 0.45, 0.55]} farbe={f.signal} schatten={false} />)}
@@ -467,7 +544,7 @@ function gangInHalle(halle, maschinen) {
 /* ---------------------------------------------------------------------------
  * Szene
  * ------------------------------------------------------------------------- */
-function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral }) {
+function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, verwaltung, onVerwaltung }) {
   const t = useT();
   // Boden, Straßen, Wände und Dächer in den Farben des Landes (Wüste in Mexiko, Schnee in Russland …)
   const f = useMemo(() => mitLandStil(fBasis, standort.land), [fBasis, standort.land]);
@@ -486,7 +563,14 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
 
   // Kameraziel: ganzes Werk oder die gewählte Halle (schräg von vorn oben)
   const richtung = new THREE.Vector3(0.42, 0.78, 0.82).normalize();
+  const buero = gs.deko.find((d) => d.art === 'buero');
   const ziel = useMemo(() => {
+    // Easter Egg: Kamera fliegt nah an das Verwaltungsgebäude heran (dort wartet das Minispiel)
+    if (verwaltung && buero) {
+      const mitte = [X(buero.x + buero.b / 2), buero.etagen * 1.8, Z(buero.y + buero.t / 2)];
+      const abstand = Math.max(buero.b, buero.t) * 1.5 + 16;
+      return { schluessel: 'verwaltung', target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand) };
+    }
     if (gewaehlt) {
       const h = gs.hallen[gewaehlt.id];
       const mitte = [X(h.x + h.b / 2), 0, Z(h.y + h.t / 2)];
@@ -498,7 +582,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     const mitte = [0, 0, 8];
     return { schluessel: 'werk', target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gewaehlt, gs]);
+  }, [gewaehlt, gs, verwaltung]);
 
   useEffect(() => { document.body.style.cursor = hover ? 'pointer' : ''; return () => { document.body.style.cursor = ''; }; }, [hover]);
 
@@ -543,13 +627,13 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs]);
   const nacht = f.nacht;
-  // Laternen bis 18 m um die geöffnete Halle werden durchsichtig
+  // Laternen bis 35 m um die geöffnete Halle werden (fast) unsichtbar
   const naheGeoeffneterHalle = (l) => {
     if (!gewaehlt) return false;
     const h = gs.hallen[gewaehlt.id];
     const dx = Math.max(X(h.x) - l.x, 0, l.x - X(h.x + h.b));
     const dz = Math.max(Z(h.y) - l.z, 0, l.z - Z(h.y + h.t));
-    return Math.hypot(dx, dz) < 18;
+    return Math.hypot(dx, dz) < 35;
   };
   // Trapezblech-Textur je Halle (Wiederholung passend zur Länge)
   const wandTexturen = useMemo(() => {
@@ -584,7 +668,10 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       t.needsUpdate = true;
       return [g.id, t];
     }));
-    return { solar: solarTextur(), zaun, park, fenster, boden: bodenTextur() };
+    // Gras bzw. Boden des Geländes: leichte Struktur statt glatter Fläche (1 Feld = 12 m)
+    const gras = grasTextur();
+    gras.repeat.set(B / 12, T / 12);
+    return { solar: solarTextur(), zaun, park, fenster, boden: bodenTextur(), gras };
   }, [gs, B, T, gebaeude]);
 
   // Solarmodule auf etwa jeder zweiten Halle (Flach- und Satteldach)
@@ -608,7 +695,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       {/* Gelände als Modellplatte */}
       <mesh position={[0, -0.6, 0]} receiveShadow>
         <boxGeometry args={[B, 1.2, T]} />
-        <meshStandardMaterial color={f.gelaende} roughness={1} />
+        <meshStandardMaterial color={f.gelaende} roughness={1} map={texturen.gras} />
       </mesh>
       {gs.strassen.map((s, i) => (s.pfad
         // geschwungene Straße: Abschnitte als gedrehte Flächen, runde Stöße an den Knicken
@@ -672,8 +759,18 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       {gs.deko.map((d, i) => {
         if (d.art === 'buero') {
           const h = d.etagen * 3.6;
+          // Easter Egg: Verwaltung anklickbar (nicht beim Melden und nicht, solange eine Halle offen ist)
+          const klickbar = Boolean(onVerwaltung) && !neutral && !gewaehlt;
           return (
-            <group key={i} position={[X(d.x + d.b / 2), 0, Z(d.y + d.t / 2)]}>
+            <group key={i} position={[X(d.x + d.b / 2), 0, Z(d.y + d.t / 2)]} scale={klickbar && hover === 'verwaltung' ? 1.04 : 1}
+                   onClick={klickbar ? (e) => klick(e, onVerwaltung) : undefined}
+                   onPointerOver={klickbar ? (e) => { e.stopPropagation(); setHover('verwaltung'); } : undefined}
+                   onPointerOut={klickbar ? () => setHover(null) : undefined}>
+              {klickbar && hover === 'verwaltung' && bereit && !verwaltung && (
+                <Html position={[0, h + 7, 0]} center zIndexRange={[4, 1]} style={{ pointerEvents: 'none' }}>
+                  <span className="raum-name"><i className="bi bi-cup-hot" aria-hidden="true" /> {t('Verwaltung')} · ?</span>
+                </Html>
+              )}
               {/* Bürogebäude im Baustil des Landes (Fachwerk, Glasturm, Pagode …), sonst schlichter Quader */}
               {stil ? <Buero3D stil={stil.buero} d={d} f={f} /> : (
                 <>
@@ -810,7 +907,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
   return (
     <>
       <Flaeche x={0} z={0} b={h.b} t={h.t} farbe={f.hallenboden} y={0.03} map={bodenMap} />
-      <Viele teile={stuetzen} farbe={f.tank} schatten={false} metall={0.3} />
+      <Viele teile={stuetzen} farbe={f.tank} schatten={false} metall={0.3} deckkraft={0.35} />
       {/* Gehweg im Gang (grüne Linien) und Gabelstapler in der Mitte */}
       {[-1, 1].map((seite) => (
         <Flaeche key={`gw${seite}`} x={ox + (gang.x0 + gang.x1) / 2} z={oz + gang.y + seite * Math.max(0.8, gang.breite / 2 - 0.25)} b={gang.x1 - gang.x0}
@@ -831,7 +928,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
           const proReihe = Math.max(2, Math.floor(h.b / 7));
           return (
             <Quader key={`lb${i}-${j}`} p={[ox + ((j + 0.5) * h.b) / proReihe, h.hoehe - 0.7, oz + ((i + 0.5) * h.t) / lichtbaender]}
-                    g={[2.4, 0.1, 0.35]} farbe={f.licht} leuchten={1.6} lichtFarbe={f.licht} schatten={false} />
+                    g={[2.0, 0.05, 0.18]} farbe={f.licht} leuchten={1.6} lichtFarbe={f.licht} schatten={false} deckkraft={0.45} />
           );
         })
       ))}
@@ -896,13 +993,24 @@ export default function Werk3D(props) {
   const { f, bewegt } = useRaum();
   const rahmen = useRef(null);
   const sichtbar = useSichtbar(rahmen);   // außerhalb des Bildschirms wird nicht gezeichnet
+  // Easter Egg: null | 'flug' (Kamera fliegt zur Verwaltung) | 'offen' (Minispiel)
+  const [spiel, setSpiel] = useState(null);
+  useEffect(() => {
+    if (spiel !== 'flug') return undefined;
+    const warten = setTimeout(() => setSpiel('offen'), bewegt ? 1150 : 0);
+    return () => clearTimeout(warten);
+  }, [spiel, bewegt]);
+  useEffect(() => { setSpiel(null); }, [props.gebaeudeId]);
   return (
     <div className="raum" ref={rahmen}>
       {/* offsetSize: Größe ohne CSS-Transform messen (die Ebene wird beim Zoomen skaliert) */}
       <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar ? 'never' : bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
               camera={{ fov: 38, near: 0.5, far: 4000, position: [150, 200, 220] }} gl={{ antialias: true, alpha: true }}>
-        <Szene {...props} f={f} bewegt={bewegt} />
+        <Szene {...props} f={f} bewegt={bewegt} verwaltung={Boolean(spiel)} onVerwaltung={props.neutral ? null : () => setSpiel('flug')} />
       </Canvas>
+      {spiel === 'offen' && (
+        <Minispiel maschinen={props.maschinen ?? []} ort={props.standort.stadt} onSchliessen={() => setSpiel(null)} />
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { zufall } from '@/lib/karten/werkGestaltung';
+import { grasTextur } from './Bausteine';
 
 /* ---------- Canvas → Textur ---------- */
 function useTextur(zeichnen, breite, hoehe, abhaengig) {
@@ -396,11 +397,13 @@ export function Baum3D({ art, groesse = 1, i = 0, f }) {
           </mesh>
         </group>
       );
-    default:        // runder Laubbaum
+    default:        // Laubbaum: Krone aus drei Kugeln, wirkt natürlicher als eine einzelne
       return (
-        <group scale={groesse}>
+        <group scale={groesse} rotation-y={i * 1.7}>
           <Teil p={[0, 1.2, 0]} g={[0.25, 0.3, 2.4, 8]} form="zyl" farbe={stamm} />
-          <Teil p={[0, 3.6, 0]} g={[2.1, 14, 10]} form="kugel" farbe={f.baum} />
+          <Teil p={[0, 3.8, 0]} g={[1.8, 12, 10]} form="kugel" farbe={f.baum} />
+          <Teil p={[0.95, 3.3, 0.35]} g={[1.25, 10, 8]} form="kugel" farbe={f.baum} />
+          <Teil p={[-0.75, 3.4, -0.55]} g={[1.35, 10, 8]} form="kugel" farbe={f.baum} />
         </group>
       );
   }
@@ -782,6 +785,12 @@ function Umgebung({ standort, gs, f }) {
     }
     return liste;
   }, [standort.kuerzel, B, T, breite, wahrzeichenX, fluss]);
+  const grasMap = useMemo(() => {
+    const m = grasTextur();
+    m.repeat.set(breite / 12, (T + UMLAND_RAND + UMLAND_VORN) / 12);
+    return m;
+  }, [breite, T]);
+  useEffect(() => () => grasMap.dispose(), [grasMap]);
   if (!stil) return null;
   const n = (paar) => paar[nacht ? 1 : 0];
   const arten = stil.umlandBaeume ?? [stil.baum];
@@ -794,7 +803,7 @@ function Umgebung({ standort, gs, f }) {
       {/* Umland als größere Platte unter dem Gelände */}
       <mesh position={[0, -0.5, (UMLAND_VORN - UMLAND_RAND) / 2]} receiveShadow>
         <boxGeometry args={[breite, 1, T + UMLAND_RAND + UMLAND_VORN]} />
-        <meshStandardMaterial color={n(stil.umland)} roughness={1} />
+        <meshStandardMaterial color={n(stil.umland)} roughness={1} map={grasMap} />
       </mesh>
       {/* Landstraße mit Mittellinie (USA: doppelt gelb) und Zufahrt zum Tor */}
       <Boden x={0} z={landstrasse} b={breite} t={9} farbe={f.strasse} />

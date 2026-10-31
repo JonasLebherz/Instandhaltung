@@ -16,10 +16,11 @@ const farbeHilfe = new THREE.Color();
 
 /**
  * teile: [{ p: [x, y, z], g: [b, h, t], r?: [rx, ry, rz], farbe?: '#…' }]
- * form: 'box' (Standard) oder 'zyl' (stehender Zylinder, g = [Durchmesser, Höhe, Durchmesser])
+ * form: 'box' (Standard), 'zyl' (stehender Zylinder) oder 'kugel'; g = Größe [b, h, t] bzw. Durchmesser
+ * deckkraft < 1: durchsichtig (Glas)
  * geometrie: eigene Form in Originalgröße (z. B. Autokarosserie), g ist dann Skalierung (Standard 1)
  */
-export function Viele({ teile, farbe = '#ffffff', form = 'box', geometrie = null, schatten = true, rauheit = 0.75, metall = 0 }) {
+export function Viele({ teile, farbe = '#ffffff', form = 'box', geometrie = null, schatten = true, rauheit = 0.75, metall = 0, deckkraft = 1 }) {
   const ref = useRef(null);
   const mitFarben = teile.some((t) => t.farbe);
   useLayoutEffect(() => {
@@ -40,11 +41,14 @@ export function Viele({ teile, farbe = '#ffffff', form = 'box', geometrie = null
   }, [teile, farbe, mitFarben]);
   if (!teile.length) return null;
   return (
-    <instancedMesh ref={ref} args={[null, null, teile.length]} castShadow={schatten} receiveShadow>
+    <instancedMesh ref={ref} args={[null, null, teile.length]} castShadow={schatten && deckkraft >= 1} receiveShadow>
       {geometrie ? <primitive object={geometrie} attach="geometry" dispose={null} />
-        : form === 'zyl' ? <cylinderGeometry args={[0.5, 0.5, 1, 12]} /> : <boxGeometry args={[1, 1, 1]} />}
-      {/* bei Einzelfarben je Teil: Grundfarbe weiß, sonst würde sie mit der Teilfarbe multipliziert */}
-      <meshStandardMaterial color={mitFarben ? '#ffffff' : farbe} roughness={rauheit} metalness={metall} />
+        : form === 'zyl' ? <cylinderGeometry args={[0.5, 0.5, 1, 12]} />
+          : form === 'kugel' ? <sphereGeometry args={[0.5, 12, 10]} /> : <boxGeometry args={[1, 1, 1]} />}
+      {/* bei Einzelfarben je Teil: Grundfarbe weiß, sonst würde sie mit der Teilfarbe multipliziert.
+          key: Three.js übernimmt "durchsichtig" nur bei neuem Material */}
+      <meshStandardMaterial key={deckkraft < 1 ? 'glas' : 'voll'} color={mitFarben ? '#ffffff' : farbe} roughness={rauheit} metalness={metall}
+                            transparent={deckkraft < 1} opacity={deckkraft} depthWrite={deckkraft >= 1} />
     </instancedMesh>
   );
 }
@@ -83,3 +87,15 @@ export function useCanvasTextur(breite, hoehe, zeichnen, wiederholung = [1, 1], 
   useLayoutEffect(() => () => textur.dispose(), [textur]);
   return textur;
 }
+
+/** Gras/Boden: unregelmäßige hellere und dunklere Flecken (wird mit der Bodenfarbe multipliziert) */
+export const grasTextur = () => canvasTextur(128, 128, (g, w, h) => {
+  g.fillStyle = '#ededed'; g.fillRect(0, 0, w, h);
+  let z = 11;
+  for (let i = 0; i < 1400; i += 1) {
+    z = (z * 16807) % 2147483647;
+    const hell = z % 3 === 0;
+    g.fillStyle = hell ? 'rgba(255,255,255,0.5)' : `rgba(60,70,50,${0.05 + (z % 9) / 100})`;
+    g.fillRect(z % w, Math.floor(z / w) % h, 1 + (z % 3), 1 + (z % 2));
+  }
+});
