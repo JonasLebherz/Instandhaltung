@@ -101,7 +101,7 @@ export default async function StatistikSeite({ searchParams }) {
       ORDER BY l.hauptsitz DESC, l.name, st.name, g.kuerzel, m.anlagennummer`,
 
     // Jede Störmeldung des Zeitraums mit ihrem Auftrag. Monat, Wochentag und Stunde
-    // nach deutscher Zeit; Reparatur- und Ausfallzeit nur für erledigte Aufträge.
+    // nach deutscher Zeit; Reparatur- und Ausfallzeit nur für erledigte Aufträge, Reaktionszeit ab Arbeitsbeginn.
     sql`
       SELECT s.id AS meldung_id, w.id AS auftrag_id, s.maschine_id, s.zeitpunkt,
              s.prioritaet::text AS prioritaet, s.ursache_kategorie::text AS ursache,
@@ -112,7 +112,10 @@ export default async function StatistikSeite({ searchParams }) {
              CASE WHEN w.status = 'erledigt'
                   THEN EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 60 END::float AS reparatur_min,
              CASE WHEN w.status = 'erledigt'
-                  THEN EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60 END::float   AS ausfall_min
+                  THEN EXTRACT(EPOCH FROM (w.ende_zeit - s.zeitpunkt)) / 60 END::float   AS ausfall_min,
+             -- Reaktionszeit: Meldung bis Arbeitsbeginn (sobald ein Techniker angefangen hat)
+             CASE WHEN w.start_zeit IS NOT NULL
+                  THEN EXTRACT(EPOCH FROM (w.start_zeit - s.zeitpunkt)) / 60 END::float  AS reaktion_min
       FROM stoermeldung s
       JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
       WHERE s.zeitpunkt >= ${ab} AND s.zeitpunkt < ${bisVor}
@@ -135,9 +138,13 @@ export default async function StatistikSeite({ searchParams }) {
   let [jahr, monat] = von.split('-').map(Number);
   const [endJahr, endMonat] = bis.split('-').map(Number);
   while (jahr < endJahr || (jahr === endJahr && monat <= endMonat)) {
+    // Tage des Monats, die im Zeitraum liegen (für die Verfügbarkeit je Monat)
+    const anfang = Math.max(Date.UTC(jahr, monat - 1, 1), ab.getTime());
+    const ende = Math.min(Date.UTC(jahr, monat, 1), bisVor.getTime());
     monate.push({
       schluessel: `${jahr}-${String(monat).padStart(2, '0')}`,
       label: `${monatKurz(monat, t.sprache)} ${String(jahr).slice(2)}`,
+      tage: Math.max(0, (ende - anfang) / 86400000),
     });
     monat += 1;
     if (monat > 12) { monat = 1; jahr += 1; }

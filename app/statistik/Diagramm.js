@@ -28,7 +28,7 @@ function mitDeckkraft(hex, deckkraft) {
   return `rgba(${r}, ${g}, ${b}, ${deckkraft})`;
 }
 
-export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '', nachkomma = 0, beschreibung, hoehe = 260, spalte = '' }) {
+export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '', nachkomma = 0, beschreibung, hoehe = 260, spalte = '', abNull = true }) {
   const t = useT();
   const leinwandRef = useRef(null);
   const formatiert = (wert) => (wert === null || wert === undefined ? '–'
@@ -50,7 +50,8 @@ export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '',
         padding: 10, cornerRadius: 10, displayColors: false,
         callbacks: { label: (k) => formatiert(waagerecht ? k.parsed.x : k.parsed.y) },
       };
-      const wertAchse = { beginAtZero: true, grid: gitter, border: { display: false }, ticks: { precision: nachkomma ? undefined : 0, font: schrift } };
+      // abNull = false: Achse beginnt knapp unter dem kleinsten Wert (z. B. Verfügbarkeit 99,x %)
+      const wertAchse = { beginAtZero: abNull, grace: abNull ? 0 : '5%', grid: gitter, border: { display: false }, ticks: { precision: nachkomma ? undefined : 0, font: schrift } };
       const textAchse = { grid: { display: false }, border: { color: gitter.color }, ticks: { font: schrift, maxRotation: 0, autoSkipPadding: 10, color: waagerecht ? farbe('--text') : undefined } };
 
       diagramm = new Chart(leinwandRef.current, {

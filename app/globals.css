@@ -1577,9 +1577,9 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 @keyframes stat-raus { from { opacity: 0; transform: scale(1.12); } }
 
 /* Zeile mit weiteren Werten */
-.stat-leiste { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 18px 20px; }
+.stat-leiste { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 8px; padding: 18px 20px; }
 .stat-leiste > div { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px; border-left: 1px solid var(--linie); }
-.stat-leiste > div:first-child { border-left: 0; }
+.stat-leiste > div:nth-child(4n+1) { border-left: 0; }
 .stat-leiste strong { font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; }
 .stat-leiste span { font-size: .8rem; color: var(--text-leise); }
 
@@ -1650,7 +1650,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 
 @media (max-width: 767.98px) {
     .stat-leiste { grid-template-columns: repeat(2, 1fr); row-gap: 14px; }
-    .stat-leiste > div:nth-child(3) { border-left: 0; }
+    .stat-leiste > div:nth-child(2n+1) { border-left: 0; }
     .heatmap { grid-template-columns: 30px repeat(8, 1fr); gap: 3px; }
     .heat-zelle { height: 24px; }
 }

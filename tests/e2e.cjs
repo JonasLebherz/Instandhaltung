@@ -298,7 +298,10 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Statistik: kein Neuladen beim Zoomen', await p.evaluate(() => window.__ohneNeuladen === true));
   await p.click('.stat-pfad button:has-text("Weltweit")'); await p.waitForTimeout(900);
   pruefe('Statistik: Pfad zoomt heraus', (await p.textContent('h1')) === 'Statistik' && (await p.$$eval('.stat-kachel', (z) => z.length)) === 8);
-  pruefe('Statistik: Diagramme gezeichnet', (await p.$$eval('.stat-ebene canvas', (z) => z.length)) === 3 && (await p.$$eval('.heat-zelle', (z) => z.length)) >= 56);
+  const neueAuswertungen = ['Verfügbarkeit pro Monat', 'Reaktionszeit nach Priorität', 'Größte Zeitfresser (Pareto)', 'Offene Aufträge nach Alter', 'Störungen nach Maschinenalter'];
+  const titelDa = await p.$$eval('.abschnitt-titel', (z) => z.map((h) => h.textContent));
+  pruefe('Statistik: weitere Auswertungen (Verfügbarkeit, Reaktionszeit, Pareto, Alter)', neueAuswertungen.every((x) => titelDa.includes(x)), titelDa.join(' | '));
+  pruefe('Statistik: Diagramme gezeichnet', (await p.$$eval('.stat-ebene canvas', (z) => z.length)) === 4 && (await p.$$eval('.heat-zelle', (z) => z.length)) >= 56);
   await p.goto(BASE + '/statistik'); await p.waitForTimeout(1500);
   await p.screenshot({ path: SHOTS + 'n-statistik-hell.png', fullPage: true });
 

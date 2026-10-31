@@ -20,7 +20,7 @@ export default function MaschineDetail3D({ maschine }) {
   const L = Math.max(maschine.breite_m, maschine.tiefe_m);
   const W = Math.min(maschine.breite_m, maschine.tiefe_m);
   // Abstand so, dass die ganze Maschine samt Ampel und Bedienpult ins Bild passt (Kugel um das Modell)
-  const hoehe = Math.max(3.6, MASCHINEN_HOEHE[maschine.typ] ?? 0);
+  const hoehe = Math.max(3.6, (MASCHINEN_HOEHE[maschine.typ] ?? 0) + 1);   // + Ampel über der Maschine
   const radius = 0.5 * Math.hypot(L + 0.6, W + 1.2, hoehe);
   const abstand = (radius / Math.sin((32 / 2) * (Math.PI / 180))) * 0.82;
   const blickHoehe = Math.max(1.3, hoehe * 0.38);

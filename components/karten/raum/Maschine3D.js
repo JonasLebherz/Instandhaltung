@@ -17,6 +17,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { ampelZustand } from '@/lib/karten/ampel';
 import { Gehaeuse, Viele, useCanvasTextur } from './Bausteine';
+import { useT } from '@/components/SpracheKontext';
 
 
 /** Quader: Mitte [x, y, z], Größe [b, h, t] */
@@ -151,7 +152,10 @@ export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1 }) {
 }
 
 /** Ungefähre Höhe je Maschinentyp in Metern (für die Kamera im Infofenster) */
-export const MASCHINEN_HOEHE = { Pressen: 5.3, Lackieren: 6, Lagertechnik: 4, Spritzguss: 3.2, Fräsen: 3.1 };
+export const MASCHINEN_HOEHE = {
+  Fräsen: 3.1, Drehen: 2.4, Spritzguss: 3.2, Laserschneiden: 2.1, Schweißen: 2.6, Pressen: 5.3,
+  Fördertechnik: 1.5, Lackieren: 6, Montage: 2.3, Druckluft: 2.0, Lagertechnik: 4,
+};
 
 /**
  * Die Form je Maschinentyp. laeuft: bewegliche Teile in Bewegung (nicht bei Stillstand).
@@ -524,7 +528,7 @@ function Funke({ p, farbe, aktiv, groesse = 0.08 }) {
  * Zusätzliche Einzelheiten für die Detailansicht im Infofenster: Bedienpult mit Bildschirm und
  * Not-Halt, Warnstreifen, Kabelkanal und je Typ ein paar typische Teile.
  */
-function Details({ typ, L, W, f, laeuft, voll }) {
+function Details({ m, zustand, typ, L, W, f, laeuft, voll }) {
   const d = f['maschine-dunkel'];
   const s = f.signal;
   const streifen = Math.max(2, Math.floor((L * 0.85) / 0.3));
@@ -577,16 +581,8 @@ function Details({ typ, L, W, f, laeuft, voll }) {
   }
   return (
     <>
-      {/* Bedienpult mit Bildschirm und Not-Halt */}
-      <group position={[L * 0.38, 0, W / 2 + 0.4]}>
-        <Kiste p={[0, 0.55, 0]} g={[0.1, 1.1, 0.1]} farbe={d} />
-        <Kiste p={[0, 1.25, 0]} g={[0.56, 0.4, 0.1]} farbe={d} />
-        <mesh position={[-0.05, 1.27, 0.052]}>
-          <planeGeometry args={[0.36, 0.26]} />
-          <meshStandardMaterial color={f.akzent} emissive={f.akzent} emissiveIntensity={laeuft ? 0.9 : 0.25} />
-        </mesh>
-        <Rolle p={[0.2, 1.2, 0.07]} r={0.045} l={0.05} achse="z" farbe={f['ampel-rot']} />
-      </group>
+      {/* Bedienpult mit Bildschirm (Statusanzeige), Tastatur und Not-Halt */}
+      <Bedienpult m={m} f={f} zustand={zustand} laeuft={laeuft} p={[L * 0.38, 0, W / 2 + 0.45]} />
       {/* Warnstreifen gelb/schwarz am Sockel (nur in der Detailansicht – viele kleine Teile) */}
       {voll && Array.from({ length: streifen }, (_, i) => (
         <Kiste key={i} p={[-L * 0.425 + (i + 0.5) * ((L * 0.85) / streifen), 0.07, W * 0.44]} g={[(L * 0.85) / streifen, 0.14, 0.02]}
@@ -599,6 +595,120 @@ function Details({ typ, L, W, f, laeuft, voll }) {
   );
 }
 
+/** Kurzname der Maschine (letztes Wort der Bezeichnung, z. B. „FZ-800“) */
+const kurzname = (m) => (m.bezeichnung ?? '').split(' ').pop();
+
+/** Wo das Namensschild sitzt: [x, y, z, Breite, Höhe] je Maschinentyp (vorn = +z) */
+const SCHILD_ORT = {
+  Fräsen: (L, W) => [-L * 0.05, 2.44, W * 0.35 + 0.045, L * 0.34, 0.3],
+  Drehen: (L, W) => [0, 1.98, W * 0.33 + 0.035, L * 0.3, 0.18],
+  Spritzguss: (L, W) => [L * 0.4, 1.9, W * 0.275 + 0.02, L * 0.15, 0.3],
+  Laserschneiden: (L, W) => [L * 0.4, 1.35, -W * 0.24 + 0.02, L * 0.13, 0.3],
+  Schweißen: (L, W) => [-L * 0.4, 1.35, W * 0.3 + 0.27, 0.5, 0.22],
+  Pressen: (L, W) => [0, 4.15, W * 0.43 + 0.04, L * 0.5, 0.42],
+  Fördertechnik: (L, W) => [-L * 0.3, 0.86, W * 0.32 + 0.045, 1.3, 0.18],
+  Lackieren: (L, W) => [0, 2.9, W * 0.45 + 0.03, L * 0.3, 0.42],
+  Montage: (L, W) => [0, 0.82, W * 0.33 + 0.01, L * 0.42, 0.14],
+  Druckluft: (L, W) => [-L * 0.2, 1.52, W * 0.4 + 0.015, L * 0.3, 0.16],
+  Lagertechnik: (L, W) => [0, 3.25, W * 0.42 + 0.06, Math.min(2.4, L * 0.15), 0.4],
+};
+
+/** Namensschild an der Maschine: Kurzname groß, Anlagennummer klein (weiß auf Akzentfarbe) */
+function Namensschild({ m, L, W, f }) {
+  const ort = SCHILD_ORT[m.typ]?.(L, W);
+  const [x, y, z, b, h] = ort ?? [0, 1, W / 2 + 0.02, 0.8, 0.2];
+  const textur = useCanvasTextur(512, Math.max(64, Math.round((512 * h) / b)), (g, w, hh) => {
+    g.fillStyle = f.akzent; g.fillRect(0, 0, w, hh);
+    g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
+    const einzeilig = hh < 120;
+    let groesse = Math.round(hh * (einzeilig ? 0.62 : 0.5));
+    const text = einzeilig ? `${kurzname(m)}  ·  ${m.anlagennummer}` : kurzname(m);
+    g.font = `700 ${groesse}px system-ui, sans-serif`;
+    while (g.measureText(text).width > w * 0.9 && groesse > 12) { groesse -= 2; g.font = `700 ${groesse}px system-ui, sans-serif`; }
+    g.textAlign = 'center';
+    g.fillText(text, w / 2, einzeilig ? hh / 2 : hh * 0.4);
+    if (!einzeilig) {
+      g.font = `500 ${Math.round(hh * 0.2)}px system-ui, sans-serif`;
+      g.globalAlpha = 0.85;
+      g.fillText(m.anlagennummer ?? '', w / 2, hh * 0.78);
+    }
+  }, [1, 1], [m.bezeichnung, m.anlagennummer, f.akzent]);
+  if (!ort && !m.typ) return null;
+  return (
+    <mesh position={[x, y, z]}>
+      <planeGeometry args={[b, h]} />
+      <meshStandardMaterial map={textur} roughness={0.4} />
+    </mesh>
+  );
+}
+
+/**
+ * Bedienpult auf Standfuß vor der Maschine: Gehäuse mit Bildschirm (Kurzname, Anlagennummer,
+ * Zustand in Ampelfarbe, Auslastung als Balken und Verlauf), Tastatur, Not-Halt und zwei Taster.
+ */
+function Bedienpult({ m, f, zustand, laeuft, p }) {
+  const t = useT();
+  const [statusText, statusFarbe] = {
+    gruen: [t('Läuft'), f['ampel-gruen']], orange: [t('Störung'), f['ampel-orange']], rot: [t('Stillstand'), f['ampel-rot']],
+  }[zustand] ?? [t('Läuft'), f['ampel-gruen']];
+  const schirm = useCanvasTextur(320, 200, (g, w, h) => {
+    g.fillStyle = '#0e151d'; g.fillRect(0, 0, w, h);
+    g.fillStyle = f.akzent; g.fillRect(0, 0, w, 34);
+    g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
+    g.font = '700 20px system-ui, sans-serif'; g.textAlign = 'left'; g.fillText(kurzname(m), 10, 17);
+    g.font = '500 14px system-ui, sans-serif'; g.textAlign = 'right'; g.fillText(m.anlagennummer ?? '', w - 10, 17);
+    // Zustand
+    g.fillStyle = statusFarbe; g.fillRect(10, 46, 120, 28);
+    g.fillStyle = '#ffffff'; g.font = '700 15px system-ui, sans-serif'; g.textAlign = 'center'; g.fillText(statusText, 70, 60);
+    // Auslastung als drei Balken
+    const werte = zustand === 'rot' ? [0.05, 0.1, 0.02] : zustand === 'orange' ? [0.45, 0.8, 0.3] : [0.72, 0.55, 0.85];
+    werte.forEach((v, i) => {
+      g.fillStyle = '#26323f'; g.fillRect(150, 48 + i * 10, 160, 6);
+      g.fillStyle = i === 1 && zustand === 'orange' ? statusFarbe : '#4fb3ff'; g.fillRect(150, 48 + i * 10, 160 * v, 6);
+    });
+    // Verlauf (Spindellast o. Ä.)
+    g.strokeStyle = '#26323f'; g.lineWidth = 1;
+    for (let y = 95; y < h - 8; y += 20) { g.beginPath(); g.moveTo(10, y); g.lineTo(w - 10, y); g.stroke(); }
+    g.strokeStyle = zustand === 'rot' ? statusFarbe : '#4fb3ff'; g.lineWidth = 2.5; g.beginPath();
+    for (let x = 0; x <= 30; x += 1) {
+      const wert = zustand === 'rot' ? 0.05 : 0.45 + Math.sin(x * 0.7 + (m.id ?? 1)) * 0.2 + Math.sin(x * 2.1) * 0.08;
+      g.lineTo(10 + (x / 30) * (w - 20), h - 12 - wert * (h - 110));
+    }
+    g.stroke();
+  }, [1, 1], [m.id, zustand, statusText, f.akzent]);
+  const tasten = useCanvasTextur(128, 48, (g, w, h) => {
+    g.fillStyle = '#2a3038'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#cfd5dc';
+    for (let r = 0; r < 4; r += 1) for (let c = 0; c < 12; c += 1) g.fillRect(3 + c * 10.4, 4 + r * 11, 8, 8);
+  });
+  const dunkel = f['maschine-dunkel'];
+  return (
+    <group position={p}>
+      <Kiste p={[0, 0.02, 0]} g={[0.42, 0.04, 0.42]} farbe={dunkel} />
+      <Rolle p={[0, 0.6, 0]} r={0.045} l={1.12} farbe={dunkel} />
+      <group position={[0, 1.38, 0]} rotation-x={-0.3}>
+        <Gehaeuse p={[0, 0, 0]} g={[0.74, 0.5, 0.1]} farbe={dunkel} radius={0.03} />
+        <mesh position={[-0.07, 0.01, 0.051]}>
+          <planeGeometry args={[0.5, 0.31]} />
+          <meshStandardMaterial map={schirm} emissive="#ffffff" emissiveMap={schirm} emissiveIntensity={laeuft || zustand !== 'gruen' ? 0.75 : 0.45} roughness={0.25} />
+        </mesh>
+        {/* Not-Halt (roter Pilz auf gelbem Ring) und zwei Taster */}
+        <Rolle p={[0.28, 0.12, 0.055]} r={0.05} l={0.012} achse="z" farbe={f.signal} />
+        <Rolle p={[0.28, 0.12, 0.08]} r={0.036} l={0.04} achse="z" farbe={f['ampel-rot']} />
+        <Rolle p={[0.28, -0.05, 0.058]} r={0.022} l={0.018} achse="z" farbe={f['ampel-gruen']} />
+        <Rolle p={[0.28, -0.14, 0.058]} r={0.022} l={0.018} achse="z" farbe="#e9edf2" />
+      </group>
+      {/* Tastatur, flach geneigt vor dem Bildschirm */}
+      <group position={[0, 1.08, 0.14]} rotation-x={-1.15}>
+        <mesh>
+          <boxGeometry args={[0.6, 0.22, 0.03]} />
+          <meshStandardMaterial map={tasten} roughness={0.6} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 const k = (f) => f.maschine;
 
 /**
@@ -608,11 +718,14 @@ const k = (f) => f.maschine;
 export function MaschineMitAmpel({ m, L, W, f, bewegt, detail = null, ampelGroesse = 1 }) {
   const zustand = ampelZustand(m);
   const laeuft = bewegt && zustand !== 'rot';
+  // Leuchten mindestens 0,4 m über der Maschine – sonst verdeckt z. B. eine Presse ihre eigene Ampel
+  const ampelHoehe = Math.max(2.4, ((MASCHINEN_HOEHE[m.typ] ?? 2.4) + 0.4) / ampelGroesse + 0.55);
   return (
     <>
       <MaschinenForm typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} />
-      {detail && <Details typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} voll={detail === 'voll'} />}
-      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} />
+      <Namensschild m={m} L={L} W={W} f={f} />
+      {detail && <Details m={m} zustand={zustand} typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} voll={detail === 'voll'} />}
+      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} hoehe={ampelHoehe} />
     </>
   );
 }

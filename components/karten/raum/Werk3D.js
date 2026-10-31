@@ -35,7 +35,7 @@ import Landesdeko, { LAND_STIL, mitLandStil, Baum3D, Buero3D } from './Landesdek
 import Figur from './Figur';
 import { VerwaltungInnen, VersteckLeiste, dingeFuerRunde } from './Verwaltung';
 import { Auto, Lkw, ParkendeAutos, Gabelstapler, AUTO_FARBEN } from './Fahrzeuge';
-import { Viele, canvasTextur, grasTextur } from './Bausteine';
+import { Viele, canvasTextur, grasTextur, useCanvasTextur } from './Bausteine';
 
 /** Farbe einer Störungsstufe */
 const stufenFarbe = (f, offen, prio, neutral = false) => (neutral ? f.linie : ({ rot: f.rot, orange: f.orange, blau: f.blau, ruhig: f.gruen })[stufe(offen, prio)]);
@@ -385,13 +385,124 @@ function VorDemBuero({ d, f }) {
         metall.push({ p: [x + 0.35, 0.55, z0 + 1.2], g: [0.04, 0.05, 1.0], farbe: [f.blau, f['ampel-rot'], f['maschine-dunkel']][i] });
       }
     }
-    return { holz, metall, raeder };
-  }, [d.b, z0, f]);
+    // Zwei Pflanzkübel mit Blumen neben dem Eingang
+    const kuebel = [];
+    const blumen = [];
+    [-1, 1].forEach((seite) => {
+      const x = seite * 2.2;
+      kuebel.push({ p: [x, 0.25, d.t / 2 + 0.9], g: [1.4, 0.5, 0.6] });
+      for (let i = 0; i < 6; i += 1) blumen.push({ p: [x - 0.55 + i * 0.22, 0.6, d.t / 2 + 0.9 + (i % 2 ? 0.1 : -0.1)], g: [0.26, 0.26, 0.26], farbe: [f['ampel-rot'], f.signal, '#e85d9b'][i % 3] });
+    });
+    return { holz, metall, raeder, kuebel, blumen };
+  }, [d.b, d.t, z0, f]);
   return (
     <>
       <Viele teile={teile.holz} farbe="#a0764d" schatten={false} />
       <Viele teile={teile.metall} farbe={f['maschine-dunkel']} schatten={false} metall={0.4} />
       <Viele teile={teile.raeder} form="ring" farbe="#1b1c1f" schatten={false} />
+      <Viele teile={teile.kuebel} farbe={f.beton} schatten={false} />
+      <Viele teile={teile.blumen} form="kugel" schatten={false} />
+    </>
+  );
+}
+
+/**
+ * Kleinkram am Hallenrand, wie in echten Hallen: Feuerlöscher mit Schild, Mülltrennung,
+ * Werkzeugwagen, Paletten mit Kartons, Erste-Hilfe-Kasten – nur an freien Stellen (nicht auf
+ * Maschinen, nicht im Gang). Dazu die gelb-schwarze Sperrfläche innen am Tor.
+ * Zwei Zeichenaufrufe für alles (Instanzen).
+ */
+function HallenDetails({ halle, h, maschinen, gang, f }) {
+  const schraffur = useCanvasTextur(64, 64, (g, w, hh) => {
+    g.fillStyle = '#f2b632'; g.fillRect(0, 0, w, hh);
+    g.fillStyle = '#22262c';
+    for (let i = -hh; i < w; i += 16) { g.beginPath(); g.moveTo(i, hh); g.lineTo(i + 8, hh); g.lineTo(i + 8 + hh, 0); g.lineTo(i + hh, 0); g.fill(); }
+  }, [Math.min(6, h.b * 0.3) / 1.2, 3 / 1.2]);
+  const teile = useMemo(() => {
+    const ox = -h.b / 2;
+    const oz = -h.t / 2;
+    const haupt = (halle.bereiche ?? [])[0] ?? { x: 0, y: 0, b: h.b, t: h.t };
+    const frei = (x, y) => Math.abs(y - gang.y) > gang.breite / 2 + 0.3
+      && !maschinen.some((m) => x > m.pos_x_m - 1.4 && x < m.pos_x_m + m.breite_m + 1.4 && y > m.pos_y_m - 1.4 && y < m.pos_y_m + m.tiefe_m + 1.4);
+    const stellen = [];
+    for (let x = haupt.x + 2.5; x < haupt.x + haupt.b - 2; x += 5) [haupt.y + 0.7, haupt.y + haupt.t - 0.7].forEach((y) => stellen.push([x, y]));
+    for (let y = haupt.y + 3; y < haupt.y + haupt.t - 3; y += 5) [haupt.x + 0.7, haupt.x + haupt.b - 0.7].forEach((x) => stellen.push([x, y]));
+    const kisten = [];
+    const rollen = [];
+    const ARTEN = ['loescher', 'muell', 'wagen', 'palette', 'erstehilfe', 'palette', 'loescher', 'muell'];
+    stellen.filter(([x, y]) => frei(x, y)).slice(0, 12).forEach(([hx, hy], i) => {
+      const x = ox + hx;
+      const z = oz + hy;
+      switch (ARTEN[i % ARTEN.length]) {
+        case 'loescher':
+          rollen.push({ p: [x, 0.3, z], g: [0.18, 0.55, 0.18], farbe: f['ampel-rot'] });
+          kisten.push({ p: [x + 0.3, 0.9, z], g: [0.05, 1.8, 0.05], farbe: f['maschine-dunkel'] }, { p: [x + 0.3, 1.7, z], g: [0.3, 0.3, 0.03], farbe: f['ampel-rot'] });
+          break;
+        case 'muell':
+          [f.blau, f.signal, '#7a8089', '#8b6b4e'].forEach((farbe, j) => kisten.push(
+            { p: [x - 0.75 + j * 0.5, 0.42, z], g: [0.44, 0.84, 0.5], farbe },
+            { p: [x - 0.75 + j * 0.5, 0.86, z], g: [0.47, 0.05, 0.53], farbe: f['maschine-dunkel'] },
+          ));
+          break;
+        case 'wagen':
+          kisten.push({ p: [x, 0.5, z], g: [0.7, 0.8, 0.45], farbe: f['ampel-rot'] }, { p: [x, 0.93, z], g: [0.74, 0.06, 0.49], farbe: f['maschine-dunkel'] },
+            { p: [x + 0.4, 0.95, z], g: [0.03, 0.3, 0.4], farbe: '#c3c8cf' });
+          [-0.28, 0.28].forEach((dx) => [-0.16, 0.16].forEach((dz) => rollen.push({ p: [x + dx, 0.06, z + dz], g: [0.1, 0.12, 0.1], farbe: '#1b1c1f' })));
+          break;
+        case 'palette':
+          kisten.push({ p: [x, 0.07, z], g: [1.2, 0.14, 0.8], farbe: '#b08a5e' }, { p: [x, 0.5, z], g: [1.1, 0.72, 0.74], farbe: '#c8a77a' },
+            { p: [x, 0.5, z], g: [1.12, 0.06, 0.76], farbe: '#e9edf1' });
+          break;
+        default:   // Erste Hilfe
+          kisten.push({ p: [x, 0.8, z], g: [0.05, 1.6, 0.05], farbe: f['maschine-dunkel'] }, { p: [x, 1.45, z + 0.06], g: [0.45, 0.4, 0.14], farbe: '#2e8b57' },
+            { p: [x, 1.45, z + 0.135], g: [0.22, 0.06, 0.01], farbe: '#ffffff' }, { p: [x, 1.45, z + 0.135], g: [0.06, 0.22, 0.01], farbe: '#ffffff' });
+      }
+    });
+    return { kisten, rollen };
+  }, [halle, h.b, h.t, maschinen, gang, f]);
+  return (
+    <>
+      <Viele teile={teile.kisten} schatten={false} />
+      <Viele teile={teile.rollen} form="zyl" schatten={false} rauheit={0.4} />
+      {/* Sperrfläche innen vor dem Rolltor */}
+      <Flaeche x={0} z={h.t / 2 - 1.6} b={Math.min(6, h.b * 0.3) + 1} t={3} farbe="#ffffff" y={0.045} map={schraffur} />
+    </>
+  );
+}
+
+/** Draußen: Hecke am Parkplatz, Büsche am Zaun, Kanaldeckel auf den Straßen */
+function AussenDetails({ gs, f, X, Z }) {
+  const teile = useMemo(() => {
+    const z = zufall(`${gs.B}-${gs.T}-${gs.parkplatz.x}-aussen`);
+    const buesche = [];
+    const hecke = [];
+    const deckel = [];
+    // Hecke entlang der oberen Kante des Parkplatzes
+    hecke.push({ p: [X(gs.parkplatz.x + gs.parkplatz.b / 2), 0.4, Z(gs.parkplatz.y - 0.7)], g: [gs.parkplatz.b, 0.8, 0.7] });
+    // Büsche am vorderen Zaun (nicht am Tor, nicht am Parkplatz)
+    for (let x = 8; x < gs.B - 8; x += 3.2 + z() * 2) {
+      const amTor = Math.abs(x - gs.B / 2) < 24;
+      const amParkplatz = x > gs.parkplatz.x - 2 && x < gs.parkplatz.x + gs.parkplatz.b + 2;
+      if (amTor || amParkplatz || z() < 0.25) continue;
+      const g = 0.9 + z() * 0.8;
+      buesche.push({ p: [X(x), g * 0.45, Z(gs.T - 4.6)], g: [g * 1.4, g, g * 1.2] });
+    }
+    // Kanaldeckel auf geraden Straßen (alle ~28 m)
+    gs.strassen.filter((s) => !s.pfad).forEach((s) => {
+      const laengs = s.b > s.t;
+      const laenge = laengs ? s.b : s.t;
+      for (let d = 12; d < laenge - 6; d += 28) {
+        deckel.push({ p: laengs ? [X(s.x + d), 0.025, Z(s.y + s.t * 0.3)] : [X(s.x + s.b * 0.3), 0.025, Z(s.y + d)], g: [0.8, 0.02, 0.8] });
+      }
+    });
+    return { buesche, hecke, deckel };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs]);
+  return (
+    <>
+      <Viele teile={teile.buesche} form="kugel" farbe={f.baum} schatten={false} rauheit={0.95} />
+      <Viele teile={teile.hecke} farbe={f.baum} rauheit={0.95} />
+      <Viele teile={teile.deckel} form="zyl" farbe={f['maschine-dunkel']} schatten={false} metall={0.3} />
     </>
   );
 }
@@ -593,6 +704,12 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
   // Kameraziel: ganzes Werk oder die gewählte Halle (schräg von vorn oben)
   const richtung = new THREE.Vector3(0.42, 0.78, 0.82).normalize();
   const buero = gs.deko.find((d) => d.art === 'buero');
+  // Maschinen je Halle (einmal sortiert, damit die Halle nicht bei jedem Neuzeichnen alles neu berechnet)
+  const maschinenJeHalle = useMemo(() => {
+    const karte = new Map();
+    maschinen.forEach((m) => karte.set(m.gebaeude_id, [...(karte.get(m.gebaeude_id) ?? []), m]));
+    return karte;
+  }, [maschinen]);
   const ziel = useMemo(() => {
     // Easter Egg: Kamera fliegt nah an das geöffnete Verwaltungsgebäude heran (Versteckspiel)
     if (verwaltung && buero) {
@@ -779,6 +896,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       <Flaeche x={X(gs.parkplatz.x + gs.parkplatz.b / 2)} z={Z(gs.parkplatz.y + gs.parkplatz.t / 2)} b={gs.parkplatz.b} t={gs.parkplatz.t} farbe={f.strasse} />
       <Flaeche x={X(gs.parkplatz.x + gs.parkplatz.b / 2)} z={Z(gs.parkplatz.y + gs.parkplatz.t / 2)} b={gs.parkplatz.b} t={gs.parkplatz.t}
                farbe={f.markierung} map={texturen.park} deckkraft={0.95} y={0.03} />
+      <AussenDetails gs={gs} f={f} X={X} Z={Z} />
       {/* Zebrastreifen über die Zufahrt vor dem Tor */}
       <Viele teile={Array.from({ length: 9 }, (_, i) => ({ p: [X(gs.tor.x + gs.tor.b / 2), 0.035, Z(gs.zufahrtY + 1 + i)], g: [3.2, 0.01, 0.5] }))}
              farbe={f.markierung} schatten={false} />
@@ -900,7 +1018,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
             )}
             {offen && (
               <HallenInneres halle={g} h={h} f={f} bewegt={bewegt} maschineId={maschineId} neutral={neutral} boden={texturen.boden}
-                             maschinen={maschinen.filter((m) => m.gebaeude_id === g.id)}
+                             maschinen={maschinenJeHalle.get(g.id) ?? []}
                              onMaschine={onMaschine} setHover={setHover} hover={hover} klick={klick} />
             )}
             {/* Beschriftung als Knopf (auch per Tastatur bedienbar); in einer Halle nur die anderen kurz */}
@@ -940,7 +1058,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
   const ox = -h.b / 2;
   const oz = -h.t / 2;
   const bereiche = halle.bereiche ?? [];
-  const gang = gangInHalle(halle, maschinen);
+  const gang = useMemo(() => gangInHalle(halle, maschinen), [halle, maschinen]);
   // Betonboden mit Fugen (Textur je Halle passend zur Größe)
   const bodenMap = useMemo(() => {
     const m = boden.clone();
@@ -952,6 +1070,7 @@ function HallenInneres({ halle, h, f, bewegt, maschinen, maschineId, onMaschine,
   return (
     <>
       <Flaeche x={0} z={0} b={h.b} t={h.t} farbe={f.hallenboden} y={0.03} map={bodenMap} />
+      <HallenDetails halle={halle} h={h} maschinen={maschinen} gang={gang} f={f} />
       {/* Gehweg im Gang (grüne Linien) und Gabelstapler in der Mitte */}
       {[-1, 1].map((seite) => (
         <Flaeche key={`gw${seite}`} x={ox + (gang.x0 + gang.x1) / 2} z={oz + gang.y + seite * Math.max(0.8, gang.breite / 2 - 0.25)} b={gang.x1 - gang.x0}

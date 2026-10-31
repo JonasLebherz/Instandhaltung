@@ -36,6 +36,16 @@ const SCHICHTEN = [
   { name: T('Nachtschicht'), zeit: '22–6', passt: (h) => h >= 22 || h < 6 },
 ];
 const BLOECKE = [0, 3, 6, 9, 12, 15, 18, 21];   // Uhrzeit in 3-Stunden-Blöcken
+// Alter offener Aufträge in Tagen
+const ALTERSSTUFEN = [
+  { name: T('unter 1 Tag'), ab: 0, bis: 1 }, { name: T('1–3 Tage'), ab: 1, bis: 3 }, { name: T('3–7 Tage'), ab: 3, bis: 7 },
+  { name: T('1–4 Wochen'), ab: 7, bis: 28 }, { name: T('älter als 4 Wochen'), ab: 28, bis: Infinity },
+];
+// Maschinenalter in Jahren (aus dem Baujahr)
+const MASCHINENALTER = [
+  { name: T('jünger als 5 Jahre'), ab: 0, bis: 5 }, { name: T('5–9 Jahre'), ab: 5, bis: 10 },
+  { name: T('10–19 Jahre'), ab: 10, bis: 20 }, { name: T('20 Jahre und älter'), ab: 20, bis: Infinity },
+];
 
 /** Kennzahlen für eine Menge von Störmeldungen */
 function auswerten(liste) {
@@ -131,7 +141,63 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     const ersatzteile = Object.entries(mengen).map(([bezeichnung, menge]) => ({ bezeichnung, menge }))
       .sort((x, y) => y.menge - x.menge).slice(0, 8);
 
-    return { liste, maschinenAnzahl: maschinenIds.size, kennzahlen, proMonat, ursachen, heat, prioritaeten, schichten, proTechniker, ersatzteile };
+    // Verfügbarkeit je Monat: 1 − Ausfallzeit / (Maschinen × Zeit im Monat)
+    const verfuegbarkeit = monate.map((mo) => {
+      const ausfall = liste.filter((e) => e.monat === mo.schluessel).reduce((sum, e) => sum + (e.ausfall_min ?? 0), 0);
+      const moeglich = maschinenIds.size * mo.tage * 1440;
+      return moeglich ? Math.max(0, 100 * (1 - ausfall / moeglich)) : null;
+    });
+
+    // Reaktionszeit (Meldung → Arbeitsbeginn) je Priorität, dringendste zuerst
+    const mittel = (zeilen, wert) => (zeilen.length ? zeilen.reduce((sum, z) => sum + wert(z), 0) / zeilen.length : null);
+    const mitReaktion = liste.filter((e) => e.reaktion_min !== null && e.reaktion_min >= 0);
+    const reaktion = Object.keys(PRIORITAET_LISTE).map((p) => {
+      const zeilen = mitReaktion.filter((e) => e.prioritaet === p);
+      return { prioritaet: p, anzahl: zeilen.length, min: mittel(zeilen, (e) => e.reaktion_min) };
+    });
+    const reaktionGesamt = mittel(mitReaktion, (e) => e.reaktion_min);
+
+    // Pareto: Maschinen mit der meisten Ausfallzeit, dazu der kumulierte Anteil an der gesamten Ausfallzeit
+    const ausfallJeMaschine = new Map();
+    liste.forEach((e) => { if (e.ausfall_min) ausfallJeMaschine.set(e.maschine_id, (ausfallJeMaschine.get(e.maschine_id) ?? 0) + e.ausfall_min); });
+    const ausfallGesamt = [...ausfallJeMaschine.values()].reduce((sum, w) => sum + w, 0);
+    let kumuliert = 0;
+    const pareto = [...ausfallJeMaschine.entries()].sort((x, y) => y[1] - x[1]).slice(0, 10).map(([id, min]) => {
+      kumuliert += min;
+      return { maschine: maschineVon[id], min, anteil: anteil(kumuliert, ausfallGesamt) };
+    });
+
+    // Ausfallzeit nach Maschinentyp (Stunden)
+    const jeTyp = {};
+    liste.forEach((e) => { const typ = maschineVon[e.maschine_id]?.typ; if (typ && e.ausfall_min) jeTyp[typ] = (jeTyp[typ] ?? 0) + e.ausfall_min / 60; });
+    const ausfallTyp = Object.entries(jeTyp).map(([typ, h]) => ({ typ, h })).sort((x, y) => y.h - x.h);
+
+    // Offene Aufträge nach Alter (seit der Meldung)
+    const jetzt = Date.now();
+    const offen = liste.filter((e) => e.status !== 'erledigt').map((e) => (jetzt - new Date(e.zeitpunkt).getTime()) / 86400000);
+    const alter = ALTERSSTUFEN.map((st) => ({ ...st, anzahl: offen.filter((tage) => tage >= st.ab && tage < st.bis).length }));
+
+    // Wiederholte Störungen: innerhalb von 7 Tagen nach einer vorherigen Störung an derselben Maschine
+    const jeMaschine = new Map();
+    [...liste].sort((x, y) => new Date(x.zeitpunkt) - new Date(y.zeitpunkt)).forEach((e) => {
+      jeMaschine.set(e.maschine_id, [...(jeMaschine.get(e.maschine_id) ?? []), new Date(e.zeitpunkt).getTime()]);
+    });
+    let wiederholt = 0;
+    jeMaschine.forEach((zeiten) => zeiten.forEach((z, i) => { if (i > 0 && z - zeiten[i - 1] < 7 * 86400000) wiederholt += 1; }));
+
+    // Störungen je Maschine nach Maschinenalter (Baujahr)
+    const jahrJetzt = new Date().getFullYear();
+    const maschinenImBlick = orte.filter(imBlick);
+    const nachAlter = MASCHINENALTER.map((st) => {
+      const ids = new Set(maschinenImBlick.filter((o) => o.baujahr && jahrJetzt - o.baujahr >= st.ab && jahrJetzt - o.baujahr < st.bis).map((o) => o.id));
+      const stoerungen = liste.filter((e) => ids.has(e.maschine_id)).length;
+      return { ...st, maschinen: ids.size, jeMaschine: ids.size ? stoerungen / ids.size : 0 };
+    }).filter((st) => st.maschinen > 0);
+
+    return {
+      liste, maschinenAnzahl: maschinenIds.size, kennzahlen, proMonat, ursachen, heat, prioritaeten, schichten, proTechniker, ersatzteile,
+      verfuegbarkeit, reaktion, reaktionGesamt, pareto, ausfallTyp, alter, wiederholt, nachAlter,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ebene, orte, ereignisse, teile, techniker, monate]);
 
@@ -328,6 +394,22 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
               <strong>{zahl(anteil(k.erledigt, k.anzahl), 0, s)} %</strong>
               <span>{t('Erledigungsquote')}</span>
             </div>
+            <div>
+              <strong>{a.maschinenAnzahl ? `${zahl(Math.max(0, 100 - anteil(k.ausfall_min, a.maschinenAnzahl * zeitraumTage * 1440)), 2, s)} %` : '–'}</strong>
+              <span>{t('Verfügbarkeit (ohne Ausfall)')}</span>
+            </div>
+            <div>
+              <strong>{a.reaktionGesamt === null ? '–' : `${zahl(a.reaktionGesamt / 60, 1, s)} h`}</strong>
+              <span>{t('Ø Reaktionszeit bis Arbeitsbeginn')}</span>
+            </div>
+            <div>
+              <strong>{zahl(anteil(a.wiederholt, k.anzahl), 0, s)} %</strong>
+              <span>{t('Wiederholungen (≤ 7 Tage an derselben Maschine)')}</span>
+            </div>
+            <div>
+              <strong>{zahl(k.anzahl / Math.max(1, zeitraumTage / 7), 1, s)}</strong>
+              <span>{t('Störungen pro Woche')}</span>
+            </div>
           </section>
 
           {/* Vergleich der Unterebene – Klick zoomt hinein */}
@@ -458,10 +540,81 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             </div>
           </div>
 
+          {/* Verfügbarkeit je Monat und Reaktionszeit je Priorität */}
+          <div className="row g-4">
+            <div className="col-lg-7">
+              <section className="karte" style={{ '--i': 13 }}>
+                <h2 className="abschnitt-titel">{t('Verfügbarkeit pro Monat')}</h2>
+                <Diagramm art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.verfuegbarkeit} einheit="%" nachkomma={2} abNull={false}
+                          spalte={t('Monat')} beschreibung={t('Liniendiagramm: Anteil der Zeit ohne Ausfall pro Monat in Prozent')} />
+              </section>
+            </div>
+            <div className="col-lg-5">
+              <section className="karte" style={{ '--i': 14 }}>
+                <h2 className="abschnitt-titel">{t('Reaktionszeit nach Priorität')}</h2>
+                <p className="klein text-leise">{t('Ø Zeit von der Meldung bis zum Arbeitsbeginn')}</p>
+                <BalkenListe zeilen={a.reaktion.filter((r) => r.anzahl > 0).map((r) => ({
+                  name: gross(t(r.prioritaet)), zusatz: t('{n} Aufträge', { n: r.anzahl }), wert: r.min ?? 0,
+                  text: r.min === null ? '–' : `${zahl(r.min / 60, 1, s)} h`,
+                }))} />
+              </section>
+            </div>
+          </div>
+
+          {/* Pareto der Ausfallzeit und Ausfall nach Maschinentyp (nicht auf Maschinenebene) */}
+          {stufe !== 'maschine' && (
+            <div className="row g-4">
+              <div className="col-lg-6">
+                <section className="karte" style={{ '--i': 15 }}>
+                  <h2 className="abschnitt-titel">{t('Größte Zeitfresser (Pareto)')}</h2>
+                  <p className="klein text-leise">{t('Maschinen mit der meisten Ausfallzeit – rechts der Anteil an der gesamten Ausfallzeit (kumuliert)')}</p>
+                  {a.pareto.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
+                    <BalkenListe zeilen={a.pareto.map((z) => ({
+                      name: z.maschine?.bezeichnung ?? '–', zusatz: z.maschine?.anlagennummer, wert: z.min,
+                      text: `${zahl(z.min / 60, 0, s)} h · ${zahl(z.anteil, 0, s)} %`,
+                    }))} />
+                  )}
+                </section>
+              </div>
+              <div className="col-lg-6">
+                <section className="karte" style={{ '--i': 16 }}>
+                  <h2 className="abschnitt-titel">{t('Ausfallzeit nach Maschinentyp')}</h2>
+                  {a.ausfallTyp.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
+                    <BalkenListe zeilen={a.ausfallTyp.map((x) => ({ name: t(x.typ), wert: x.h, text: `${zahl(x.h, 0, s)} h` }))} />
+                  )}
+                </section>
+              </div>
+            </div>
+          )}
+
+          {/* Offene Aufträge nach Alter und Störungen nach Maschinenalter */}
+          <div className="row g-4">
+            <div className="col-lg-6">
+              <section className="karte" style={{ '--i': 17 }}>
+                <h2 className="abschnitt-titel">{t('Offene Aufträge nach Alter')}</h2>
+                <p className="klein text-leise">{t('Wie lange warten die noch offenen Störungen schon?')}</p>
+                {k.offen === 0 ? <p className="leer"><i className="bi bi-check-circle" />{t('Keine offenen Aufträge.')}</p> : (
+                  <BalkenListe zeilen={a.alter.map((st) => ({ name: t(st.name), wert: st.anzahl, text: String(st.anzahl) }))} />
+                )}
+              </section>
+            </div>
+            {stufe !== 'maschine' && (
+              <div className="col-lg-6">
+                <section className="karte" style={{ '--i': 18 }}>
+                  <h2 className="abschnitt-titel">{t('Störungen nach Maschinenalter')}</h2>
+                  <p className="klein text-leise">{t('Ø Störungen je Maschine im Zeitraum, nach Baujahr gruppiert')}</p>
+                  <BalkenListe zeilen={a.nachAlter.map((st) => ({
+                    name: t(st.name), zusatz: t('{n} Maschinen', { n: st.maschinen }), wert: st.jeMaschine, text: zahl(st.jeMaschine, 1, s),
+                  }))} />
+                </section>
+              </div>
+            )}
+          </div>
+
           {/* Techniker und Ersatzteile */}
           <div className="row g-4">
             <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 13 }}>
+              <section className="karte" style={{ '--i': 19 }}>
                 <h2 className="abschnitt-titel">{t('Techniker')}</h2>
                 {a.proTechniker.length === 0 ? (
                   <p className="leer">{t('Keine zugewiesenen Aufträge im Zeitraum.')}</p>
@@ -492,7 +645,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
               </section>
             </div>
             <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 14 }}>
+              <section className="karte" style={{ '--i': 20 }}>
                 <h2 className="abschnitt-titel">{t('Verbaute Ersatzteile')}</h2>
                 {a.ersatzteile.length === 0 ? (
                   <p className="leer">{t('Keine Ersatzteile im Zeitraum gebucht.')}</p>
