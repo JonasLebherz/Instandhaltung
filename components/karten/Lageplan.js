@@ -6,7 +6,7 @@
  * als anklickbare Flächen darüber (Position und Größe aus der Datenbank, in Metern).
  * Ein Klick ruft onWaehle(gebaeude) auf – die Zoom-Karte zoomt in das Gebäude.
  * Aufbau und Deko kommen aus lib/karten/werkGestaltung.js – so sieht jedes Werk etwas
- * anders aus (gespiegelt, Bürogebäude, Tanks, Dachfarbe), genau wie in der 3D-Ansicht.
+ * anders aus (Straßenführung, Anbauten, gespiegelt, Bürogebäude, Tanks, Dachfarbe), genau wie in der 3D-Ansicht.
  * neutral: beim Melden – ohne Zahlen und Farben offener Störungen.
  */
 import { stufe, offenText } from './stufe';
@@ -35,7 +35,9 @@ export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehl
           <rect x="3" y="3" width={B - 6} height={T - 6} rx="6" fill="url(#lageplan-raster)" />
 
           {/* Werksstraßen und Zufahrt */}
-          {g3.strassen.map((st, i) => <rect key={i} x={st.x} y={st.y} width={st.b} height={st.t} rx={i < g3.strassen.length - 1 ? 3 : 0} className="plan-strasse" />)}
+          {g3.strassen.map((st, i) => (st.pfad
+            ? <polyline key={i} points={st.pfad.map((p) => p.join(',')).join(' ')} strokeWidth={st.breite} className="plan-strasse-linie" />
+            : <rect key={i} x={st.x} y={st.y} width={st.b} height={st.t} rx={i < g3.strassen.length - 1 ? 3 : 0} className="plan-strasse" />))}
           <line x1="8" y1={zufahrtY + 5} x2={B - 8} y2={zufahrtY + 5} className="plan-mittellinie" />
 
           {/* Parkplatz und Tor */}
@@ -49,6 +51,16 @@ export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehl
           {g3.deko.map((d, i) => (d.art === 'buero'
             ? <rect key={i} x={d.x} y={d.y} width={d.b} height={d.t} rx="1" className="plan-buero" />
             : <circle key={i} cx={d.x} cy={d.y} r={d.r} className="plan-tank" />))}
+          {g3.strassen.filter((st) => st.pfad).map((st, i) => (
+            <g key={`kv${i}`}>
+              <circle cx={st.pfad[0][0]} cy={st.pfad[0][1]} r="8" className="plan-strasse" />
+              <circle cx={st.pfad[0][0]} cy={st.pfad[0][1]} r="3.6" className="plan-baum" />
+            </g>
+          ))}
+          {/* Anbauten der Hallen (Flachbau, Kopfbau, höherer Hallenteil) */}
+          {Object.values(g3.hallen).flatMap((h) => h.anbauten).filter((a) => a.art !== 'hochteil').map((a, i) => (
+            <rect key={`a${i}`} x={a.x} y={a.y} width={a.b} height={a.t} rx=".6" className="plan-anbau" />
+          ))}
           {g3.baeume.map((bm) => <circle key={`${bm.x}-${bm.y}`} cx={bm.x} cy={bm.y} r={3 * bm.groesse} className="plan-baum" />)}
         </svg>
         <span className="plan-beschriftung" style={{ left: '50%', top: prozent(zufahrtY - 3, T) }}>{t('Zufahrt · Tor')}</span>

@@ -570,7 +570,7 @@ export const UMLAND_RAND = 28;   // Umland links, rechts und hinten (m)
 export const UMLAND_VORN = 50;   // Umland vor dem Werk: Landstraße + typisches Objekt
 
 /** Flache Bodenfläche (Straße, Feldstreifen) */
-function Boden({ x, z, b, t, farbe, y = 0.01 }) {
+function Boden({ x, z, b, t, farbe, y = 0.12 }) {
   return (
     <mesh position={[x, y, z]} rotation-x={-Math.PI / 2} receiveShadow>
       <planeGeometry args={[b, t]} />
@@ -582,7 +582,7 @@ function Boden({ x, z, b, t, farbe, y = 0.01 }) {
 /** Feld mit Streifen in zwei Farben (Raps, Mais, Lavendel, Reis …) */
 function Feld({ x, z, b, t, farben, streifen = 9 }) {
   return Array.from({ length: streifen }, (_, i) => (
-    <Boden key={i} x={x} z={z - t / 2 + ((i + 0.5) * t) / streifen} b={b} t={t / streifen} farbe={farben[i % 2]} y={0.02} />
+    <Boden key={i} x={x} z={z - t / 2 + ((i + 0.5) * t) / streifen} b={b} t={t / streifen} farbe={farben[i % 2]} y={0.05} />
   ));
 }
 
@@ -695,6 +695,55 @@ function Wahrzeichen({ land, x, z }) {
   }
 }
 
+/** Fluss als Band (eine Fläche aus Dreiecken entlang der Punkte) */
+function Band({ punkte, breite, farbe, y, glanz = false }) {
+  const geo = useMemo(() => {
+    const pos = [];
+    const idx = [];
+    punkte.forEach(([x, z], i) => {
+      const [x0, z0] = punkte[Math.max(i - 1, 0)];
+      const [x2, z2] = punkte[Math.min(i + 1, punkte.length - 1)];
+      const l = Math.hypot(x2 - x0, z2 - z0) || 1;
+      const nx = (-(z2 - z0) / l) * (breite / 2);
+      const nz = ((x2 - x0) / l) * (breite / 2);
+      pos.push(x + nx, 0, z + nz, x - nx, 0, z - nz);
+      if (i > 0) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  }, [punkte, breite]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <mesh geometry={geo} position-y={y} receiveShadow>
+      <meshStandardMaterial color={farbe} roughness={glanz ? 0.15 : 1} metalness={glanz ? 0.15 : 0} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+/** Brücke der Landstraße über den Fluss */
+function Bruecke({ x, z, breite, f }) {
+  return (
+    <group position={[x, 0, z]}>
+      <Teil p={[0, 0.25, 0]} g={[breite, 0.5, 10]} farbe={f.beton} />
+      <mesh position={[0, 0.51, 0]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[breite, 8.6]} />
+        <meshStandardMaterial color={f.strasse} roughness={1} />
+      </mesh>
+      {[-4.85, 4.85].map((dz) => (
+        <group key={dz}>
+          <Teil p={[0, 1.4, dz]} g={[breite, 0.12, 0.12]} farbe={f['maschine-dunkel']} />
+          {Array.from({ length: Math.floor(breite / 2) + 1 }, (_, i) => (
+            <Teil key={i} p={[-breite / 2 + i * 2, 0.95, dz]} g={[0.1, 0.9, 0.1]} farbe={f['maschine-dunkel']} />
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+}
+
 function Umgebung({ standort, gs, f }) {
   const land = standort.land;
   const stil = LAND_STIL[land];
@@ -703,6 +752,18 @@ function Umgebung({ standort, gs, f }) {
   const breite = B + 2 * UMLAND_RAND;
   const landstrasse = T / 2 + 9;                // Mitte der Landstraße vor dem Tor (Szenenkoordinaten)
   const wahrzeichenX = gs.fahnenSeite * B * 0.2;  // hinter den Hallen, hoch genug, um darüber hinaus zu ragen
+  // Bei manchen Werken fließt links neben dem Gelände ein Fluss (das Feld liegt dann rechts) (geschwungen, mit Brücke für die Landstraße)
+  const fluss = useMemo(() => {
+    const z = zufall(`${standort.kuerzel}-fluss`);
+    if (z() >= 0.45) return null;
+    const phase = z() * Math.PI * 2;
+    const punkte = [];
+    for (let zz = -T / 2 - UMLAND_RAND; zz <= T / 2 + UMLAND_VORN + 0.1; zz += 4) {
+      punkte.push([-B / 2 - 14 + Math.sin(zz * 0.05 + phase) * 4.5, zz]);
+    }
+    const anDerStrasse = punkte.reduce((a, p) => (Math.abs(p[1] - landstrasse) < Math.abs(a[1] - landstrasse) ? p : a));
+    return { punkte, brueckeX: anDerStrasse[0] };
+  }, [standort.kuerzel, B, T, landstrasse]);
   // Bäume am Rand des Umlands (fest je Werk), Platz für Feld (links) und Wahrzeichen (hinten rechts) bleibt frei
   const baeume = useMemo(() => {
     const z = zufall(`${standort.kuerzel}-umland`);
@@ -711,12 +772,16 @@ function Umgebung({ standort, gs, f }) {
       if (Math.abs(x - wahrzeichenX) < 22) continue;     // dort steht das Wahrzeichen
       liste.push({ x, z: -T / 2 - 8 - z() * 14, groesse: 0.9 + z() * 0.6 });
     }
+    // Seiten: neben dem Feld nur vor und hinter dem Feld, am Fluss nur ein schmaler Streifen am äußeren Rand
+    const feldSeite = fluss ? 1 : -1;
     for (let y = -T / 2; y < T / 2 + 4; y += 10 + z() * 5) {
-      liste.push({ x: B / 2 + 7 + z() * 16, z: y, groesse: 0.9 + z() * 0.6 });
-      if (y < -T / 2 + 6 || y > T * 0.1) liste.push({ x: -B / 2 - 7 - z() * 16, z: y, groesse: 0.9 + z() * 0.6 });
+      [-1, 1].forEach((seite) => {
+        const x = seite * (fluss && seite === -1 ? B / 2 + 25 + z() * 2 : B / 2 + 7 + z() * 16);
+        if (seite !== feldSeite || y < -T / 2 + 6 || y > T * 0.1) liste.push({ x, z: y, groesse: 0.9 + z() * 0.6 });
+      });
     }
     return liste;
-  }, [standort.kuerzel, B, T, breite, wahrzeichenX]);
+  }, [standort.kuerzel, B, T, breite, wahrzeichenX, fluss]);
   if (!stil) return null;
   const n = (paar) => paar[nacht ? 1 : 0];
   const arten = stil.umlandBaeume ?? [stil.baum];
@@ -734,17 +799,24 @@ function Umgebung({ standort, gs, f }) {
       {/* Landstraße mit Mittellinie (USA: doppelt gelb) und Zufahrt zum Tor */}
       <Boden x={0} z={landstrasse} b={breite} t={9} farbe={f.strasse} />
       {land === 'US'
-        ? [-0.2, 0.2].map((d) => <Boden key={d} x={0} z={landstrasse + d} b={breite} t={0.16} farbe={f.markierung} y={0.02} />)
+        ? [-0.2, 0.2].map((d) => <Boden key={d} x={0} z={landstrasse + d} b={breite} t={0.16} farbe={f.markierung} y={0.14} />)
         : Array.from({ length: Math.floor(breite / 9) }, (_, i) => (
-          <Boden key={i} x={-breite / 2 + 4 + i * 9} z={landstrasse} b={3.5} t={0.2} farbe={f.markierung} y={0.02} />
+          <Boden key={i} x={-breite / 2 + 4 + i * 9} z={landstrasse} b={3.5} t={0.2} farbe={f.markierung} y={0.14} />
         ))}
       <Boden x={gs.tor.x + gs.tor.b / 2 - B / 2} z={T / 2 + 2.3} b={gs.tor.b} t={4.6} farbe={f.strasse} />
-      {/* Feld links vom Werk */}
-      {stil.feld && <Feld x={-B / 2 - UMLAND_RAND / 2} z={-T * 0.12} b={UMLAND_RAND - 6} t={T * 0.55} farben={n(stil.feld)} />}
+      {/* Feld neben dem Werk */}
+      {stil.feld && <Feld x={(fluss ? 1 : -1) * (B / 2 + UMLAND_RAND / 2)} z={-T * 0.12} b={UMLAND_RAND - 6} t={T * 0.55} farben={n(stil.feld)} />}
       {/* Berge hinten (Mexiko kahl, Russland nicht – dort liegt der Schnee schon auf dem Boden) */}
       {land === 'MX' && [-0.38, -0.12, 0.18].map((a, i) => (
         <Berg key={i} x={a * breite} z={-T / 2 - 16} r={11 + i * 2} h={14 + (i % 2) * 6} farbe={nacht ? '#6a5541' : '#c4935f'} />
       ))}
+      {fluss && (
+        <>
+          <Band punkte={fluss.punkte} breite={13} farbe={n(['#b8a77f', '#4d4636'])} y={0.04} />
+          <Band punkte={fluss.punkte} breite={9} farbe={n(land === 'RU' ? ['#bcd6ea', '#4d6b86'] : ['#5d9fd3', '#2d5b85'])} y={0.08} glanz />
+          <Bruecke x={fluss.brueckeX} z={landstrasse} breite={16} f={f} />
+        </>
+      )}
       {baeume.map((bm, i) => (
         <group key={i} position={[bm.x, 0, bm.z]}>
           <Baum3D art={arten[i % arten.length]} groesse={bm.groesse} i={i} f={f} />

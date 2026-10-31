@@ -97,19 +97,48 @@ function Quader({ p, g, farbe, schatten = true, leuchten = 0, lichtFarbe = null,
   );
 }
 
-/** Wandverkleidung aus Trapezblech: senkrechte Rippen als kleine Textur (wird je Halle wiederholt) */
-function rippenTextur() {
+/** Kleine Canvas-Textur (wird wiederholt) */
+function canvasTextur(breite, hoehe, zeichnen) {
   const c = document.createElement('canvas');
-  c.width = 32; c.height = 4;
-  const g = c.getContext('2d');
-  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 32, 4);
-  g.fillStyle = '#d4d6da'; g.fillRect(0, 0, 5, 4);
-  g.fillStyle = '#ebedf0'; g.fillRect(5, 0, 3, 4);
+  c.width = breite; c.height = hoehe;
+  zeichnen(c.getContext('2d'), breite, hoehe);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.RepeatWrapping;
   return t;
 }
+
+/** Wandverkleidung aus Trapezblech: senkrechte Rippen, alle 6,6 m eine Stütze (Feld = 192 px) */
+const WANDFELD = 6.6;
+function rippenTextur() {
+  return canvasTextur(192, 4, (g) => {
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 192, 4);
+    for (let x = 0; x < 192; x += 32) { g.fillStyle = '#d4d6da'; g.fillRect(x, 0, 5, 4); g.fillStyle = '#ebedf0'; g.fillRect(x + 5, 0, 3, 4); }
+    g.fillStyle = '#b4b8be'; g.fillRect(0, 0, 9, 4);
+  });
+}
+
+/** Solarmodule: dunkelblaue Zellen mit hellem Raster (1 Feld = 1 × 1,7 m) */
+const solarTextur = () => canvasTextur(32, 54, (g, w, h) => {
+  g.fillStyle = '#c9d2dc'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#1f3558'; g.fillRect(1, 1, w - 2, h - 2);
+  g.fillStyle = '#2b4a78'; g.fillRect(1, 1, w - 2, 10);
+});
+
+/** Zaun: Pfosten, Ober- und Unterholm, Maschendraht (durchsichtig, alphaTest) – 1 Feld = 2,5 m */
+const zaunTextur = () => canvasTextur(64, 56, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1;
+  for (let i = -h; i < w; i += 8) { g.beginPath(); g.moveTo(i, h); g.lineTo(i + h, 0); g.stroke(); g.beginPath(); g.moveTo(i, 0); g.lineTo(i + h, h); g.stroke(); }
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 4, h); g.fillRect(0, 0, w, 3); g.fillRect(0, h - 3, w, 3);
+});
+
+/** Parkplatz: weiße Trennlinien der Stellplätze (1 Feld = 3 m breit, 8 m tief, Linien 5 m lang) */
+const parkTextur = () => canvasTextur(30, 80, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 1.5, 50);
+});
 
 /** Straßenlaterne: Mast, Ausleger zur Straße hin, Leuchte (nachts an) */
 function Laterne({ x, z, richtung, f, durchsichtig = false }) {
@@ -130,11 +159,11 @@ function Laterne({ x, z, richtung, f, durchsichtig = false }) {
 }
 
 /** Flache Fläche knapp über dem Boden (Straßen, Markierungen) */
-function Flaeche({ x, z, b, t, farbe, y = 0.02, deckkraft = 1 }) {
+function Flaeche({ x, z, b, t, farbe, y = 0.02, deckkraft = 1, map = null, drehung = 0 }) {
   return (
-    <mesh position={[x, y, z]} rotation-x={-Math.PI / 2} receiveShadow>
+    <mesh position={[x, y, z]} rotation={[-Math.PI / 2, 0, drehung]} receiveShadow>
       <planeGeometry args={[b, t]} />
-      <meshStandardMaterial color={farbe} roughness={1} transparent={deckkraft < 1} opacity={deckkraft} />
+      <meshStandardMaterial color={farbe} map={map} roughness={1} transparent={deckkraft < 1} opacity={deckkraft} />
     </mesh>
   );
 }
@@ -285,6 +314,111 @@ function Dach({ form, b, t, hoehe, farbe, glas }) {
 }
 
 /* ---------------------------------------------------------------------------
+ * Details an der Halle: Andockstellen mit Torabdichtung, Personaltür mit Vordach,
+ * Solarmodule und Anbauten
+ * ------------------------------------------------------------------------- */
+function Fassade({ h, f }) {
+  const vorn = h.t / 2;
+  const docks = h.b >= 40 ? 3 : h.b >= 26 ? 2 : 0;
+  return (
+    <>
+      {Array.from({ length: docks }, (_, k) => {
+        const x = -h.b * 0.42 + 1.9 + k * 4;
+        return (
+          <group key={k} position={[x, 0, vorn]}>
+            <Quader p={[0, 2.5, 0.3]} g={[3.4, 3.6, 0.6]} farbe={f['maschine-dunkel']} schatten={false} />
+            <Quader p={[0, 2.4, 0.62]} g={[2.7, 2.8, 0.06]} farbe={f.tor} schatten={false} />
+            <Quader p={[0, 0.6, 0.9]} g={[3, 1.2, 1.2]} farbe={f.beton} schatten={false} />
+          </group>
+        );
+      })}
+      {/* Personaltür mit Vordach */}
+      <Quader p={[h.b * 0.42, 1.15, vorn + 0.05]} g={[1.1, 2.3, 0.1]} farbe={f['maschine-dunkel']} schatten={false} />
+      <Quader p={[h.b * 0.42, 2.65, vorn + 0.6]} g={[2.2, 0.14, 1.2]} farbe={f.tor} schatten={false} />
+    </>
+  );
+}
+
+/** Solarmodule: Flachdach zwischen den Lichtbändern, Satteldach auf der vorderen Dachfläche */
+function Solar({ h, map }) {
+  const laengs = h.b >= h.t;
+  const L = Math.max(h.b, h.t);
+  const S = Math.min(h.b, h.t);
+  const flach = h.dach === 'flach';
+  // Satteldach: Profil wie in Dach() – First entlang der längeren Seite
+  const first = Math.max(1.5, S * 0.12);
+  const halb = S / 2 + 0.4;
+  const b = flach ? (laengs ? h.b * 0.5 : h.b * 0.26) : L * 0.6;
+  const t = flach ? (laengs ? h.t * 0.26 : h.t * 0.5) : Math.hypot(halb, first) * 0.7;
+  const textur = useMemo(() => {
+    const m = map.clone();
+    m.repeat.set(b, t / 1.7);
+    m.needsUpdate = true;
+    return m;
+  }, [map, b, t]);
+  useEffect(() => () => textur.dispose(), [textur]);
+  if (flach) {
+    return (
+      <mesh position={[laengs ? -h.b * 0.2 : 0, h.hoehe + 0.62, laengs ? 0 : -h.t * 0.2]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[b, t]} />
+        <meshStandardMaterial map={textur} roughness={0.3} metalness={0.3} />
+      </mesh>
+    );
+  }
+  return (
+    <group rotation-y={laengs ? 0 : Math.PI / 2}>
+      <mesh position={[0, h.hoehe + first / 2 + 0.1, halb / 2]} rotation-x={-Math.PI / 2 + Math.atan2(first, halb)}>
+        <planeGeometry args={[b, t]} />
+        <meshStandardMaterial map={textur} roughness={0.3} metalness={0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Anbau an einer Halle (lx/lz: Mitte relativ zur Hallenmitte) */
+function Anbau({ a, lx, lz, f, offen, dachFarbe, wand }) {
+  const deckkraft = offen ? 0.14 : 1;
+  if (a.art === 'hochteil') {
+    // höherer Hallenteil: etwas größer als die Halle selbst, damit die Wände nicht flimmern
+    return (
+      <group position={[lx, 0, lz]}>
+        <mesh position={[0, a.hoehe / 2, 0]} castShadow={!offen} receiveShadow raycast={offen ? KEIN_STRAHL : THREE.Mesh.prototype.raycast}>
+          <boxGeometry args={[a.b + 0.2, a.hoehe, a.t + 0.3]} />
+          <meshStandardMaterial key={offen ? 'glas' : 'voll'} color={f.wand} map={wand} roughness={0.8}
+                                transparent={offen} opacity={deckkraft} depthWrite={!offen} />
+        </mesh>
+        {!offen && (
+          <>
+            <Quader p={[0, a.hoehe * 0.8, 0]} g={[a.b + 0.3, 1, a.t + 0.4]} farbe={f.fenster} schatten={false} leuchten={f.nacht ? 0.9 : 0} lichtFarbe={f.licht} />
+            <Quader p={[0, a.hoehe + 0.25, 0]} g={[a.b + 0.6, 0.5, a.t + 0.7]} farbe={dachFarbe} />
+          </>
+        )}
+      </group>
+    );
+  }
+  const buero = a.art === 'kopfbau';
+  return (
+    <group position={[lx, 0, lz]}>
+      <Quader p={[0, a.hoehe / 2, 0]} g={[a.b, a.hoehe, a.t]} farbe={buero ? f.buero : f.wand} deckkraft={deckkraft}
+              raycast={offen ? KEIN_STRAHL : THREE.Mesh.prototype.raycast} />
+      {!offen && (
+        <>
+          {buero
+            ? Array.from({ length: a.etagen }, (_, e) => (
+              <Quader key={e} p={[0, 1.9 + e * 3.6, 0]} g={[a.b + 0.08, 1.3, a.t + 0.08]} farbe={f.fenster} schatten={false}
+                      leuchten={f.nacht && e % 2 === 0 ? 0.8 : 0} lichtFarbe={f.licht} />
+            ))
+            : <Quader p={[0, a.hoehe * 0.6, 0]} g={[a.b + 0.08, 0.9, a.t + 0.08]} farbe={f.fenster} schatten={false} />}
+          <Quader p={[0, a.hoehe + 0.2, 0]} g={[a.b + 0.4, 0.4, a.t + 0.4]} farbe={f['maschine-dunkel']} />
+          {/* Eingang (Glas) an der Vorderseite */}
+          {buero && <Quader p={[0, 1.4, a.t / 2 + 0.06]} g={[2.6, 2.8, 0.1]} farbe={f.glas} schatten={false} />}
+        </>
+      )}
+    </group>
+  );
+}
+
+/* ---------------------------------------------------------------------------
  * Einrichtung der Nebenbereiche (wie im 2D-Grundriss): Regale bzw. Schreibtische
  * ------------------------------------------------------------------------- */
 function Einrichtung({ bereich, f, ursprung }) {
@@ -381,7 +515,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
   // Straßenlaternen am Rand der Werksstraßen (alle 30 m), Ausleger zur Straße hin
   const laternen = useMemo(() => {
     const liste = [];
-    gs.strassen.forEach((st) => {
+    gs.strassen.filter((st) => !st.pfad).forEach((st) => {
       if (st.b > st.t) for (let x = st.x + 8; x < st.x + st.b - 4; x += 30) liste.push({ x: X(x), z: Z(st.y - 1.2), richtung: [0, 1] });
       else for (let y = st.y + 8; y < st.y + st.t - 4; y += 30) liste.push({ x: X(st.x - 1.2), z: Z(y), richtung: [1, 0] });
     });
@@ -402,11 +536,32 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     const basis = rippenTextur();
     return new Map(gebaeude.map((g) => {
       const t = basis.clone();
-      t.repeat.set(Math.max(gs.hallen[g.id].b, gs.hallen[g.id].t) / 1.1, 1);
+      t.repeat.set(Math.max(gs.hallen[g.id].b, gs.hallen[g.id].t) / WANDFELD, 1);
       t.needsUpdate = true;
       return [g.id, t];
     }));
   }, [gebaeude, gs]);
+  // Weitere Texturen (einmal je Szene): Solarmodule, Zaun, Stellplatz-Linien
+  // Zaun um das Gelände (vorn mit Lücke für das Tor): [x1, y1, x2, y2] in Werkskoordinaten
+  const texturen = useMemo(() => {
+    const zaunBasis = zaunTextur();
+    const zaun = [[3, 3, B - 3, 3], [3, 3, 3, T - 3.2], [B - 3, 3, B - 3, T - 3.2],
+      [3, T - 3.2, gs.tor.x, T - 3.2], [gs.tor.x + gs.tor.b, T - 3.2, B - 3, T - 3.2]].map(([x1, y1, x2, y2]) => {
+      const laenge = Math.hypot(x2 - x1, y2 - y1);
+      const map = zaunBasis.clone();
+      map.repeat.set(laenge / 2.5, 1);
+      map.needsUpdate = true;
+      return { x: (x1 + x2) / 2, y: (y1 + y2) / 2, laenge, quer: x1 === x2, map };
+    });
+    const park = parkTextur();
+    park.repeat.set(gs.parkplatz.b / 3, 1);
+    park.offset.set(1 / 3, 0);
+    return { solar: solarTextur(), zaun, park };
+  }, [gs, B, T]);
+
+  // Solarmodule auf etwa jeder zweiten Halle (Flach- und Satteldach)
+  const solar = useMemo(() => new Set(gebaeude.filter((g) => gs.hallen[g.id].dach !== 'shed'
+    && zufall(`${standort.kuerzel}${g.kuerzel}-solar`)() < 0.5).map((g) => g.id)), [gebaeude, gs, standort.kuerzel]);
 
   const schatten = Math.max(B, T) * 0.7;
   return (
@@ -427,11 +582,47 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
         <boxGeometry args={[B, 1.2, T]} />
         <meshStandardMaterial color={f.gelaende} roughness={1} />
       </mesh>
-      {gs.strassen.map((s, i) => <Flaeche key={i} x={X(s.x + s.b / 2)} z={Z(s.y + s.t / 2)} b={s.b} t={s.t} farbe={f.strasse} />)}
-      {Array.from({ length: Math.floor((B - 16) / 8) }, (_, i) => (
-        <Flaeche key={`m${i}`} x={X(8 + i * 8 + 2)} z={Z(gs.zufahrtY + 5)} b={4} t={0.25} farbe={f.markierung} y={0.03} />
+      {gs.strassen.map((s, i) => (s.pfad
+        // geschwungene Straße: Abschnitte als gedrehte Flächen, runde Stöße an den Knicken
+        ? s.pfad.map(([x, y], j) => {
+          const [x2, y2] = s.pfad[j + 1] ?? [x, y];
+          return (
+            <group key={`${i}-${j}`}>
+              <mesh position={[X(x), 0.02, Z(y)]} rotation-x={-Math.PI / 2} receiveShadow>
+                <circleGeometry args={[s.breite / 2, 16]} />
+                <meshStandardMaterial color={f.strasse} roughness={1} />
+              </mesh>
+              {j < s.pfad.length - 1 && (
+                <Flaeche x={X((x + x2) / 2)} z={Z((y + y2) / 2)} b={Math.hypot(x2 - x, y2 - y)} t={s.breite} farbe={f.strasse}
+                         drehung={-Math.atan2(y2 - y, x2 - x)} />
+              )}
+            </group>
+          );
+        })
+        : <Flaeche key={i} x={X(s.x + s.b / 2)} z={Z(s.y + s.t / 2)} b={s.b} t={s.t} farbe={f.strasse} />))}
+      {/* Kreisverkehr, wo die geschwungene Straße abzweigt */}
+      {gs.strassen.filter((s) => s.pfad).map((s, i) => (
+        <group key={`kv${i}`} position={[X(s.pfad[0][0]), 0, Z(s.pfad[0][1])]}>
+          <mesh position-y={0.022} rotation-x={-Math.PI / 2} receiveShadow><circleGeometry args={[8, 32]} /><meshStandardMaterial color={f.strasse} roughness={1} /></mesh>
+          <mesh position-y={0.12} receiveShadow><cylinderGeometry args={[3.6, 3.8, 0.24, 28]} /><meshStandardMaterial color={f.beton} roughness={1} /></mesh>
+          <mesh position-y={0.25} receiveShadow><cylinderGeometry args={[3.2, 3.2, 0.06, 28]} /><meshStandardMaterial color={f.baum} roughness={1} /></mesh>
+          <group position-y={0.25}><Baum3D art={LAND_STIL[standort.land]?.baum ?? 'rund'} groesse={0.8} i={1} f={f} /></group>
+        </group>
+      ))}
+      {/* Gehwege an den Längsstraßen */}
+      {gs.strassen.filter((s) => !s.pfad && s.b > s.t && s.t <= 6).flatMap((s, i) => [-0.8, s.t + 0.8].map((d) => (
+        <Flaeche key={`gw${i}${d}`} x={X(s.x + s.b / 2)} z={Z(s.y + d)} b={s.b} t={1.4} farbe={f.beton} y={0.025} />
+      )))}
+      {/* Zaun ums Gelände */}
+      {texturen.zaun.map((z, i) => (
+        <mesh key={`z${i}`} position={[X(z.x), 1.1, Z(z.y)]} rotation-y={z.quer ? Math.PI / 2 : 0}>
+          <planeGeometry args={[z.laenge, 2.2]} />
+          <meshStandardMaterial map={z.map} color={f.linie} transparent opacity={0.85} depthWrite={false} side={THREE.DoubleSide} roughness={0.6} />
+        </mesh>
       ))}
       <Flaeche x={X(gs.parkplatz.x + gs.parkplatz.b / 2)} z={Z(gs.parkplatz.y + gs.parkplatz.t / 2)} b={gs.parkplatz.b} t={gs.parkplatz.t} farbe={f.strasse} />
+      <Flaeche x={X(gs.parkplatz.x + gs.parkplatz.b / 2)} z={Z(gs.parkplatz.y + gs.parkplatz.t / 2)} b={gs.parkplatz.b} t={gs.parkplatz.t}
+               farbe={f.markierung} map={texturen.park} deckkraft={0.95} y={0.03} />
       {autos.map((belegt, i) => (belegt ? (
         <group key={`auto${i}`} position={[X(gs.parkplatz.x + 3.5 + i * 3), 0, Z(gs.parkplatz.y + 3)]}>
           <Quader p={[0, 0.45, 0]} g={[1.7, 0.7, 4]} farbe={f[`person-${i % 3}`]} />
@@ -518,9 +709,20 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
                         leuchten={nacht ? 0.9 : 0} lichtFarbe={f.licht} />
                 <Quader p={[0, 2.4, h.t / 2 + 0.05]} g={[Math.min(6, h.b * 0.3), 4.8, 0.2]} farbe={f.tor} schatten={false} />
                 <Quader p={[0, 0.25, 0]} g={[h.b + 0.5, 0.5, h.t + 0.5]} farbe={farbe} schatten={false} />
-                <Dach form={gs.dach} b={h.b} t={h.t} hoehe={h.hoehe} farbe={dachFarbe} glas={f.glas} />
+                <Dach form={h.dach} b={h.b} t={h.t} hoehe={h.hoehe} farbe={dachFarbe} glas={f.glas} />
+                <Fassade h={h} f={f} />
+                {solar.has(g.id) && <Solar h={h} map={texturen.solar} />}
               </>
             )}
+            {/* Anbauten: Flachbau, Kopfbau mit Büros, höherer Hallenteil (bei geöffneter Halle durchsichtig) */}
+            <group onClick={offen ? undefined : (e) => klick(e, () => onGebaeude(g))}
+                   onPointerOver={offen ? undefined : (e) => { e.stopPropagation(); setHover(`g${g.id}`); }}
+                   onPointerOut={offen ? undefined : () => setHover(null)}>
+              {h.anbauten.map((a, i) => (
+                <Anbau key={i} a={a} lx={a.x + a.b / 2 - h.x - h.b / 2} lz={a.y + a.t / 2 - h.y - h.t / 2} f={f} offen={offen}
+                       dachFarbe={dachFarbe} wand={wandTexturen.get(g.id)} />
+              ))}
+            </group>
             {offen && (
               <HallenInneres halle={g} h={h} f={f} bewegt={bewegt} maschineId={maschineId} neutral={neutral}
                              maschinen={maschinen.filter((m) => m.gebaeude_id === g.id)}
@@ -528,7 +730,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
             )}
             {/* Beschriftung als Knopf (auch per Tastatur bedienbar); in einer Halle nur die anderen kurz */}
             {!offen && bereit && (
-              <Html position={[0, h.hoehe + (gs.dach === 'flach' ? 2.5 : Math.min(h.b, h.t) * 0.12 + 2.5), 0]} center zIndexRange={[4, 1]}>
+              <Html position={[0, Math.max(h.hoehe + (h.dach === 'flach' ? 2.5 : Math.min(h.b, h.t) * 0.12 + 2.5), ...h.anbauten.map((a) => a.hoehe + 2.5)), 0]} center zIndexRange={[4, 1]}>
                 <button type="button" className={`raum-halle stufe-${neutral ? 'neutral' : stufe(g.offen, g.hoechste_prioritaet)}${gewaehlt ? ' klein' : ''}`}
                         data-ort={`g-${g.id}`} aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen, t)}`}
                         onClick={() => onGebaeude(g)} onMouseEnter={() => setHover(`g${g.id}`)} onMouseLeave={() => setHover(null)}>
