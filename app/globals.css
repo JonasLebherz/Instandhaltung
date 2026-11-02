@@ -1993,8 +1993,16 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .raum, .raum-laden { position: absolute; inset: 0; }
 .raum canvas { touch-action: none; outline: none; }
 /* 3D blendet erst ein, wenn die Grafik vorbereitet ist (kein Ruckeln beim Öffnen) */
-.raum > div:first-child { opacity: 0; transition: opacity .3s ease; }
+.raum > div:first-child { opacity: 0; transition: opacity .35s ease; }
 .raum.fertig > div:first-child { opacity: 1; }
+/* Beim Verlassen: erst fährt die Kamera nach oben (≈ 0,8 s), dann blendet die Szene zum Plan darunter aus */
+.raum.fertig.verlassen > div:first-child, .raum.verlassen .raum-uhr { opacity: 0; transition: opacity .3s ease .8s; }
+.raum-uhr { transition: opacity .3s ease; }
+/* 2D-Plan unter der 3D-Szene – gleiche Lage wie die 2D-Ebene, nicht anklickbar */
+.raum-unterlage { position: absolute; inset: 0; display: flex; padding: var(--kopf-h) 22px 22px; pointer-events: none; }
+/* Plan unter der 3D-Szene und der Plan direkt nach dem Verlassen von 3D: ohne Einblend-Animation,
+   sonst flögen die Kacheln beim Überblenden noch einmal herein */
+.raum-unterlage *, .explorer-buehne.ohne-einblenden .explorer-ebene * { animation: none !important; }
 /* Ortszeit des Werks unten links in der 3D-Ansicht */
 .raum-uhr {
     position: absolute; left: 14px; bottom: 14px; z-index: 5; display: inline-flex; align-items: center; gap: 6px;

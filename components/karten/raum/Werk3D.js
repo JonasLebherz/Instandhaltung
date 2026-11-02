@@ -76,7 +76,8 @@ function Kamera({ ziel, bewegt, steuerung }) {
     }
     const f = z.flug;
     if (!f) return;
-    f.t = Math.min(1, f.t + dt / 1.1);
+    // Zeitschritt begrenzen: nach einem langsamen Bild (z. B. Texturen hochladen) soll der Flug nicht springen
+    f.t = Math.min(1, f.t + Math.min(dt, 1 / 30) / 1.1);
     const e = easing(f.t);
     camera.position.lerpVectors(f.vonPos, f.nachPos, e);
     steuer.target.lerpVectors(f.vonZiel, f.nachZiel, e);
@@ -822,7 +823,7 @@ function gangInHalle(halle, maschinen) {
 /* ---------------------------------------------------------------------------
  * Szene
  * ------------------------------------------------------------------------- */
-function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, phase }) {
+function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, phase, vonOben }) {
   const t = useT();
   // Boden, Straßen, Wände und Dächer in den Farben des Landes (Wüste in Mexiko, Schnee in Russland …)
   // nacht (Laternen, Fenster, Scheinwerfer an) aus der Ortszeit des Werks – auch in der Dämmerung schon Licht
@@ -859,7 +860,21 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     maschinen.forEach((m) => karte.set(m.gebaeude_id, [...(karte.get(m.gebaeude_id) ?? []), m]));
     return karte;
   }, [maschinen]);
+  const { size } = useThree();
   const ziel = useMemo(() => {
+    // Von oben: Kamera senkrecht über Werk bzw. Halle, so weit weg, dass das Bild dem 2D-Plan darunter
+    // entspricht (gleiche Breite und Lage wie in der Bühne: Kopfzeile 66 px, Rand 22 px). So kann die
+    // Szene aus dem Plan heraus einblenden und die Kamera danach in die Schrägansicht kippen – und umgekehrt.
+    if (vonOben) {
+      const fl = gewaehlt ? gs.hallen[gewaehlt.id] : { x: 0, y: 0, b: B, t: T };
+      const kopf = 66;
+      const breitePx = Math.max(50, Math.min(size.width - 44, ((size.height - kopf - 22) * fl.b) / fl.t));
+      const proPx = fl.b / breitePx;                                   // Meter je Bildpunkt
+      const abstand = (size.height * proPx) / (2 * Math.tan((38 / 2) * (Math.PI / 180)));
+      const cx = X(fl.x + fl.b / 2);
+      const cz = Z(fl.y + fl.t / 2) - ((kopf - 22) / 2) * proPx;
+      return { schluessel: `oben-${gewaehlt?.id ?? 'werk'}`, target: [cx, 0, cz], position: [cx, abstand, cz + abstand * 0.001] };
+    }
     if (gewaehlt) {
       const h = gs.hallen[gewaehlt.id];
       const mitte = [X(h.x + h.b / 2), 0, Z(h.y + h.t / 2)];
@@ -871,7 +886,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     const mitte = [0, 0, 4];
     return { schluessel: 'werk', target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gewaehlt, gs]);
+  }, [gewaehlt, gs, vonOben, size.width, size.height]);
 
   useEffect(() => { document.body.style.cursor = hover ? 'pointer' : ''; return () => { document.body.style.cursor = ''; }; }, [hover]);
 
@@ -1332,6 +1347,15 @@ export default function Werk3D(props) {
   const rahmen = useRef(null);
   const sichtbar = useSichtbar(rahmen);   // außerhalb des Bildschirms wird nicht gezeichnet
   const [fertig, setFertig] = useState(false);   // Shader übersetzt → zeichnen und einblenden
+  // Kamera beginnt senkrecht von oben (wie der 2D-Plan darunter) und kippt kurz nach dem Einblenden in die
+  // Schrägansicht; beim Verlassen fährt sie wieder nach oben, bevor die Szene ausblendet
+  const [vonOben, setVonOben] = useState(true);
+  useEffect(() => {
+    if (props.verlassen) { setVonOben(true); return undefined; }
+    if (!fertig) return undefined;
+    const warten = setTimeout(() => setVonOben(false), bewegt ? 380 : 0);
+    return () => clearTimeout(warten);
+  }, [fertig, props.verlassen, bewegt]);
   // Ortszeit des Werks, jede Minute neu – bestimmt Tag, Dämmerung oder Nacht
   const [zeit, setZeit] = useState(() => ortszeit(props.standort));
   useEffect(() => {
@@ -1341,11 +1365,11 @@ export default function Werk3D(props) {
   }, [props.standort]);
   const t = useT();
   return (
-    <div className={`raum${fertig ? ' fertig' : ''}`} ref={rahmen}>
+    <div className={`raum${fertig ? ' fertig' : ''}${props.verlassen ? ' verlassen' : ''}`} ref={rahmen}>
       {/* offsetSize: Größe ohne CSS-Transform messen (die Ebene wird beim Zoomen skaliert) */}
       <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar || !fertig ? 'never' : bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
               camera={{ fov: 38, near: 0.5, far: 4000, position: [150, 200, 220] }} gl={{ antialias: true, alpha: true }}>
-        <Szene {...props} f={f} bewegt={bewegt} phase={zeit.phase} />
+        <Szene {...props} f={f} bewegt={bewegt} phase={zeit.phase} vonOben={vonOben} />
         <Vorbereiten onFertig={() => setFertig(true)} />
       </Canvas>
       <span className="raum-uhr" title={t('Ortszeit am Standort')}>

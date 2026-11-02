@@ -397,7 +397,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   }
   await p.click('.buehne-kopf button[aria-label="Herauszoomen"]'); await p.waitForTimeout(1500);
   pruefe('3D: zurück zum Werk ohne Neuladen der Szene', p.url().endsWith('/karte?werk=alb') && (await p.$$eval('.raum canvas', (z) => z.length)) === 1, p.url());
-  await p.click('.raum-schalter button:has-text("2D")'); await p.waitForTimeout(800);
+  await p.click('.raum-schalter button:has-text("2D")');
+  await p.waitForFunction(() => !document.querySelector('.raum'), null, { timeout: 30000 }).catch(() => {});
   // Melden in 3D: neutral (keine Störungszahlen), Maschine über die Liste wählen
   await p.click('.raum-schalter button:has-text("3D")'); await p.waitForTimeout(300);
   await p.goto(BASE + '/melden?standort=' + sql("SELECT id FROM standort WHERE kuerzel='ALB'"));
@@ -408,7 +409,9 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.waitForSelector('#beschreibung', { timeout: 15000 }).catch(() => {});
   pruefe('Melden 3D: Maschine gewählt, Formular offen', (await p.$('#beschreibung')) !== null && (await p.textContent('.auswahl-chip')).includes('ALB-H1-01'));
   await p.goto(BASE + '/karte?werk=alb'); await p.waitForTimeout(1500);
-  await p.click('.raum-schalter button:has-text("2D")'); await p.waitForTimeout(800);
+  await p.click('.raum-schalter button:has-text("2D")');
+  // 3D → 2D: Kamera fährt erst nach oben und blendet aus (gut 1 s), dann ist die 3D-Szene weg
+  await p.waitForFunction(() => !document.querySelector('.raum'), null, { timeout: 30000 }).catch(() => {});
   pruefe('2D: Lageplan wieder da, Wahl gemerkt', (await p.$('.ebene-neu .lageplan')) !== null && (await p.evaluate(() => localStorage.getItem('kartenansicht'))) === '2d');
   }
   await b3.close();

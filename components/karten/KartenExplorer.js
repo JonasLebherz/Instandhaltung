@@ -126,10 +126,30 @@ export default function KartenExplorer({
     if (drei) dreiDVorladen();
   }, []);
   function ansichtWaehlen(drei) {
-    setDreiD(drei);
-    setUebergang(null);
-    try { localStorage.setItem('kartenansicht', drei ? '3d' : '2d'); } catch { /* ignorieren */ }
+    const setzen = () => {
+      setDreiD(drei);
+      setUebergang(null);
+      try { localStorage.setItem('kartenansicht', drei ? '3d' : '2d'); } catch { /* ignorieren */ }
+    };
+    // 3D → 2D: erst fährt die Kamera senkrecht nach oben, dann wird zum Plan überblendet
+    if (!drei) ausRaum(setzen); else setzen();
   }
+
+  // Aus der 3D-Szene heraus (zu 2D oder zurück ins Land): Kamera fährt nach oben über das Werk, die Szene
+  // blendet aus und gibt den 2D-Plan darunter frei – erst dann folgt der eigentliche Wechsel (sanft statt Schnitt)
+  const [verlassen, setVerlassen] = useState(false);
+  function ausRaum(aktion) {
+    const ruhig = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (!istRaum(ebene) || ruhig) { aktion(); return; }
+    setVerlassen(true);
+    setTimeout(() => {
+      setOhneEinblenden(true);
+      aktion();
+      setVerlassen(false);
+      setTimeout(() => setOhneEinblenden(false), 1500);
+    }, 1150);
+  }
+  const [ohneEinblenden, setOhneEinblenden] = useState(false);
 
   const standortVon = (e) => standorte.find((st) => st.id === e.standortId) ?? null;
   const gebaeudeVon = (e) => gebaeude.find((g) => g.id === e.gebaeudeId) ?? null;
@@ -170,8 +190,8 @@ export default function KartenExplorer({
   const zuLand = (l) => wechsle({ land: l.kuerzel, standortId: null, gebaeudeId: null }, 'rein');
   const zuWerk = (st) => wechsle({ land: st.land, standortId: st.id, gebaeudeId: null }, 'rein');
   const zuGebaeude = (g) => wechsle({ land: ebene.land, standortId: g.standort_id, gebaeudeId: g.id }, 'rein');
-  const zuWelt = () => wechsle({ land: null, standortId: null, gebaeudeId: null }, 'raus');
-  const zuLandRaus = () => wechsle({ land: ebene.land, standortId: null, gebaeudeId: null }, 'raus');
+  const zuWelt = () => ausRaum(() => wechsle({ land: null, standortId: null, gebaeudeId: null }, 'raus'));
+  const zuLandRaus = () => ausRaum(() => wechsle({ land: ebene.land, standortId: null, gebaeudeId: null }, 'raus'));
   const zuStandort = () => wechsle({ land: ebene.land, standortId: ebene.standortId, gebaeudeId: null }, 'raus');
   // Eine Ebene höher (Zurück-Knopf)
   const zurueck = { gebaeude: zuStandort, werk: zuLandRaus, land: zuWelt }[stufeName];
@@ -329,7 +349,7 @@ export default function KartenExplorer({
 
       {/* Weltebene: Bühne so hoch wie die (breite) Weltkarte, damit oben und unten nichts leer bleibt.
           Während eines Zooms behält die Bühne die volle Höhe – die Weltkarte ist oben verankert und bewegt sich nicht. */}
-      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' && !uebergang ? ' buehne-welt' : ''}`} ref={buehneRef}
+      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' && !uebergang ? ' buehne-welt' : ''}${ohneEinblenden ? ' ohne-einblenden' : ''}`} ref={buehneRef}
            style={{ '--welt-verhaeltnis': weltVerhaeltnis() }}>
         {/* Kopf über der Karte: Zurück und Titel */}
         <div className="buehne-kopf">
@@ -356,8 +376,13 @@ export default function KartenExplorer({
                className={`explorer-ebene ${aktiv ? 'ebene-neu' : 'ebene-alt'}${istRaum(e) ? ' ebene-raum' : ''}`
                  + `${aktiv && uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`}>
             {istRaum(e) ? (
-              <Werk3D standort={standortVon(e)} {...werkDaten(e.standortId)} gebaeudeId={e.gebaeudeId}
-                      maschineId={aktiv ? maschineId : null} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
+              <>
+                {/* Darunter der 2D-Plan: Auf ihn zoomt die Kamerafahrt, aus ihm „wächst“ die 3D-Szene (erst von oben,
+                    dann kippt die Kamera) und beim Verlassen kommt er wieder zum Vorschein */}
+                <div className="raum-unterlage" aria-hidden="true">{ebeneZeichnen(e, false)}</div>
+                <Werk3D standort={standortVon(e)} {...werkDaten(e.standortId)} gebaeudeId={e.gebaeudeId} verlassen={aktiv && verlassen}
+                        maschineId={aktiv ? maschineId : null} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
+              </>
             ) : ebeneZeichnen(e, aktiv)}
           </div>
         ))}
