@@ -143,7 +143,7 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 - Zustand in `<html data-leiste="auf|zu">`, gemerkt in `localStorage` unter `seitenleiste`. Das Start-Skript in `app/layout.js` setzt ihn vor dem ersten Anzeigen (ohne Wahl: ab 1200 px offen). Die Breite steuert `--leiste-b`, der Inhalt rückt per `.app-rahmen` daneben.
 - Eingeklappt wird der Text zur Sprechblase beim Darüberfahren. Unter 768 px gibt es oben `.mobil-kopf`, die Leiste fährt dann von links herein.
 - Neue Seiten in `BEREICHE` in `Seitenleiste.js` eintragen (mit `symbol` und gefüllter Variante `symbolAktiv`).
-- Logo: `components/Logo.js` (Schild mit Pulslinie auf Akzentfläche, Farbe aus CSS). Das Browser-Symbol `app/icon.svg` hat dieselbe Form mit festen Farben.
+- Logo: `components/Logo.js` – schlicht und dunkel: fast schwarzes Quadrat mit Sechskantmutter als feiner weißer Linie (Farben `--logo-*`, im Dunkelmodus etwas heller mit feinem Rand). Beim Darüberfahren dreht sich die Mutter. Das Browser-Symbol `app/icon.svg` hat dieselbe Form mit festen Farben.
 
 ## Personen & Rollen
 
