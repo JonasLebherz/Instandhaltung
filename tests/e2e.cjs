@@ -386,8 +386,6 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   const offenH1 = Number(sql("SELECT count(DISTINCT m.id) FROM maschine m JOIN gebaeude g ON g.id=m.gebaeude_id JOIN standort s ON s.id=g.standort_id JOIN stoermeldung sm ON sm.maschine_id=m.id JOIN wartungsauftrag w ON w.stoermeldung_id=sm.id WHERE s.kuerzel='ALB' AND g.kuerzel='H1' AND w.status <> 'erledigt'"));
   await p.waitForFunction((n) => document.querySelectorAll('.raum-marke .zaehl-marke').length >= n, offenH1, { timeout: 60000 }).catch(() => {});
   pruefe('3D: Halle – Adresse und Störungen an den Maschinen', /halle=h1/.test(p.url()) && (await p.$$eval('.raum-marke .zaehl-marke', (z) => z.length)) === offenH1, `${p.url()} ${offenH1}`);
-  const maschinenH1 = Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id=m.gebaeude_id JOIN standort s ON s.id=g.standort_id WHERE s.kuerzel='ALB' AND g.kuerzel='H1'"));
-  pruefe('3D: Halle – Schild mit Kurzname über jeder Maschine', (await p.$$eval('.raum-marke.mit-name', (z) => z.length)) === maschinenH1);
   await p.waitForTimeout(1500);
   await p.screenshot({ path: SHOTS + 'r-halle-3d.png' });
   if (offenH1 > 0) {

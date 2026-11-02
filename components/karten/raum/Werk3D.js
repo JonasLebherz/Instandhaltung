@@ -407,6 +407,21 @@ function VorDemBuero({ d, f }) {
   );
 }
 
+/** Kurzname der Maschine als dunkle Bodenschrift vorn auf dem Sockel (Textur einmal je Maschine; Graphit wie das Logo) */
+function BodenSchild({ text, b, z, f }) {
+  const textur = useCanvasTextur(Math.round(64 * (b / 0.75)), 64, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = '#ffffff'; g.font = '800 54px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, w / 2, h / 2 + 2);
+  }, [1, 1], [text, b]);
+  return (
+    <mesh position={[0, 0.13, z]} rotation-x={-Math.PI / 2}>
+      <planeGeometry args={[b, 0.75]} />
+      <meshBasicMaterial map={textur} color="#1d1d1f" transparent depthWrite={false} />
+    </mesh>
+  );
+}
+
 /**
  * Kleinkram am Hallenrand, wie in echten Hallen: Feuerlöscher mit Schild, Mülltrennung,
  * Werkzeugwagen, Paletten mit Kartons, Erste-Hilfe-Kasten – nur an freien Stellen (nicht auf
@@ -765,7 +780,7 @@ function bueroTeile(r, f) {
   };
 }
 
-/** Brückenkran unter der Decke: Brücke fährt längs (Kranbahn mit den Wänden ausgeblendet), Katze mit Haken quer */
+/** Brückenkran unter der Decke (halb durchsichtig, damit er die Maschinen nicht verdeckt): Brücke fährt längs, Katze mit Haken quer */
 function Hallenkran({ L, S, hoehe, f, bewegt }) {
   const bruecke = useRef(null);
   const katze = useRef(null);
@@ -779,12 +794,12 @@ function Hallenkran({ L, S, hoehe, f, bewegt }) {
   return (
     <>
       <group ref={bruecke} position={[L * 0.1, y + 0.5, 0]}>
-        <Quader p={[0, 0, 0]} g={[0.7, 0.8, S - 1.1]} farbe={f.signal} schatten={false} />
-        {[-1, 1].map((z) => <Quader key={z} p={[0, -0.15, z * (S / 2 - 0.6)]} g={[2.2, 0.45, 0.55]} farbe={f.signal} schatten={false} />)}
+        <Quader p={[0, 0, 0]} g={[0.7, 0.8, S - 1.1]} farbe={f.signal} schatten={false} deckkraft={0.35} />
+        {[-1, 1].map((z) => <Quader key={z} p={[0, -0.15, z * (S / 2 - 0.6)]} g={[2.2, 0.45, 0.55]} farbe={f.signal} schatten={false} deckkraft={0.35} />)}
         <group ref={katze}>
-          <Quader p={[0, 0.55, 0]} g={[1.2, 0.5, 1.1]} farbe={f['maschine-dunkel']} schatten={false} />
-          <Quader p={[0, -1.6, 0]} g={[0.04, 3.2, 0.04]} farbe={f['maschine-dunkel']} schatten={false} />
-          <Quader p={[0, -3.3, 0]} g={[0.32, 0.4, 0.22]} farbe={f.signal} schatten={false} />
+          <Quader p={[0, 0.55, 0]} g={[1.2, 0.5, 1.1]} farbe={f['maschine-dunkel']} schatten={false} deckkraft={0.35} />
+          <Quader p={[0, -1.6, 0]} g={[0.04, 3.2, 0.04]} farbe={f['maschine-dunkel']} schatten={false} deckkraft={0.35} />
+          <Quader p={[0, -3.3, 0]} g={[0.32, 0.4, 0.22]} farbe={f.signal} schatten={false} deckkraft={0.35} />
         </group>
       </group>
     </>
@@ -1205,11 +1220,13 @@ function HallenInneres({ halle, h, f, bewegt, aktiv, maschinen, maschineId, onMa
     maschinen.forEach((m) => {
       const x = -h.b / 2 + m.pos_x_m + m.breite_m / 2;
       const z = -h.t / 2 + m.pos_y_m + m.tiefe_m / 2;
+      // Sockel vorn 1 m länger: dort steht der Kurzname als Bodenschrift
       const b = m.breite_m * 1.12 + 1.2;
-      const t = m.tiefe_m * 1.12 + 1.2;
-      sockel.push({ p: [x, 0.06, z], g: [b, 0.12, t] });
-      rahmen.push({ p: [x, 0.125, z - t / 2 + 0.12], g: [b, 0.01, 0.24] }, { p: [x, 0.125, z + t / 2 - 0.12], g: [b, 0.01, 0.24] },
-        { p: [x - b / 2 + 0.12, 0.125, z], g: [0.24, 0.01, t] }, { p: [x + b / 2 - 0.12, 0.125, z], g: [0.24, 0.01, t] });
+      const t = m.tiefe_m * 1.12 + 2.2;
+      const zm = z + 0.5;
+      sockel.push({ p: [x, 0.06, zm], g: [b, 0.12, t] });
+      rahmen.push({ p: [x, 0.125, zm - t / 2 + 0.12], g: [b, 0.01, 0.24] }, { p: [x, 0.125, zm + t / 2 - 0.12], g: [b, 0.01, 0.24] },
+        { p: [x - b / 2 + 0.12, 0.125, zm], g: [0.24, 0.01, t] }, { p: [x + b / 2 - 0.12, 0.125, zm], g: [0.24, 0.01, t] });
     });
     return { sockel, rahmen };
   }, [maschinen, h.b, h.t]);
@@ -1277,16 +1294,16 @@ function HallenInneres({ halle, h, f, bewegt, aktiv, maschinen, maschineId, onMa
             <group position-y={0.12} rotation-y={m.tiefe_m > m.breite_m ? Math.PI / 2 : 0} scale={hervor || gewaehlt ? 1.18 : 1.12}>
               <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} detail="mittel" ampelGroesse={2.1} />
             </group>
-            {/* Schild über jeder Maschine: Symbol und Kurzname, bei Störung mit Zahl; beim Darüberfahren der volle Name */}
-            {aktiv && (
-              <Html position={[0, (MASCHINEN_HOEHE[m.typ] ?? 2.4) * 1.12 + 1.6, 0]} center zIndexRange={[4, 1]}>
-                <button type="button" className={`raum-marke mit-name stufe-${mitStoerung ? stufe(m.offen, m.hoechste_prioritaet) : 'ruhig'}${gewaehlt ? ' gewaehlt' : ''}`}
+            {/* Kurzname als Bodenmarkierung vorn auf dem Sockel – nichts schwebt über der Maschine */}
+            <BodenSchild text={m.bezeichnung.split(' ').pop()} b={Math.min(m.breite_m * 1.12 + 0.6, 3.2)} z={m.tiefe_m * 0.56 + 0.95} f={f} />
+            {/* Störungszahl bzw. Auswahl klein an der vorderen Ecke des Sockels, beim Darüberfahren der volle Name */}
+            {aktiv && (mitStoerung || gewaehlt || hervor) && (
+              <Html position={[-(m.breite_m * 0.56 + 0.3), 0.3, m.tiefe_m * 0.56 + 1.3]} center zIndexRange={[4, 1]}>
+                <button type="button" className={`raum-marke stufe-${mitStoerung ? stufe(m.offen, m.hoechste_prioritaet) : 'ruhig'}${gewaehlt ? ' gewaehlt' : ''}`}
                         aria-label={`${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen, t)}`}
-                        aria-pressed={gewaehlt} data-ort={`m-${m.id}`} onClick={() => onMaschine(m)}
-                        onMouseEnter={() => setHover(`m${m.id}`)} onMouseLeave={() => setHover(null)}>
+                        aria-pressed={gewaehlt} data-ort={`m-${m.id}`} onClick={() => onMaschine(m)}>
                   {mitStoerung && <span className="zaehl-marke">{m.offen}</span>}
-                  <i className={`bi ${MASCHINEN_SYMBOLE[m.typ] ?? 'bi-gear'}`} aria-hidden="true" />
-                  <span>{hervor ? `${m.bezeichnung} · ${m.anlagennummer}` : m.bezeichnung.split(' ').pop()}</span>
+                  {(gewaehlt || hervor) && <span className="raum-marke-name">{m.bezeichnung} · {m.anlagennummer}</span>}
                 </button>
               </Html>
             )}

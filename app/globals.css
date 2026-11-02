@@ -2002,14 +2002,8 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     background: var(--karte-erhoeht); border: 1px solid var(--glas-rand); box-shadow: var(--glas-kante), 0 4px 14px rgba(31, 38, 64, .1);
     font-variant-numeric: tabular-nums; pointer-events: none;
 }
-/* Schild über jeder Maschine in der geöffneten Halle: Symbol und Kurzname */
-.raum-marke.mit-name {
-    padding: 2px 10px 2px 4px; background: var(--karte-erhoeht); border: 1px solid var(--glas-rand);
-    box-shadow: 0 3px 10px rgba(31, 38, 64, .14); font-size: .74rem;
-}
-.raum-marke.mit-name:not(:has(.zaehl-marke)) { padding-left: 8px; }
-.raum-marke.mit-name > i { color: var(--text-leise); }
-.raum-marke.mit-name.gewaehlt > i { color: inherit; }
+.raum-marke-name { padding: 0 6px; }
+.raum-marke:not(.gewaehlt) .raum-marke-name { padding: 3px 10px; border-radius: 999px; background: var(--karte-erhoeht); border: 1px solid var(--glas-rand); font-weight: 600; }
 .raum-laden { background: radial-gradient(60% 50% at 50% 55%, var(--fuellung), transparent); animation: einblenden .4s ease; }
 .raum-schalter { position: absolute; top: 14px; right: 14px; z-index: 6; box-shadow: var(--glas-kante), 0 4px 16px rgba(31, 38, 64, .08); background: var(--karte-erhoeht); }
 .raum-schalter button { min-width: 44px; }
