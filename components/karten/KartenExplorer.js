@@ -283,8 +283,8 @@ export default function KartenExplorer({
     ? { welt: T('In welchem Land?'), land: T('In welchem Werk?'), werk: T('In welchem Gebäude?'), gebaeude: T('An welcher Maschine?') }[stufeName]
     : {
       welt: T('Land anklicken zum Hineinzoomen'), land: T('Werk anklicken zum Hineinzoomen'),
-      werk: raum ? T('Halle anklicken · ziehen zum Drehen') : T('Gebäude anklicken für den Grundriss'),
-      gebaeude: raum ? T('Maschine anklicken · ziehen zum Drehen') : T('Maschine anklicken für Details'),
+      werk: raum ? T('Halle anklicken · Mausrad zum Zoomen') : T('Gebäude anklicken für den Grundriss'),
+      gebaeude: raum ? T('Maschine anklicken · Mausrad zum Zoomen') : T('Maschine anklicken für Details'),
     }[stufeName]);
 
   const buehne = (

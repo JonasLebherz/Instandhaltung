@@ -20,7 +20,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { zufall } from '@/lib/karten/werkGestaltung';
-import { grasTextur } from './Bausteine';
+import { grasTextur, useCanvasTextur, Viele } from './Bausteine';
 
 /* ---------- Canvas → Textur ---------- */
 function useTextur(zeichnen, breite, hoehe, abhaengig) {
@@ -571,6 +571,7 @@ function HallenFlagge({ gs, land, X, Z, flaggeZeichnen, gebaeudeId }) {
  * ================================================================== */
 export const UMLAND_RAND = 28;   // Umland links, rechts und hinten (m)
 export const UMLAND_VORN = 50;   // Umland vor dem Werk: Landstraße + typisches Objekt
+const WEIT = 4000;               // Boden, Landstraße und Fluss reichen bis zum Horizont (Dunst blendet aus)
 
 /** Flache Bodenfläche (Straße, Feldstreifen) */
 function Boden({ x, z, b, t, farbe, y = 0.12 }) {
@@ -747,6 +748,80 @@ function Bruecke({ x, z, breite, f }) {
   );
 }
 
+/**
+ * Fernsicht: die Gegend rund um das Werk bis zum Horizont – Felder im Flickenteppich, Waldstücke
+ * (Baumart des Landes), Nachbarbetriebe mit Schornsteinen. Alles als Instanzen (wenige Zeichenaufrufe),
+ * fest je Werk (Pseudozufall aus dem Kürzel). Der Dunst der Szene blendet nach hinten weich aus.
+ */
+function Fernsicht({ standort, gs, f, stil, n, fluss, landstrasse }) {
+  const teile = useMemo(() => {
+    const z = zufall(`${standort.kuerzel}-fernsicht`);
+    const { B, T } = gs;
+    const innen = (x, y, rand) => Math.abs(x) < B / 2 + UMLAND_RAND + rand && y > -T / 2 - UMLAND_RAND - rand && y < T / 2 + UMLAND_VORN + rand;
+    const amFluss = (x) => fluss && Math.abs(x - (-B / 2 - 14)) < 18;
+    const anStrasse = (y, t) => Math.abs(y - landstrasse) < t / 2 + 8;
+    const felder = [];
+    const kronen = [];
+    const staemme = [];
+    const kegel = [];
+    const hallen = [];
+    const schlote = [];
+    const feldFarben = [...(stil.feld ? n(stil.feld) : []), n(stil.umland), n(stil.gras ?? stil.umland)];
+    // Felder in einem lockeren Raster bis ca. 900 m
+    for (let gx = -900; gx < 900; gx += 70) {
+      for (let gy = -900; gy < 900; gy += 55) {
+        const b = 45 + z() * 30;
+        const t = 35 + z() * 25;
+        const x = gx + z() * 15;
+        const y = gy + z() * 12;
+        if (innen(x, y, 30) || amFluss(x) || anStrasse(y, t) || z() < 0.25) continue;
+        felder.push({ p: [x, 0.03, y], g: [b, 0.02, t], farbe: feldFarben[Math.floor(z() * feldFarben.length)] });
+      }
+    }
+    // Waldstücke
+    const nadel = ['kegel', 'birke'].includes(stil.baum) || stil.baum === 'mix';
+    for (let w = 0; w < 26; w += 1) {
+      const wx = (z() - 0.5) * 1500;
+      const wy = (z() - 0.5) * 1500;
+      if (innen(wx, wy, 60)) continue;
+      for (let i = 0; i < 14; i += 1) {
+        const x = wx + (z() - 0.5) * 60;
+        const y = wy + (z() - 0.5) * 40;
+        if (amFluss(x) || anStrasse(y, 4) || innen(x, y, 20)) continue;
+        const g = 0.8 + z() * 0.8;
+        staemme.push({ p: [x, 1.2 * g, y], g: [0.5 * g, 2.4 * g, 0.5 * g] });
+        if (nadel && z() < 0.6) kegel.push({ p: [x, 4.2 * g, y], g: [3.6 * g, 6 * g, 3.6 * g] });
+        else kronen.push({ p: [x, 3.8 * g, y], g: [4 * g, 3.6 * g, 4 * g] });
+      }
+    }
+    // Nachbarbetriebe: Hallen in Grautönen, manche mit Schornstein
+    for (let i = 0; i < 18; i += 1) {
+      const winkel = z() * Math.PI * 2;
+      const r = 320 + z() * 600;
+      const x = Math.cos(winkel) * r;
+      const y = Math.sin(winkel) * r;
+      if (amFluss(x) || anStrasse(y, 50)) continue;
+      const b = 40 + z() * 70;
+      const t = 25 + z() * 40;
+      const h = 8 + z() * 10;
+      hallen.push({ p: [x, h / 2, y], g: [b, h, t], farbe: ['#c9ced6', '#b7bec8', '#d6d2c8', '#a9b1bb'][i % 4] });
+      if (z() < 0.4) schlote.push({ p: [x + b * 0.3, (h + 20) / 2, y], g: [2, h + 20, 2] });
+    }
+    return { felder, kronen, staemme, kegel, hallen, schlote };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [standort.kuerzel, gs, f.nacht, fluss, landstrasse]);
+  return (
+    <>
+      <Viele teile={teile.felder} schatten={false} rauheit={1} />
+      <Viele teile={teile.staemme} form="zyl" farbe={f.stamm} schatten={false} />
+      <Viele teile={teile.kronen} form="kugel" farbe={f.baum} schatten={false} rauheit={0.95} />
+      <Viele teile={teile.kegel} form="kegel" farbe="#3e6b47" schatten={false} rauheit={0.95} />
+      <Viele teile={teile.hallen} schatten={false} />
+      <Viele teile={teile.schlote} form="zyl" farbe={f.tank} schatten={false} />
+    </>
+  );
+}
+
 function Umgebung({ standort, gs, f }) {
   const land = standort.land;
   const stil = LAND_STIL[land];
@@ -761,7 +836,7 @@ function Umgebung({ standort, gs, f }) {
     if (z() >= 0.45) return null;
     const phase = z() * Math.PI * 2;
     const punkte = [];
-    for (let zz = -T / 2 - UMLAND_RAND; zz <= T / 2 + UMLAND_VORN + 0.1; zz += 4) {
+    for (let zz = -WEIT / 2; zz <= WEIT / 2; zz += 6) {
       punkte.push([-B / 2 - 14 + Math.sin(zz * 0.05 + phase) * 4.5, zz]);
     }
     const anDerStrasse = punkte.reduce((a, p) => (Math.abs(p[1] - landstrasse) < Math.abs(a[1] - landstrasse) ? p : a));
@@ -787,10 +862,12 @@ function Umgebung({ standort, gs, f }) {
   }, [standort.kuerzel, B, T, breite, wahrzeichenX, fluss]);
   const grasMap = useMemo(() => {
     const m = grasTextur();
-    m.repeat.set(breite / 12, (T + UMLAND_RAND + UMLAND_VORN) / 12);
+    m.repeat.set(WEIT / 12, WEIT / 12);
     return m;
-  }, [breite, T]);
+  }, []);
   useEffect(() => () => grasMap.dispose(), [grasMap]);
+  // Gestrichelte Mittellinie als Textur (1 Strich je 9 m) statt hunderter Einzelteile
+  const strich = useCanvasTextur(64, 4, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#ffffff'; g.fillRect(0, 0, w * (3.5 / 9), h); }, [WEIT / 9, 1]);
   if (!stil) return null;
   const n = (paar) => paar[nacht ? 1 : 0];
   const arten = stil.umlandBaeume ?? [stil.baum];
@@ -800,18 +877,22 @@ function Umgebung({ standort, gs, f }) {
   const objektZ = landstrasse + 4.5 + 2 + 6 * gross;
   return (
     <group position-y={-0.25}>
-      {/* Umland als größere Platte unter dem Gelände */}
-      <mesh position={[0, -0.5, (UMLAND_VORN - UMLAND_RAND) / 2]} receiveShadow>
-        <boxGeometry args={[breite, 1, T + UMLAND_RAND + UMLAND_VORN]} />
+      {/* Landschaft bis zum Horizont (statt einer Platte im Nichts) */}
+      <mesh position={[0, -0.5, 0]} receiveShadow>
+        <boxGeometry args={[WEIT, 1, WEIT]} />
         <meshStandardMaterial color={n(stil.umland)} roughness={1} map={grasMap} />
       </mesh>
-      {/* Landstraße mit Mittellinie (USA: doppelt gelb) und Zufahrt zum Tor */}
-      <Boden x={0} z={landstrasse} b={breite} t={9} farbe={f.strasse} />
+      <Fernsicht standort={standort} gs={gs} f={f} stil={stil} n={n} fluss={fluss} landstrasse={landstrasse} />
+      {/* Landstraße mit Mittellinie (USA: doppelt gelb), ebenfalls bis zum Horizont */}
+      <Boden x={0} z={landstrasse} b={WEIT} t={9} farbe={f.strasse} />
       {land === 'US'
-        ? [-0.2, 0.2].map((d) => <Boden key={d} x={0} z={landstrasse + d} b={breite} t={0.16} farbe={f.markierung} y={0.14} />)
-        : Array.from({ length: Math.floor(breite / 9) }, (_, i) => (
-          <Boden key={i} x={-breite / 2 + 4 + i * 9} z={landstrasse} b={3.5} t={0.2} farbe={f.markierung} y={0.14} />
-        ))}
+        ? [-0.2, 0.2].map((d) => <Boden key={d} x={0} z={landstrasse + d} b={WEIT} t={0.16} farbe={f.markierung} y={0.14} />)
+        : (
+          <mesh position={[0, 0.14, landstrasse]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[WEIT, 0.2]} />
+            <meshStandardMaterial map={strich} color={f.markierung} transparent alphaTest={0.5} roughness={1} />
+          </mesh>
+        )}
       <Boden x={gs.tor.x + gs.tor.b / 2 - B / 2} z={T / 2 + 2.3} b={gs.tor.b} t={4.6} farbe={f.strasse} />
       {/* Feld neben dem Werk */}
       {stil.feld && <Feld x={(fluss ? 1 : -1) * (B / 2 + UMLAND_RAND / 2)} z={-T * 0.12} b={UMLAND_RAND - 6} t={T * 0.55} farben={n(stil.feld)} />}

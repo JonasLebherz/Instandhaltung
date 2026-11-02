@@ -16,7 +16,7 @@ const farbeHilfe = new THREE.Color();
 
 /**
  * teile: [{ p: [x, y, z], g: [b, h, t], r?: [rx, ry, rz], farbe?: '#…' }]
- * form: 'box' (Standard), 'zyl' (stehender Zylinder), 'kugel' oder 'ring' (Rad); g = Größe [b, h, t] bzw. Durchmesser
+ * form: 'box' (Standard), 'zyl' (stehender Zylinder), 'kugel', 'kegel' oder 'ring' (Rad); g = Größe [b, h, t] bzw. Durchmesser
  * deckkraft < 1: durchsichtig (Glas)
  * geometrie: eigene Form in Originalgröße (z. B. Autokarosserie), g ist dann Skalierung (Standard 1)
  */
@@ -45,7 +45,8 @@ export function Viele({ teile, farbe = '#ffffff', form = 'box', geometrie = null
       {geometrie ? <primitive object={geometrie} attach="geometry" dispose={null} />
         : form === 'zyl' ? <cylinderGeometry args={[0.5, 0.5, 1, 12]} />
           : form === 'kugel' ? <sphereGeometry args={[0.5, 12, 10]} />
-            : form === 'ring' ? <torusGeometry args={[0.5, 0.06, 6, 20]} /> : <boxGeometry args={[1, 1, 1]} />}
+            : form === 'ring' ? <torusGeometry args={[0.5, 0.06, 6, 20]} />
+              : form === 'kegel' ? <coneGeometry args={[0.5, 1, 10]} /> : <boxGeometry args={[1, 1, 1]} />}
       {/* bei Einzelfarben je Teil: Grundfarbe weiß, sonst würde sie mit der Teilfarbe multipliziert.
           key: Three.js übernimmt "durchsichtig" nur bei neuem Material */}
       <meshStandardMaterial key={deckkraft < 1 ? 'glas' : 'voll'} color={mitFarben ? '#ffffff' : farbe} roughness={rauheit} metalness={metall}

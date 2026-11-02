@@ -2041,27 +2041,6 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     opacity: 1; box-shadow: 0 0 8px currentColor;
 }
 .ampel-rot { color: var(--rot); } .ampel-orange { color: var(--orange); } .ampel-gruen { color: var(--gruen); }
-/* Easter Egg Versteckspiel (raum/Verwaltung.js): schwebende Leiste unten über der 3D-Ansicht */
-.versteck {
-    position: absolute; left: 50%; bottom: 14px; z-index: 8; transform: translateX(-50%);
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px;
-    width: max-content; max-width: calc(100% - 28px); padding: 10px 14px; border-radius: 18px;
-    border: 1px solid var(--glas-rand); background: var(--karte-erhoeht); color: var(--text);
-    box-shadow: var(--glas-kante), var(--schatten); backdrop-filter: var(--glas-unschaerfe); -webkit-backdrop-filter: var(--glas-unschaerfe);
-    animation: einblenden .3s ease;
-}
-.versteck-intro, .versteck-fertig { flex-direction: column; width: min(420px, calc(100% - 28px)); text-align: center; padding: 14px 18px; }
-.versteck p { margin: 0; color: var(--text-leise); font-size: .88rem; }
-.versteck-dinge { display: flex; gap: 6px; }
-.versteck-dinge span {
-    position: relative; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px;
-    background: var(--fuellung); font-size: 1.3rem; line-height: 1;
-}
-.versteck-dinge span.gefunden { opacity: .45; }
-.versteck-dinge span i { position: absolute; right: -4px; bottom: -4px; color: var(--gruen); font-size: .9rem; opacity: 1; }
-.versteck-zeit { font-weight: 600; font-variant-numeric: tabular-nums; }
-.versteck-knoepfe { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-
 /* 3D-Modell der Maschine im Infofenster */
 .maschine-detail-3d {
     position: relative; height: 230px; margin: 0 0 14px; border-radius: 14px; overflow: hidden;
