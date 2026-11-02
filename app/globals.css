@@ -84,6 +84,7 @@
     --raum-baum: #86b583; --raum-stamm: #8b6b4e; --raum-buero: #e7e1d6; --raum-tank: #cfd6de;
     --raum-person-0: #ff9f0a; --raum-person-1: #0071e3; --raum-person-2: #2e9b4a; --raum-haut: #e8c2a2;
     --raum-ampel-rot: #ff3b30; --raum-ampel-orange: #ff9500; --raum-ampel-gruen: #34c759; --raum-licht: #ffd58a;
+    --raum-himmel-tag: #dfe8f0; --raum-himmel-daemmerung: #f0cfae; --raum-himmel-nacht: #1a2232;
     color-scheme: light;
 }
 
@@ -128,16 +129,17 @@
     --schatten-hover: 0 16px 44px rgba(0, 0, 0, .6);
 
 
-    /* Nacht: dunkler als am Tag, aber Hallen und Maschinen bleiben gut erkennbar */
     --raum-akzent: #9fb3cc;
-    --raum-umgebung: #20242a; --raum-gelaende: #37443b; --raum-beton: #4f545b; --raum-strasse: #4a515b; --raum-markierung: #8e959f;
-    --raum-wand: #727b88; --raum-fenster: #7393bb; --raum-tor: #3d434c;
-    --raum-dach-0: #7c889b; --raum-dach-1: #94857a; --raum-dach-2: #74907e; --raum-dach-3: #8586a6;
-    --raum-hallenboden: #444a53; --raum-linie: #68707b;
-    --raum-maschine: #9aa1ac; --raum-maschine-dunkel: #424852; --raum-signal: #e6ad2e; --raum-glas: #86a9d1;
-    --raum-baum: #548a5e; --raum-stamm: #745c46; --raum-buero: #66625a; --raum-tank: #78808b;
-    --raum-person-0: #ff9f0a; --raum-person-1: #2997ff; --raum-person-2: #30d158; --raum-haut: #c49a7a;
+    /* Dunkelmodus: dieselbe Welt wie am Tag, nur etwas gedämpft (Nacht kommt von der Ortszeit, nicht vom Modus) */
+    --raum-umgebung: #20242a; --raum-gelaende: #a9b2a2; --raum-beton: #b6b7b6; --raum-strasse: #a1a5ab; --raum-markierung: #d9dde3;
+    --raum-wand: #c5c6c7; --raum-fenster: #7e90a6; --raum-tor: #727882;
+    --raum-dach-0: #727c89; --raum-dach-1: #8f7d6b; --raum-dach-2: #728479; --raum-dach-3: #82839b;
+    --raum-hallenboden: #bdbec1; --raum-linie: #949aa2;
+    --raum-maschine: #adb1b6; --raum-maschine-dunkel: #4c525b; --raum-signal: #e6ad2e; --raum-glas: #879fb8;
+    --raum-baum: #6b9169; --raum-stamm: #6f563e; --raum-buero: #b9b4ab; --raum-tank: #a6abb2;
+    --raum-person-0: #ff9f0a; --raum-person-1: #2997ff; --raum-person-2: #30d158; --raum-haut: #ba9b82;
     --raum-ampel-rot: #ff453a; --raum-ampel-orange: #ff9f0a; --raum-ampel-gruen: #30d158; --raum-licht: #ffcf7a;
+    --raum-himmel-tag: #4a5868; --raum-himmel-daemmerung: #5a4a4a; --raum-himmel-nacht: #121826;
     color-scheme: dark;
 }
 
@@ -1990,6 +1992,24 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .explorer-ebene:has(> .ebene-welt), .explorer-ebene:has(> .ebene-land), .explorer-ebene:has(> .ebene-werk) { overflow: hidden; }
 .raum, .raum-laden { position: absolute; inset: 0; }
 .raum canvas { touch-action: none; outline: none; }
+/* 3D blendet erst ein, wenn die Grafik vorbereitet ist (kein Ruckeln beim Öffnen) */
+.raum > div:first-child { opacity: 0; transition: opacity .3s ease; }
+.raum.fertig > div:first-child { opacity: 1; }
+/* Ortszeit des Werks unten links in der 3D-Ansicht */
+.raum-uhr {
+    position: absolute; left: 14px; bottom: 14px; z-index: 5; display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; color: var(--text);
+    background: var(--karte-erhoeht); border: 1px solid var(--glas-rand); box-shadow: var(--glas-kante), 0 4px 14px rgba(31, 38, 64, .1);
+    font-variant-numeric: tabular-nums; pointer-events: none;
+}
+/* Schild über jeder Maschine in der geöffneten Halle: Symbol und Kurzname */
+.raum-marke.mit-name {
+    padding: 2px 10px 2px 4px; background: var(--karte-erhoeht); border: 1px solid var(--glas-rand);
+    box-shadow: 0 3px 10px rgba(31, 38, 64, .14); font-size: .74rem;
+}
+.raum-marke.mit-name:not(:has(.zaehl-marke)) { padding-left: 8px; }
+.raum-marke.mit-name > i { color: var(--text-leise); }
+.raum-marke.mit-name.gewaehlt > i { color: inherit; }
 .raum-laden { background: radial-gradient(60% 50% at 50% 55%, var(--fuellung), transparent); animation: einblenden .4s ease; }
 .raum-schalter { position: absolute; top: 14px; right: 14px; z-index: 6; box-shadow: var(--glas-kante), 0 4px 16px rgba(31, 38, 64, .08); background: var(--karte-erhoeht); }
 .raum-schalter button { min-width: 44px; }

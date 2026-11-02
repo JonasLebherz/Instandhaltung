@@ -42,6 +42,12 @@ const Werk3D = dynamic(() => import('./raum/Werk3D'), { ssr: false, loading: () 
 // Drehendes 3D-Modell der gewählten Maschine im Infofenster
 const MaschineDetail3D = dynamic(() => import('./raum/MaschineDetail3D'), { ssr: false, loading: () => <div className="maschine-detail-3d" /> });
 
+/** 3D-Teil schon im Hintergrund laden, damit der Wechsel ins Werk nicht auf das Nachladen warten muss */
+function dreiDVorladen() {
+  const laden = () => { import('./raum/Werk3D'); import('./raum/MaschineDetail3D'); };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(laden, { timeout: 3000 }); else setTimeout(laden, 1500);
+}
+
 /** Kann der Browser WebGL (3D)? */
 function webglVorhanden() {
   try {
@@ -115,7 +121,9 @@ export default function KartenExplorer({
     setWebgl(kann);
     let wahl = null;
     try { wahl = localStorage.getItem('kartenansicht'); } catch { /* z. B. privater Modus */ }
-    setDreiD(kann && (wahl ? wahl === '3d' : window.innerWidth >= 768));
+    const drei = kann && (wahl ? wahl === '3d' : window.innerWidth >= 768);
+    setDreiD(drei);
+    if (drei) dreiDVorladen();
   }, []);
   function ansichtWaehlen(drei) {
     setDreiD(drei);

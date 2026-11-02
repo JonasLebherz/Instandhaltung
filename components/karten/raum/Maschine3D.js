@@ -16,7 +16,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { ampelZustand } from '@/lib/karten/ampel';
-import { Gehaeuse, Viele, useCanvasTextur } from './Bausteine';
+import { Gehaeuse, Viele, useCanvasTextur, canvasTextur } from './Bausteine';
 import { useT } from '@/components/SpracheKontext';
 
 
@@ -642,6 +642,19 @@ function Namensschild({ m, L, W, f }) {
   );
 }
 
+/** Tastatur-Textur: einmal für alle Bedienpulte (wird nie freigegeben, ist winzig) */
+let tastatur = null;
+function tastaturTextur() {
+  if (!tastatur) {
+    tastatur = canvasTextur(128, 48, (g, w, h) => {
+      g.fillStyle = '#2a3038'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#cfd5dc';
+      for (let r = 0; r < 4; r += 1) for (let c = 0; c < 12; c += 1) g.fillRect(3 + c * 10.4, 4 + r * 11, 8, 8);
+    });
+  }
+  return tastatur;
+}
+
 /**
  * Bedienpult auf Standfuß vor der Maschine: Gehäuse mit Bildschirm (Kurzname, Anlagennummer,
  * Zustand in Ampelfarbe, Auslastung als Balken und Verlauf), Tastatur, Not-Halt und zwei Taster.
@@ -676,11 +689,7 @@ function Bedienpult({ m, f, zustand, laeuft, p }) {
     }
     g.stroke();
   }, [1, 1], [m.id, zustand, statusText, f.akzent]);
-  const tasten = useCanvasTextur(128, 48, (g, w, h) => {
-    g.fillStyle = '#2a3038'; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#cfd5dc';
-    for (let r = 0; r < 4; r += 1) for (let c = 0; c < 12; c += 1) g.fillRect(3 + c * 10.4, 4 + r * 11, 8, 8);
-  });
+  const tasten = tastaturTextur();
   const dunkel = f['maschine-dunkel'];
   return (
     <group position={p}>

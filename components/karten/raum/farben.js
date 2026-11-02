@@ -4,13 +4,15 @@
  *
  * WebGL kann keine CSS-Variablen lesen. Deshalb werden die Werte (--raum-*, --rot …)
  * einmal ausgelesen und beim Umschalten hell/dunkel ("darstellungswechsel") neu geholt.
- * nacht = Dunkelmodus: Dann brennen Straßenlaternen und Hallenlicht.
+ * dunkel = Dunkelmodus: dieselbe Welt, etwas gedämpft. Ob Tag oder Nacht ist, bestimmt die Ortszeit
+ * des Werks (lib/karten/ortszeit.js, in Werk3D) – nachts brennen Laternen und Hallenlicht.
  */
 import { useEffect, useState } from 'react';
 
 const NAMEN = ['umgebung', 'gelaende', 'strasse', 'markierung', 'wand', 'fenster', 'tor', 'dach-0', 'dach-1', 'dach-2', 'dach-3',
   'hallenboden', 'linie', 'maschine', 'maschine-dunkel', 'signal', 'glas', 'baum', 'stamm', 'buero', 'tank',
-  'person-0', 'person-1', 'person-2', 'haut', 'ampel-rot', 'ampel-orange', 'ampel-gruen', 'licht', 'beton'];
+  'person-0', 'person-1', 'person-2', 'haut', 'ampel-rot', 'ampel-orange', 'ampel-gruen', 'licht', 'beton',
+  'himmel-tag', 'himmel-daemmerung', 'himmel-nacht'];
 
 export function farbenLesen() {
   const stil = getComputedStyle(document.documentElement);
@@ -20,7 +22,8 @@ export function farbenLesen() {
   // Akzent in 3D: eigener, ruhiger Stahlton (die Oberfläche ist schwarz/weiß – darauf leuchtet nichts)
   f.akzent = stil.getPropertyValue('--raum-akzent').trim() || '#5b6b7f';
   f.marke = '#1d1d1f';   // Schilder, Firmenflagge: Graphit wie das Logo
-  f.nacht = document.documentElement.getAttribute('data-theme') === 'dark';
+  f.dunkel = document.documentElement.getAttribute('data-theme') === 'dark';
+  f.nacht = false;            // wird in Werk3D aus der Ortszeit gesetzt
   return f;
 }
 

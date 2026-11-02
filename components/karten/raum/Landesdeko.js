@@ -298,7 +298,7 @@ function Wasserturm({ f }) {
 
 /* =====================================================================
  * Landesstil: Boden, Straßen, Hallen, Dächer, Bäume und Bürogebäude je Land
- * Farben je [hell, dunkel] – das Werk soll auf den ersten Blick "nach dem Land" aussehen.
+ * Farben je [hell, dunkel]; verwendet wird die helle, im Dunkelmodus um 20 % gedämpft (landFarbe).
  * ================================================================== */
 export const LAND_STIL = {
   DE: { gras: ['#c6dbbb', '#34473a'], wand: ['#dfe2e5', '#6e7681'], dach: ['#a2402f', '#6e3a33'], baum: 'mix', buero: 'fachwerk', umland: ['#b4cc9f', '#2f3f33'], umlandBaeume: ['kegel', 'rund'], feld: [['#ecd648', '#9cbc6a'], ['#6f6a35', '#41543a']] },
@@ -315,15 +315,25 @@ export const LAND_STIL = {
   PL: { gras: ['#c4d9b8', '#34463a'], wand: ['#f0e9df', '#787470'], dach: ['#b53a2c', '#7a3530'], baum: 'kegel', buero: 'backstein', umland: ['#b9d0a1', '#314033'], umlandBaeume: ['kegel'], feld: [['#e6c862', '#a8c070'], ['#6c6234', '#46573a']] },
 };
 
+/** Farbe um 20 % abdunkeln (Dunkelmodus: dieselbe Welt, nur gedämpft) */
+export function gedaempft(farbe) {
+  if (Array.isArray(farbe)) return farbe.map(gedaempft);
+  const n = parseInt(farbe.slice(1), 16);
+  return `#${[16, 8, 0].map((v) => Math.round(((n >> v) & 255) * 0.8).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Farbe aus einem Paar [hell, …] wählen – im Dunkelmodus die gedämpfte helle Farbe */
+export const landFarbe = (paar, dunkel) => (dunkel ? gedaempft(paar[0]) : paar[0]);
+
 /** Farben der Szene mit dem Landesstil überschreiben */
 export function mitLandStil(f, land) {
   const s = LAND_STIL[land];
   if (!s) return f;
-  const i = f.nacht ? 1 : 0;
-  const neu = { ...f, gelaende: s.gras[i], wand: s.wand[i] };
-  if (s.strasse) neu.strasse = s.strasse[i];
-  if (s.linie) neu.markierung = s.linie[i];
-  ['dach-0', 'dach-1', 'dach-2', 'dach-3'].forEach((k) => { neu[k] = s.dach[i]; });
+  const w = (paar) => landFarbe(paar, f.dunkel);
+  const neu = { ...f, gelaende: w(s.gras), wand: w(s.wand) };
+  if (s.strasse) neu.strasse = w(s.strasse);
+  if (s.linie) neu.markierung = w(s.linie);
+  ['dach-0', 'dach-1', 'dach-2', 'dach-3'].forEach((k) => { neu[k] = w(s.dach); });
   return neu;
 }
 
@@ -383,7 +393,7 @@ export function Baum3D({ art, groesse = 1, i = 0, f }) {
           {[1.2, 2.3, 3.4].map((y) => <Teil key={y} p={[0, y, 0.16]} g={[0.18, 0.08, 0.04]} farbe="#2b2b2b" />)}
           <mesh position={[0, 5.4, 0]} scale={[1, 1.4, 1]} castShadow>
             <sphereGeometry args={[1.3, 12, 10]} />
-            <meshStandardMaterial color={f.nacht ? '#5f7a4c' : '#a6c97f'} roughness={0.9} />
+            <meshStandardMaterial color={f.dunkel ? '#86a466' : '#a6c97f'} roughness={0.9} />
           </mesh>
         </group>
       );
@@ -809,7 +819,7 @@ function Fernsicht({ standort, gs, f, stil, n, fluss, landstrasse }) {
     }
     return { felder, kronen, staemme, kegel, hallen, schlote };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [standort.kuerzel, gs, f.nacht, fluss, landstrasse]);
+  }, [standort.kuerzel, gs, f.dunkel, fluss, landstrasse]);
   return (
     <>
       <Viele teile={teile.felder} schatten={false} rauheit={1} />
@@ -869,7 +879,7 @@ function Umgebung({ standort, gs, f }) {
   // Gestrichelte Mittellinie als Textur (1 Strich je 9 m) statt hunderter Einzelteile
   const strich = useCanvasTextur(64, 4, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#ffffff'; g.fillRect(0, 0, w * (3.5 / 9), h); }, [WEIT / 9, 1]);
   if (!stil) return null;
-  const n = (paar) => paar[nacht ? 1 : 0];
+  const n = (paar) => landFarbe(paar, f.dunkel);   // Farben: hell bzw. gedämpft (Dunkelmodus)
   const arten = stil.umlandBaeume ?? [stil.baum];
   // Typisches Objekt: hohe Bauwerke (Wasserturm, Eiffelturm) etwas kleiner, damit sie das Werk nicht verdecken
   const gross = land === 'US' ? 1.5 : land === 'FR' ? 1.8 : 2.4;
@@ -898,7 +908,7 @@ function Umgebung({ standort, gs, f }) {
       {stil.feld && <Feld x={(fluss ? 1 : -1) * (B / 2 + UMLAND_RAND / 2)} z={-T * 0.12} b={UMLAND_RAND - 6} t={T * 0.55} farben={n(stil.feld)} />}
       {/* Berge hinten (Mexiko kahl, Russland nicht – dort liegt der Schnee schon auf dem Boden) */}
       {land === 'MX' && [-0.38, -0.12, 0.18].map((a, i) => (
-        <Berg key={i} x={a * breite} z={-T / 2 - 16} r={11 + i * 2} h={14 + (i % 2) * 6} farbe={nacht ? '#6a5541' : '#c4935f'} />
+        <Berg key={i} x={a * breite} z={-T / 2 - 16} r={11 + i * 2} h={14 + (i % 2) * 6} farbe={f.dunkel ? '#9d7a52' : '#c4935f'} />
       ))}
       {fluss && (
         <>
