@@ -613,12 +613,12 @@ const SCHILD_ORT = {
   Lagertechnik: (L, W) => [0, 3.25, W * 0.42 + 0.06, Math.min(2.4, L * 0.15), 0.4],
 };
 
-/** Namensschild an der Maschine: Kurzname groß, Anlagennummer klein (weiß auf Akzentfarbe) */
+/** Namensschild an der Maschine: Kurzname groß, Anlagennummer klein (weiß auf Graphit wie das Logo) */
 function Namensschild({ m, L, W, f }) {
   const ort = SCHILD_ORT[m.typ]?.(L, W);
   const [x, y, z, b, h] = ort ?? [0, 1, W / 2 + 0.02, 0.8, 0.2];
   const textur = useCanvasTextur(512, Math.max(64, Math.round((512 * h) / b)), (g, w, hh) => {
-    g.fillStyle = f.akzent; g.fillRect(0, 0, w, hh);
+    g.fillStyle = f.marke; g.fillRect(0, 0, w, hh);
     g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
     const einzeilig = hh < 120;
     let groesse = Math.round(hh * (einzeilig ? 0.62 : 0.5));
@@ -632,7 +632,7 @@ function Namensschild({ m, L, W, f }) {
       g.globalAlpha = 0.85;
       g.fillText(m.anlagennummer ?? '', w / 2, hh * 0.78);
     }
-  }, [1, 1], [m.bezeichnung, m.anlagennummer, f.akzent]);
+  }, [1, 1], [m.bezeichnung, m.anlagennummer, f.marke]);
   if (!ort && !m.typ) return null;
   return (
     <mesh position={[x, y, z]}>
@@ -653,7 +653,7 @@ function Bedienpult({ m, f, zustand, laeuft, p }) {
   }[zustand] ?? [t('Läuft'), f['ampel-gruen']];
   const schirm = useCanvasTextur(320, 200, (g, w, h) => {
     g.fillStyle = '#0e151d'; g.fillRect(0, 0, w, h);
-    g.fillStyle = f.akzent; g.fillRect(0, 0, w, 34);
+    g.fillStyle = '#2c2c30'; g.fillRect(0, 0, w, 34);
     g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
     g.font = '700 20px system-ui, sans-serif'; g.textAlign = 'left'; g.fillText(kurzname(m), 10, 17);
     g.font = '500 14px system-ui, sans-serif'; g.textAlign = 'right'; g.fillText(m.anlagennummer ?? '', w - 10, 17);

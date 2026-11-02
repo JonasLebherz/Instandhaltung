@@ -167,7 +167,7 @@ Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos ode
 - Einblend-Animationen mit `backwards` statt `both`, sonst blockieren sie hinterher Hover-Transformationen.
 - Hell/Dunkel: Ein Skript in `app/layout.js` setzt `data-theme` und `data-bs-theme` vor dem ersten Anzeigen. Die Auswahl steht in `localStorage` unter `darstellung` (`hell`, `dunkel` oder leer = automatisch). Beim Umschalten wird das Event `darstellungswechsel` ausgelöst, die Diagramme färben sich daraufhin neu ein.
 - Karten (`.karte`) gleiten versetzt ein. Die Reihenfolge steuert `style={{ '--i': n }}`. Kennzahlen zählen hoch (`components/Zaehler.js`), Balken wachsen. Bei `prefers-reduced-motion` ist alles aus.
-- Akzentfarbe `#0071e3` (dunkel `#2997ff`). Status und Priorität werden als Pills angezeigt (`components/Pills.js`), immer mit Text.
+- Akzentfarbe Graphit wie das Logo: `#1d1d1f` (dunkel hell `#f2f2f7`, Schrift darauf `--akzent-text`). Kein Blau als Auswahlfarbe. In 3D eigener ruhiger Stahlton `--raum-akzent`, Schilder und Firmenflagge graphit (`f.marke`). Status und Priorität werden als Pills angezeigt (`components/Pills.js`), immer mit Text.
 - Tablet und Handy müssen bedienbar sein: kein seitliches Scrollen der Seite, Tabellenspalten werden ab `md`/`lg` eingeblendet.
 
 ## Datenmodell (siehe `supabase/schema.sql`)

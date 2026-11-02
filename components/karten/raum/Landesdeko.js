@@ -846,7 +846,7 @@ export default function Landesdeko({ standort, gs, f, X, Z, gebaeudeId }) {
   const land = standort.land;
   const zeichnen = FLAGGEN[land];
   const firma = (g, w, h) => {      // Firmenflagge: Akzentfarbe mit Schild-Zeichen
-    g.fillStyle = f.akzent; g.fillRect(0, 0, w, h);
+    g.fillStyle = f.marke; g.fillRect(0, 0, w, h);
     g.strokeStyle = '#ffffff'; g.lineWidth = h * 0.06;
     g.beginPath(); g.moveTo(w / 2, h * 0.18); g.lineTo(w * 0.62, h * 0.28); g.lineTo(w * 0.62, h * 0.52);
     g.quadraticCurveTo(w * 0.6, h * 0.75, w / 2, h * 0.84); g.quadraticCurveTo(w * 0.4, h * 0.75, w * 0.38, h * 0.52);
@@ -856,7 +856,7 @@ export default function Landesdeko({ standort, gs, f, X, Z, gebaeudeId }) {
   return (
     <>
       {zeichnen && gs.fahnen.map((p, i) => (
-        <Fahne key={i} x={X(p.x)} z={Z(p.y)} zeichnen={i === 1 ? firma : zeichnen} kennung={i === 1 ? `firma${f.akzent}` : land} />
+        <Fahne key={i} x={X(p.x)} z={Z(p.y)} zeichnen={i === 1 ? firma : zeichnen} kennung={i === 1 ? `firma${f.marke}` : land} />
       ))}
       {/* Torbogen mit Schild in Landessprache */}
       <group position={[X(gs.tor.x + gs.tor.b / 2), 0, Z(gs.T - 3.2)]}>

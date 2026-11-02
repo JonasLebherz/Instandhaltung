@@ -51,10 +51,11 @@
     --umgebung-2: rgba(175, 82, 222, .10);
     --umgebung-3: rgba(48, 176, 199, .10);
 
-    --akzent: #0071e3;
-    --akzent-hover: #0077ed;
-    --akzent-zart: #e8f1fc;
-    --akzent-ring: rgba(0, 113, 227, .18);
+    --akzent: #1d1d1f;               /* Graphit wie das Logo – schlicht statt Blau */
+    --akzent-hover: #3a3a3c;
+    --akzent-zart: rgba(29, 29, 31, .07);
+    --akzent-ring: rgba(29, 29, 31, .16);
+    --akzent-text: #ffffff;          /* Schrift auf Akzentflächen */
 
     /* Status-Farben: jeweils Hintergrund (zart) + Schrift (kräftig) */
     --gruen-bg: #e3f5e8;   --gruen: #1a7f37;
@@ -74,6 +75,7 @@
 
 
     /* 3D-Ansicht und Werks-Deko (components/karten/raum/) – feste Farben, weil WebGL keine Transparenz-Mischung wie CSS kann */
+    --raum-akzent: #5b6b7f;
     --raum-umgebung: #e6e9ee; --raum-gelaende: #d3dfca; --raum-beton: #e4e5e3; --raum-strasse: #c9ced6; --raum-markierung: #ffffff;
     --raum-wand: #f6f7f9; --raum-fenster: #9db4cf; --raum-tor: #8e96a3;
     --raum-dach-0: #8f9bab; --raum-dach-1: #b39c86; --raum-dach-2: #8ea597; --raum-dach-3: #a3a4c2;
@@ -109,10 +111,11 @@
     --umgebung-2: rgba(191, 90, 242, .12);
     --umgebung-3: rgba(48, 176, 199, .08);
 
-    --akzent: #2997ff;
-    --akzent-hover: #47a6ff;
-    --akzent-zart: rgba(41, 151, 255, .16);
-    --akzent-ring: rgba(41, 151, 255, .3);
+    --akzent: #f2f2f7;               /* im Dunkeln hell, Schrift darauf dunkel */
+    --akzent-hover: #ffffff;
+    --akzent-zart: rgba(255, 255, 255, .1);
+    --akzent-ring: rgba(255, 255, 255, .22);
+    --akzent-text: #1d1d1f;
 
     --gruen-bg: rgba(48, 209, 88, .16);   --gruen: #30d158;
     --orange-bg: rgba(255, 159, 10, .16); --orange: #ff9f0a;
@@ -126,6 +129,7 @@
 
 
     /* Nacht: dunkler als am Tag, aber Hallen und Maschinen bleiben gut erkennbar */
+    --raum-akzent: #9fb3cc;
     --raum-umgebung: #20242a; --raum-gelaende: #37443b; --raum-beton: #4f545b; --raum-strasse: #4a515b; --raum-markierung: #8e959f;
     --raum-wand: #727b88; --raum-fenster: #7393bb; --raum-tor: #3d434c;
     --raum-dach-0: #7c889b; --raum-dach-1: #94857a; --raum-dach-2: #74907e; --raum-dach-3: #8586a6;
@@ -334,8 +338,9 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     width: 30px; height: 30px; border-radius: 50%;
     display: grid; place-items: center;
     font-size: .72rem; font-weight: 700; letter-spacing: .02em;
-    color: #fff;
-    background: linear-gradient(150deg, color-mix(in srgb, var(--lila) 70%, #fff), var(--akzent));
+    color: var(--logo-zeichen);
+    background: linear-gradient(180deg, var(--logo-oben), var(--logo-unten));
+    box-shadow: inset 0 0 0 1px var(--logo-rand);
 }
 .leiste-konto { min-height: 52px; }
 .konto-name { min-width: 0; color: var(--text); font-weight: 600; font-size: .9rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; }
@@ -800,7 +805,7 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
 .btn-primary {
     background: linear-gradient(180deg, color-mix(in srgb, var(--akzent) 82%, #fff) 0%, var(--akzent) 55%);
     border-color: transparent;
-    color: #fff;
+    color: var(--akzent-text);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 2px 8px var(--akzent-ring);
 }
 .btn-primary:hover, .btn-primary:focus {
@@ -1114,7 +1119,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     white-space: nowrap;
 }
 .karten-punkt:hover .punkt-blase, .karten-punkt:focus-visible .punkt-blase, .karten-punkt.gewaehlt .punkt-blase { transform: scale(1.15); }
-.karten-punkt.gewaehlt .punkt-name { background: var(--akzent); color: #fff; }
+.karten-punkt.gewaehlt .punkt-name { background: var(--akzent); color: var(--akzent-text); }
 /* Name über dem Punkt (wenn darunter ein anderes Werk liegt) */
 .karten-punkt.name-oben { flex-direction: column-reverse; --anker: translate(-50%, calc(-100% + 17px)); }
 .karten-punkt.name-oben .punkt-info { bottom: auto; top: calc(100% + 8px); }
@@ -1284,7 +1289,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     border-radius: 5px;
     pointer-events: none;
 }
-.plan-maschine.gewaehlt .maschine-modell { color: #fff; background: var(--akzent); }
+.plan-maschine.gewaehlt .maschine-modell { color: var(--akzent-text); background: var(--akzent); }
 
 /* ---------- Seitenleiste & Brotkrumen ---------- */
 
@@ -2009,7 +2014,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     display: inline-flex; align-items: center; gap: 6px; padding: 2px; border: 0; border-radius: 999px;
     background: transparent; color: var(--text); font-size: .78rem; font-weight: 600; white-space: nowrap;
 }
-.raum-marke.gewaehlt { padding: 2px 10px 2px 2px; background: var(--akzent); color: #fff; box-shadow: 0 4px 14px var(--akzent-ring); }
+.raum-marke.gewaehlt { padding: 2px 10px 2px 2px; background: var(--akzent); color: var(--akzent-text); box-shadow: 0 4px 14px var(--akzent-ring); }
 .raum-marke .zaehl-marke { box-shadow: 0 0 0 3px var(--karte-erhoeht); }
 .stufe-rot.raum-marke .zaehl-marke { animation: maschine-puls 2s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .stufe-rot.raum-marke .zaehl-marke { animation: none; } }

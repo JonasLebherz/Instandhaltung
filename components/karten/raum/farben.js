@@ -16,7 +16,10 @@ export function farbenLesen() {
   const stil = getComputedStyle(document.documentElement);
   const f = {};
   NAMEN.forEach((n) => { f[n] = stil.getPropertyValue(`--raum-${n}`).trim() || '#999999'; });
-  ['rot', 'orange', 'blau', 'gruen', 'akzent'].forEach((n) => { f[n] = stil.getPropertyValue(`--${n}`).trim() || '#888888'; });
+  ['rot', 'orange', 'blau', 'gruen'].forEach((n) => { f[n] = stil.getPropertyValue(`--${n}`).trim() || '#888888'; });
+  // Akzent in 3D: eigener, ruhiger Stahlton (die Oberfläche ist schwarz/weiß – darauf leuchtet nichts)
+  f.akzent = stil.getPropertyValue('--raum-akzent').trim() || '#5b6b7f';
+  f.marke = '#1d1d1f';   // Schilder, Firmenflagge: Graphit wie das Logo
   f.nacht = document.documentElement.getAttribute('data-theme') === 'dark';
   return f;
 }
