@@ -150,9 +150,10 @@ export default function Favoriten({ onOeffnen, person }) {
                         </span>
                       </span>
                       <span className="leiste-text">
+                        {/* „Werk · Halle“ zweizeilig: Werk klein oben, Halle darunter – sonst wäre nur „Stammwerk …“ zu lesen */}
                         <span className="favorit-name">
-                          {f.person && <small>{t('Mein Werk')}</small>}
-                          {f.name}
+                          {f.person ? <small>{t('Mein Werk')}</small> : f.name.includes(' · ') && <small>{f.name.split(' · ')[0]}</small>}
+                          {f.person ? f.name : f.name.split(' · ').slice(-1)[0]}
                         </span>
                         <span className="favorit-ansicht">{f.ansicht === '3d' ? '3D' : '2D'}</span>
                       </span>
