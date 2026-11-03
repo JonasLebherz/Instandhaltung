@@ -310,10 +310,10 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 :root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) .leiste-symbol {
     border-radius: 9px;
-    background: linear-gradient(180deg, var(--logo-oben), var(--logo-unten));
-    box-shadow: inset 0 0 0 1px var(--logo-rand), 0 2px 6px rgba(0, 0, 0, .18);
+    background: linear-gradient(180deg, var(--akzent-hover), var(--akzent));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), 0 2px 6px color-mix(in srgb, var(--akzent) 30%, transparent);
 }
-:root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) .leiste-symbol i { color: var(--logo-zeichen); font-size: 1rem; }
+:root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) .leiste-symbol i { color: var(--akzent-text); font-size: 1rem; }
 .leiste-symbol {
     position: relative;
     flex: 0 0 30px;
@@ -392,11 +392,11 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     background: var(--karte-solid);
     box-shadow: inset 0 0 0 1px var(--linie);
 }
-/* Nur der Favorit, den die Karte gerade zeigt, bekommt das dunkle Feld (wie der aktive Eintrag) */
+/* Der Favorit, den die Karte gerade zeigt: Symbol zart in der Akzentfarbe mit Ring (kein dunkler Fleck) */
 .favorit-link.aktiv .favorit-symbol {
-    color: var(--logo-zeichen);
-    background: linear-gradient(180deg, var(--logo-oben), var(--logo-unten));
-    box-shadow: inset 0 0 0 1px var(--logo-rand);
+    color: var(--akzent);
+    background: var(--akzent-zart);
+    box-shadow: inset 0 0 0 1.5px var(--akzent-ring);
 }
 .favorit-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
 .favorit-name small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: .64rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--text-leise); }
