@@ -21,7 +21,7 @@
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS v_stoerung_details, v_stoerungen_monat, v_ausfallzeit_maschine, v_mttr_maschine,
                     v_kennzahlen_standort;
-DROP TABLE IF EXISTS auftrag_verlauf, bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
+DROP TABLE IF EXISTS nachricht, auftrag_verlauf, bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
                      stoermeldung, person, techniker, maschine, gebaeude, standort, land CASCADE;
 DROP TYPE IF EXISTS auftragsstatus, prioritaet, schicht, bestellstatus, ursache, maschinentyp, rolle;
 
@@ -220,6 +220,21 @@ CREATE TABLE auftrag_verlauf (
 COMMENT ON TABLE auftrag_verlauf IS 'Wer wann was an einem Wartungsauftrag getan hat';
 CREATE INDEX idx_auftrag_verlauf_auftrag ON auftrag_verlauf (auftrag_id, zeitpunkt);
 
+-- Nachrichten zwischen Personen (Chat auf der Seite „Mitarbeiter“)
+CREATE TABLE nachricht (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    von_id      INTEGER NOT NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    an_id       INTEGER NOT NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    text        VARCHAR(1000) NOT NULL CHECK (length(trim(text)) > 0),
+    zeitpunkt   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    gelesen_am  TIMESTAMPTZ NULL,
+    CONSTRAINT chk_nachricht_nicht_an_sich CHECK (von_id <> an_id)
+);
+COMMENT ON TABLE nachricht IS 'Nachrichten zwischen Personen (Chat)';
+-- Index für „ungelesene Nachrichten an mich“ und für den Verlauf zweier Personen
+CREATE INDEX idx_nachricht_an ON nachricht (an_id, gelesen_am);
+CREATE INDEX idx_nachricht_verlauf ON nachricht (von_id, an_id, zeitpunkt);
+
 -- Bestellungen von Ersatzteilen
 CREATE TABLE bestellung (
     id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -256,6 +271,7 @@ ALTER TABLE auftrag_ersatzteil ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bestellung         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE person             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auftrag_verlauf    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nachricht          ENABLE ROW LEVEL SECURITY;
 
 
 -- =====================================================================

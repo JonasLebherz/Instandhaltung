@@ -2,8 +2,8 @@
  * app/datenbasis/page.js – Datenbasis: Verbindungen, Datenmodell und Daten
  *
  * Drei Teile:
- *  1. Verbindungen (Verbindungen.js): Wie hängen Claude/Codex, GitHub, Vercel,
- *     Supabase und Power BI zusammen – und funktioniert jede Verbindung gerade?
+ *  1. So funktioniert die App (Verbindungen.js): Browser, GitHub, Vercel und
+ *     Supabase einfach erklärt – und funktioniert jede Verbindung gerade?
  *  2. Datenmodell (Datenmodell.js): alle Tabellen mit Spalten, Schlüsseln und
  *     Beziehungen als Diagramm, dazu Views und Wertelisten
  *  3. Tabelle anklicken: Spalten im Detail und die Datensätze als Vorschau
@@ -34,7 +34,7 @@ export default async function DatenbasisSeite() {
     <>
       <div className="seitenkopf">
         <h1>{t('Datenbasis')}</h1>
-        <p>{t('Wie die Anwendung aufgebaut ist: Verbindungen, Tabellen, Beziehungen und Daten – live aus der Datenbank.')}</p>
+        <p>{t('Wie die App aufgebaut ist und wo die Daten liegen – live aus der Datenbank.')}</p>
       </div>
 
       <div className="row g-4 mb-2">
@@ -45,7 +45,7 @@ export default async function DatenbasisSeite() {
           <Kennzahl titel={t('Datensätze')} wert={datensaetze} zusatz={t('in allen Tabellen')} symbol="bi-collection" i={1} />
         </div>
         <div className="col-6 col-lg-3">
-          <Kennzahl titel={t('Views')} wert={tabellen.length - nurTabellen.length} zusatz={t('für Power BI')} symbol="bi-eye" i={2} />
+          <Kennzahl titel={t('Views')} wert={tabellen.length - nurTabellen.length} zusatz={t('fertige Auswertungen')} symbol="bi-eye" i={2} />
         </div>
         <div className="col-6 col-lg-3">
           <Kennzahl titel={t('Größe')} wert={info.groesse / 1024 / 1024} nachkomma={1} einheit="MB"

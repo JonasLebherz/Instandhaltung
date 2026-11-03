@@ -20,7 +20,7 @@
 -- Vorhandene Daten löschen und die fortlaufenden Nummern (IDs) zurücksetzen.
 -- CASCADE leert auch alle Tabellen, die per Fremdschlüssel darauf verweisen.
 TRUNCATE land, standort, gebaeude, maschine, techniker, person, ersatzteil, stoermeldung, wartungsauftrag,
-         auftrag_ersatzteil, bestellung, auftrag_verlauf RESTART IDENTITY CASCADE;
+         auftrag_ersatzteil, bestellung, auftrag_verlauf, nachricht RESTART IDENTITY CASCADE;
 
 -- ---------------------------------------------------------------------
 -- Standorte (Werke) mit GPS-Position und Größe des Werksgeländes
@@ -2126,3 +2126,20 @@ LEFT JOIN person p     ON p.techniker_id = w.techniker_id
 WHERE w.status = 'erledigt' AND w.ende_zeit IS NOT NULL;
 
 DROP TABLE klon, neue_leute, neue_werke;
+
+-- ---------------------------------------------------------------------
+-- Nachrichten (Chat) – gleiche Daten wie in migrationen/003
+-- ---------------------------------------------------------------------
+-- Beispielnachrichten (Albstadt: Schichtleitung, Produktion und die beiden Techniker)
+INSERT INTO nachricht (von_id, an_id, text, zeitpunkt, gelesen_am)
+SELECT von.id, an.id, v.text, now() - v.vor, CASE WHEN v.gelesen THEN now() - v.vor + interval '5 minutes' END
+FROM (VALUES
+    ('Claudia Richter', 1, 'Kannst du dir heute noch die Fräse in Halle 1 ansehen? Sie läuft unruhig.', interval '3 hours', true),
+    (NULL, 1, 'Ja, ich komme nach der Pause vorbei.', interval '170 minutes', true),
+    ('Sabine Vogt', 2, 'Die Presse hat wieder kurz gestoppt, Meldung ist drin.', interval '50 minutes', false),
+    ('Claudia Richter', 2, 'Bitte die Presse vorziehen, wir brauchen sie für die Spätschicht.', interval '20 minutes', false)
+) AS v(von_name, techniker_id, text, vor, gelesen)
+JOIN person tech ON tech.techniker_id = v.techniker_id
+JOIN person von  ON von.id = COALESCE((SELECT id FROM person WHERE name = v.von_name), tech.id)
+JOIN person an   ON an.id = CASE WHEN v.von_name IS NULL THEN (SELECT id FROM person WHERE name = 'Claudia Richter') ELSE tech.id END
+WHERE NOT EXISTS (SELECT 1 FROM nachricht);

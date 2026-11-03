@@ -41,7 +41,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     '/statistik?von=2026-09-01&bis=2026-01-01', '/statistik?von=2030-01-01&bis=2030-02-01', '/statistik?standort=8', '/statistik?standort=abc',
     '/karte', '/karte?werk=ham', '/karte?werk=ham&halle=h2', '/karte?maschine=1', '/karte?werk=xyz&halle=q', '/karte?maschine=abc',
     '/karte/ham', '/karte/HAM', '/karte/ber', '/karte/ham/h2', '/karte/alb/h1?maschine=1', '/auftraege?standort=8', '/melden?standort=8',
-    '/statistik?werk=ham', '/statistik?werk=ham&halle=h2', '/statistik?maschine=5', '/statistik?werk=xyz', '/datenbasis', '/login', '/karte?land=us', '/karte?land=xx', '/statistik?land=cn', '/statistik?land=xx']) {
+    '/statistik?werk=ham', '/statistik?werk=ham&halle=h2', '/statistik?maschine=5', '/statistik?werk=xyz', '/datenbasis', '/mitarbeiter', '/login', '/karte?land=us', '/karte?land=xx', '/statistik?land=cn', '/statistik?land=xx']) {
     const r = await p.goto(BASE + url, { waitUntil: 'networkidle' });
     pruefe(`GET ${url}`, r.status() === 200, r.status());
   }
@@ -297,16 +297,21 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   const neueAuswertungen = ['Verfügbarkeit pro Monat', 'Reaktionszeit nach Priorität', 'Größte Zeitfresser (Pareto)', 'Offene Aufträge nach Alter', 'Störungen nach Maschinenalter'];
   const titelDa = await p.$$eval('.abschnitt-titel', (z) => z.map((h) => h.textContent));
   pruefe('Statistik: weitere Auswertungen (Verfügbarkeit, Reaktionszeit, Pareto, Alter)', neueAuswertungen.every((x) => titelDa.includes(x)), titelDa.join(' | '));
-  pruefe('Statistik: Diagramme gezeichnet', (await p.$$eval('.stat-ebene canvas', (z) => z.length)) === 4 && (await p.$$eval('.heat-zelle', (z) => z.length)) >= 56);
+  pruefe('Statistik: Diagramme gezeichnet', (await p.$$eval('.stat-ebene canvas', (z) => z.length)) === 4 && (await p.$('.heat-zelle')) === null);
   await p.goto(BASE + '/statistik'); await p.waitForTimeout(1500);
   await p.screenshot({ path: SHOTS + 'n-statistik-hell.png', fullPage: true });
 
   // 15c. Datenbasis: Tabellen, Beziehungen, Vorschau, Verbindungen
   await p.goto(BASE + '/datenbasis'); await p.waitForTimeout(2000);
-  pruefe('Datenbasis: 12 Tabellen im Diagramm', (await p.$$eval('.er-tabelle', (z) => z.length)) === 12);
-  pruefe('Datenbasis: Beziehungslinien gezeichnet', (await p.$$eval('.er-linie', (z) => z.length)) === 15, await p.$$eval('.er-linie', (z) => z.length));
+  pruefe('Datenbasis: 13 Tabellen im Diagramm', (await p.$$eval('.er-tabelle', (z) => z.length)) === 13);
+  pruefe('Datenbasis: Beziehungslinien gezeichnet', (await p.$$eval('.er-linie', (z) => z.length)) === 17, await p.$$eval('.er-linie', (z) => z.length));
   pruefe('Datenbasis: 5 Views', (await p.$$eval('.er-view', (z) => z.length)) === 5);
   pruefe('Datenbasis: Verbindung zur Datenbank geprüft', (await p.textContent('.verbund-knoten[style*="db"]')).includes('verbunden'));
+  pruefe('Datenbasis: einfach erklärt, ohne Power BI und Commit-Texte', (await p.$$eval('.verbund-knoten', (z) => z.length)) === 5
+    && !(await p.textContent('main')).includes('Power BI') && !(await p.textContent('main')).includes('Commit'));
+  pruefe('Datenbasis: zuerst nur Schlüssel, „Alle Spalten“ zeigt alle', (await p.$$eval('.er-spalte', (z) => z.length)) < Number(sql("SELECT count(*) FROM information_schema.columns c JOIN information_schema.tables x USING (table_schema, table_name) WHERE c.table_schema = 'public' AND x.table_type = 'BASE TABLE'")));
+  await p.click('.er-alle'); await p.waitForTimeout(300);
+  pruefe('Datenbasis: alle Spalten sichtbar', (await p.$$eval('.er-spalte', (z) => z.length)) === Number(sql("SELECT count(*) FROM information_schema.columns c JOIN information_schema.tables x USING (table_schema, table_name) WHERE c.table_schema = 'public' AND x.table_type = 'BASE TABLE'")));
   await p.click('.er-tabelle:has-text("maschine") >> nth=0'); await p.waitForTimeout(1200);
   const maschinen = Number(sql('SELECT count(*) FROM maschine'));
   pruefe('Datenbasis: Vorschau der Tabelle maschine', (await p.$$eval('.er-vorschau tbody tr', (z) => z.length)) === 25 && (await p.textContent('.er-detail')).includes(`(${maschinen})`));
@@ -441,7 +446,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.favorit-link:has-text("Stammwerk Albstadt") >> nth=0');
   await p.waitForSelector('.ebene-neu .lageplan', { timeout: 15000 }).catch(() => {});
   pruefe('Favoriten: Klick öffnet die Karte in genau dieser Ansicht (Werk, 2D)', (await p.$('.ebene-neu .lageplan')) !== null
-    && (await p.textContent('.buehne-titel')) === 'Stammwerk Albstadt' && (await p.$('.raum')) === null);
+    // 3D-Szenen bleiben unsichtbar im Hintergrund erhalten (gegen Flackern) – sichtbar ist nur der 2D-Plan
+    && (await p.textContent('.buehne-titel')) === 'Stammwerk Albstadt' && (await p.$('.ebene-neu .raum')) === null);
   pruefe('Favoriten: aktiver Favorit markiert', (await p.textContent('.favorit-link.aktiv')).includes('Stammwerk Albstadt'));
   // Umbenennen und Entfernen über das „…“-Menü
   await p.hover('.favorit >> nth=0'); await p.click('.favorit >> nth=0 >> .favorit-mehr'); await p.click('.favorit-menue button:has-text("Umbenennen")');
@@ -531,6 +537,28 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.fill('#beschreibung', 'Test der Personenwahl beim Melden'); await waehle(p, 'ursache_kategorie', 'Sonstiges');
   await Promise.all([p.waitForURL(BASE + '/'), p.click('button[type=submit]')]);
   pruefe('Person: Meldung mit Person im Verlauf', sql('SELECT person_id FROM auftrag_verlauf WHERE auftrag_id = (SELECT max(id) FROM wartungsauftrag) AND aktion = \'gemeldet\'') === julia);
+
+  // Mitarbeiter: Teamliste und Chat (als Julia Krause)
+  await p.goto(BASE + '/mitarbeiter'); await p.waitForTimeout(1200);
+  pruefe('Mitarbeiter: Teamliste mit allen Personen', (await p.$$eval('.mitarbeiter-tabelle tbody tr', (z) => z.length)) === Number(sql('SELECT count(*) FROM person')));
+  await waehle(p, 'mitarbeiter-rolle', 'Instandhaltung');
+  pruefe('Mitarbeiter: Filter Rolle', (await p.$$eval('.mitarbeiter-tabelle tbody tr', (z) => z.length)) === 38);
+  const [mTech, mOffen] = sql("SELECT p.name || '|' || count(w.id) FILTER (WHERE w.status <> 'erledigt') FROM person p JOIN techniker t ON t.id = p.techniker_id LEFT JOIN wartungsauftrag w ON w.techniker_id = t.id WHERE p.name = 'Markus Weber' GROUP BY p.name").split('|');
+  pruefe('Mitarbeiter: offene Aufträge je Techniker stimmen mit SQL', (await p.textContent(`.mitarbeiter-tabelle tr:has-text("${mTech}") .mitarbeiter-offen`)).trim() === mOffen);
+  await p.fill('.chat input[type=search]', 'Claudia Richter'); await p.click('.chat-treffer button >> nth=0'); await p.waitForSelector('.chat-eingabe');
+  await p.fill('.chat-eingabe textarea', 'Hallo Claudia, Test aus der Mitarbeiter-Seite'); await p.keyboard.press('Enter'); await p.waitForTimeout(1200);
+  const claudia = sql("SELECT id FROM person WHERE name = 'Claudia Richter'");
+  pruefe('Chat: Nachricht gespeichert und angezeigt', sql(`SELECT count(*) FROM nachricht WHERE von_id = ${julia} AND an_id = ${claudia}`) === '1'
+    && (await p.textContent('.chat-blase.meine')).includes('Hallo Claudia'));
+  // Antwort kommt an (direkt in der Datenbank) → rote Zahl in der Seitenleiste, nach dem Lesen weg
+  sql(`INSERT INTO nachricht (von_id, an_id, text) VALUES (${claudia}, ${julia}, 'Danke, kommt an!')`);
+  await p.goto(BASE + '/'); await p.waitForTimeout(1200);
+  pruefe('Chat: ungelesene Nachricht als rote Zahl in der Seitenleiste', (await p.textContent('a[href="/mitarbeiter"] .leiste-zahl')).trim() === '1');
+  await p.click('a[href="/mitarbeiter"]'); await p.waitForURL(/mitarbeiter/); await p.waitForSelector('.chat-liste button.ungelesen');
+  await p.click('.chat-liste button.ungelesen'); await p.waitForSelector('.chat-blase:not(.meine)'); await p.waitForTimeout(1500);
+  pruefe('Chat: gelesen markiert, Zahl verschwindet', sql(`SELECT count(*) FROM nachricht WHERE an_id = ${julia} AND gelesen_am IS NULL`) === '0'
+    && (await p.$('a[href="/mitarbeiter"] .leiste-zahl')) === null);
+  await p.screenshot({ path: SHOTS + 'q-mitarbeiter-chat.png' });
   await p.waitForTimeout(500);
   await p.screenshot({ path: SHOTS + 'p-auftrag-produktion.png', fullPage: true });
   // Ohne Person
@@ -538,6 +566,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.dialog-fuss button'); await p.waitForTimeout(800);
   await p.goto(BASE + '/'); await p.waitForTimeout(500);
   pruefe('Person: "Ohne Person arbeiten" setzt zurück', await p.isVisible('.person-hinweis') && (await p.$('.favorit-eigenes')) === null);
+  await p.goto(BASE + '/mitarbeiter'); await p.waitForTimeout(800);
+  pruefe('Chat: ohne Person Hinweis zur Personenwahl', await p.isVisible('.chat-leer'));
 
   // Maschinen: Liste, Seite mit Historie (Zahl gegen SQL)
   await p.goto(BASE + '/maschinen'); await p.waitForTimeout(800);

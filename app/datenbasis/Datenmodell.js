@@ -2,7 +2,9 @@
 /**
  * app/datenbasis/Datenmodell.js – Tabellen und Beziehungen als Diagramm
  *
- * Jede Tabelle ist eine Karte mit ihren Spalten:
+ * Jede Tabelle ist eine Karte, farbig nach Thema (Werke & Maschinen, Störungen & Aufträge,
+ * Personen, Ersatzteile). Zur besseren Übersicht stehen zuerst nur die Schlüssel darin
+ * („Alle Spalten“ zeigt den Rest):
  *   Schlüssel-Symbol = Primärschlüssel, Ketten-Symbol = Fremdschlüssel (Verweis)
  * Die Linien zeigen die Fremdschlüssel: von der Spalte (z. B. maschine.gebaeude_id)
  * zur Spalte, auf die sie verweist (gebaeude.id). Fährt man über eine Tabelle,
@@ -26,7 +28,17 @@ const PLATZ = {
   standort: [0, 0], gebaeude: [1, 0], maschine: [2, 0], stoermeldung: [3, 0],
   land: [0, 1], techniker: [1, 1], person: [2, 1], wartungsauftrag: [3, 1],
   bestellung: [0, 2], ersatzteil: [1, 2], auftrag_ersatzteil: [2, 2], auftrag_verlauf: [3, 2],
+  nachricht: [2, 3],
 };
+
+// Thema jeder Tabelle (Farbe der Karte und Legende)
+const GRUPPEN = [
+  { id: 'orte', name: T('Werke & Maschinen'), tabellen: ['land', 'standort', 'gebaeude', 'maschine'] },
+  { id: 'stoerung', name: T('Störungen & Aufträge'), tabellen: ['stoermeldung', 'wartungsauftrag', 'auftrag_verlauf'] },
+  { id: 'personen', name: T('Personen'), tabellen: ['techniker', 'person', 'nachricht'] },
+  { id: 'material', name: T('Ersatzteile'), tabellen: ['ersatzteil', 'auftrag_ersatzteil', 'bestellung'] },
+];
+const gruppeVon = (name) => GRUPPEN.find((g) => g.tabellen.includes(name))?.id ?? 'sonst';
 
 // Kurzbeschreibung der Views (in der Datenbank gibt es dafür keinen Kommentar)
 const VIEW_TEXTE = {
@@ -34,7 +46,7 @@ const VIEW_TEXTE = {
   v_ausfallzeit_maschine: T('Ausfallzeit je Maschine'),
   v_kennzahlen_standort: T('Kennzahlen je Standort mit GPS-Position'),
   v_stoerungen_monat: T('Störungen je Monat'),
-  v_stoerung_details: T('Alle Störungen mit Auftrag, Maschine und Ort – Grundlage für Power BI'),
+  v_stoerung_details: T('Alle Störungen mit Auftrag, Maschine und Ort'),
 };
 
 export default function Datenmodell({ tabellen, wertelisten }) {
@@ -44,6 +56,7 @@ export default function Datenmodell({ tabellen, wertelisten }) {
   const [linien, setLinien] = useState([]);
   const [hervor, setHervor] = useState(null);     // Tabelle unter der Maus
   const [gewaehlt, setGewaehlt] = useState(null); // angeklickte Tabelle/View
+  const [alle, setAlle] = useState(false);        // alle Spalten statt nur der Schlüssel
 
   const nurTabellen = tabellen.filter((x) => x.art === 'tabelle');
   const views = tabellen.filter((x) => x.art === 'view');
@@ -100,7 +113,7 @@ export default function Datenmodell({ tabellen, wertelisten }) {
     beobachter.observe(rahmen);
     return () => { clearTimeout(spaeter); beobachter.disconnect(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabellen]);
+  }, [tabellen, alle]);
 
   function waehlen(name) {
     setGewaehlt(gewaehlt === name ? null : name);
@@ -118,7 +131,13 @@ export default function Datenmodell({ tabellen, wertelisten }) {
       <section className="karte" style={{ '--i': 5 }}>
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">{t('Datenmodell')}</h2>
-          <span className="klein">{t('Tabelle anklicken für Spalten und Daten')}</span>
+          <button type="button" className="btn btn-sekundaer btn-klein er-alle" aria-pressed={alle} onClick={() => setAlle(!alle)}>
+            <i className={`bi ${alle ? 'bi-arrows-collapse' : 'bi-arrows-expand'}`} aria-hidden="true" /> {alle ? t('Nur Schlüssel') : t('Alle Spalten')}
+          </button>
+        </div>
+        <p className="text-leise mb-3">{t('Jeder Kasten ist eine Tabelle. Die Linien zeigen, welche Tabelle auf welche verweist – z. B. gehört jede Maschine zu einem Gebäude. Tabelle anklicken für alle Spalten und Daten.')}</p>
+        <div className="er-legende klein">
+          {GRUPPEN.map((g) => <span key={g.id} className={`er-gruppe gruppe-${g.id}`}><span className="er-gruppe-farbe" aria-hidden="true" />{t(g.name)}</span>)}
         </div>
         <div className="er-legende klein">
           <span><i className="bi bi-key-fill er-pk" aria-hidden="true" /> {t('Primärschlüssel')}</span>
@@ -135,9 +154,12 @@ export default function Datenmodell({ tabellen, wertelisten }) {
           </svg>
           {nurTabellen.map((tab, i) => {
             const [spalte, zeile] = platzVon[tab.name];
+            // Ohne „Alle Spalten“ nur Primär- und Fremdschlüssel (die Linien brauchen sie)
+            const sichtbar = alle ? tab.spalten : tab.spalten.filter((s) => s.pk || s.fk);
+            const weitere = tab.spalten.length - sichtbar.length;
             return (
               <button key={tab.name} type="button"
-                      className={`er-tabelle${gewaehlt === tab.name ? ' gewaehlt' : ''}${verbunden(tab.name) ? '' : ' gedimmt'}`}
+                      className={`er-tabelle gruppe-${gruppeVon(tab.name)}${gewaehlt === tab.name ? ' gewaehlt' : ''}${verbunden(tab.name) ? '' : ' gedimmt'}`}
                       style={{ gridColumn: spalte + 1, gridRow: zeile + 1, '--i': i }}
                       onClick={() => waehlen(tab.name)}
                       onMouseEnter={() => setHervor(tab.name)} onMouseLeave={() => setHervor(null)}
@@ -150,7 +172,7 @@ export default function Datenmodell({ tabellen, wertelisten }) {
                   <span className="er-anzahl" title={t('Datensätze')}>{tab.anzahl ?? '–'}</span>
                 </span>
                 <span className="er-spalten">
-                  {tab.spalten.map((s) => (
+                  {sichtbar.map((s) => (
                     <span key={s.name} className="er-spalte" data-spalte={`${tab.name}.${s.name}`}>
                       <span className="er-symbol" aria-hidden="true">
                         {s.pk ? <i className="bi bi-key-fill er-pk" /> : s.fk ? <i className="bi bi-link-45deg er-fk" /> : null}
@@ -160,6 +182,7 @@ export default function Datenmodell({ tabellen, wertelisten }) {
                       <span className="er-typ">{s.typ}</span>
                     </span>
                   ))}
+                  {weitere > 0 && <span className="er-weitere">{t('+ {n} weitere Spalten', { n: weitere })}</span>}
                 </span>
                 {tab.beschreibung && <span className="er-text">{t(tab.beschreibung)}</span>}
               </button>
@@ -167,8 +190,8 @@ export default function Datenmodell({ tabellen, wertelisten }) {
           })}
         </div>
 
-        {/* Views (für Power BI) */}
-        <h3 className="er-zwischentitel">{t('Views für Power BI')}</h3>
+        {/* Views: gespeicherte Abfragen, z. B. Kennzahlen je Maschine */}
+        <h3 className="er-zwischentitel">{t('Views (fertige Auswertungen)')}</h3>
         <div className="er-views">
           {views.map((v) => (
             <button key={v.name} type="button" className={`er-view${gewaehlt === v.name ? ' gewaehlt' : ''}`} onClick={() => waehlen(v.name)}

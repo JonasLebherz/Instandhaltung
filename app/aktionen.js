@@ -17,6 +17,7 @@
  *   auftragSpeichern – Techniker, Status, Zeiten, Maßnahme
  *   teilBuchen       – Ersatzteil buchen bzw. automatisch bestellen
  *   lieferungBuchen  – Wareneingang einer Bestellung
+ *   nachrichtSenden, nachrichtenGelesen – Chat zwischen Personen (Seite „Mitarbeiter“, ohne Weiterleitung)
  */
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
@@ -389,4 +390,38 @@ export async function lieferungBuchen(formular) {
   }
   revalidatePath('/', 'layout');
   redirect('/');
+}
+
+/* =====================================================================
+ * Chat zwischen Personen (Seite „Mitarbeiter“)
+ *
+ * Anders als die übrigen Aktionen ohne Weiterleitung: Der Chat bleibt offen
+ * und lädt den Verlauf selbst neu (/api/nachrichten). Absender ist immer die
+ * gewählte Person – die ID wird mit der Datenbank abgeglichen, nie aus dem
+ * Formular übernommen.
+ * ================================================================== */
+export async function nachrichtSenden(anId, text) {
+  await benutzerPflicht();
+  const t = await uebersetzer();
+  const ich = await aktuellePerson();
+  if (!ich) return { fehler: t('Bitte zuerst eine Person wählen.') };
+  const inhalt = String(text ?? '').trim();
+  if (!inhalt) return { fehler: t('Bitte eine Nachricht eingeben.') };
+  if (inhalt.length > 1000) return { fehler: t('Höchstens 1000 Zeichen.') };
+  const an = Number(anId);
+  if (!Number.isInteger(an) || an === ich.id) return { fehler: t('Empfänger ungültig.') };
+  const [empfaenger] = await sql`SELECT id FROM person WHERE id = ${an}`;
+  if (!empfaenger) return { fehler: t('Empfänger ungültig.') };
+  await sql`INSERT INTO nachricht (von_id, an_id, text) VALUES (${ich.id}, ${an}, ${inhalt})`;
+  return { ok: true };
+}
+
+/** Alle Nachrichten von „mitId“ an mich als gelesen markieren */
+export async function nachrichtenGelesen(mitId) {
+  await benutzerPflicht();
+  const ich = await aktuellePerson();
+  const mit = Number(mitId);
+  if (!ich || !Number.isInteger(mit)) return { ok: false };
+  await sql`UPDATE nachricht SET gelesen_am = now() WHERE an_id = ${ich.id} AND von_id = ${mit} AND gelesen_am IS NULL`;
+  return { ok: true };
 }

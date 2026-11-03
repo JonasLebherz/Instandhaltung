@@ -486,7 +486,12 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     :root:not([data-leiste="auf"]) .favoriten-leer { display: none; }
     :root:not([data-leiste="auf"]) .favorit-link { padding: 0 10px; justify-content: flex-start; }
     :root:not([data-leiste="auf"]) .favorit-link .leiste-symbol { flex-basis: 30px; }
-    :root:not([data-leiste="auf"]) .favorit-mehr { right: -2px; width: 18px; height: 22px; font-size: .75rem; border-radius: 6px; }
+    /* „…“ als kleines rundes Abzeichen oben rechts am Symbol (wie die Zahl bei „Aufträge“), mittig zum Symbol ausgerichtet */
+    :root:not([data-leiste="auf"]) .favorit-mehr {
+        left: calc(50% + 5px); right: auto; top: 1px; transform: none;
+        width: 17px; height: 17px; border-radius: 50%; font-size: .62rem;
+        background: var(--karte-solid); color: var(--text); box-shadow: 0 0 0 1px var(--linie), 0 1px 3px rgba(0, 0, 0, .12);
+    }
     :root:not([data-leiste="auf"]) .favorit-bearbeiten {
         position: absolute; left: calc(100% + 16px); top: 50%; transform: translateY(-50%); width: 240px; z-index: 4;
         padding: 4px; border-radius: 12px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
@@ -1749,25 +1754,9 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .balken-wert { font-size: .85rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .balken-liste .mini-balken { min-width: 0; }
 
-/* Wochentag × Uhrzeit */
-.heatmap { display: grid; grid-template-columns: 38px repeat(8, 1fr); gap: 4px; align-items: center; }
-.heat-kopf { font-size: .72rem; color: var(--text-leise); text-align: left; }
-.heat-tag { font-size: .78rem; color: var(--text-leise); }
-.heat-zelle { display: block; height: 30px; border-radius: 6px; transition: transform var(--uebergang); }
-.heatmap .heat-zelle:hover { transform: scale(1.08); }
-.heat-zelle.s0 { background: var(--fuellung); }
-.heat-zelle.s1 { background: color-mix(in srgb, var(--akzent) 22%, var(--karte-solid)); }
-.heat-zelle.s2 { background: color-mix(in srgb, var(--akzent) 45%, var(--karte-solid)); }
-.heat-zelle.s3 { background: color-mix(in srgb, var(--akzent) 70%, var(--karte-solid)); }
-.heat-zelle.s4 { background: var(--akzent); }
-.heat-legende { display: flex; align-items: center; gap: 5px; margin-top: 12px; font-size: .75rem; color: var(--text-leise); }
-.heat-legende .heat-zelle { width: 18px; height: 12px; border-radius: 3px; }
-
 @media (max-width: 767.98px) {
     .stat-leiste { grid-template-columns: repeat(2, 1fr); row-gap: 14px; }
     .stat-leiste > div:nth-child(2n+1) { border-left: 0; }
-    .heatmap { grid-template-columns: 30px repeat(8, 1fr); gap: 3px; }
-    .heat-zelle { height: 24px; }
 }
 
 /* =====================================================================
@@ -1783,18 +1772,17 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 
 .verbund {
     display: grid;
-    grid-template-columns: 1fr 56px 1fr 56px 1fr 64px 1fr 56px 1fr;
-    grid-template-rows: auto auto;
+    grid-template-columns: 1fr 90px 1.1fr 90px 1fr;
+    grid-template-rows: 1fr 1fr;
     grid-template-areas:
-        "ki l1 gh l2 vc l3 db l4 pb"
-        "ki l1 gh l2 vc l3 au .  .";
-    gap: 14px 0;
-    align-items: center;
+        "br l1 vc l3 db"
+        "gh l2 vc l4 au";
+    gap: 0;
 }
 .verbund-knoten {
-    align-self: stretch;
+    margin: 8px 0;
     display: flex; flex-direction: column; gap: 8px;
-    padding: 14px;
+    padding: 14px 16px;
     border-radius: 16px;
     background: var(--karte-erhoeht);
     border: 1px solid color-mix(in srgb, var(--zustand) 35%, var(--glas-rand));
@@ -1802,63 +1790,65 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     min-width: 0;
     transition: border-color .4s ease;
 }
-.verbund-knoten[style*="ki"], .verbund-knoten[style*="gh"], .verbund-knoten[style*="vc"] { align-self: center; }
+/* Vercel steht in der Mitte zwischen beiden Zeilen */
+.verbund-knoten[style*="vc"] { align-self: center; }
 .knoten-kopf { display: flex; gap: 10px; align-items: center; }
 .knoten-symbol {
-    width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px;
-    display: grid; place-items: center; font-size: 1.05rem;
+    width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px;
+    display: grid; place-items: center; font-size: 1.1rem;
     background: var(--fuellung); color: var(--text);
 }
 .knoten-name { display: block; font-weight: 650; line-height: 1.2; }
 .knoten-rolle { display: block; font-size: .75rem; color: var(--text-leise); line-height: 1.2; }
+.knoten-text { margin: 0; font-size: .82rem; line-height: 1.4; color: var(--text); }
 .knoten-status {
-    align-self: flex-start;
+    align-self: flex-start; margin-top: auto;
     display: inline-flex; align-items: center; gap: 6px;
     padding: 2px 10px; border-radius: 999px;
     font-size: .75rem; font-weight: 600;
     color: var(--zustand); background: var(--zustand-bg);
 }
+.knoten-ms { font-weight: 500; font-variant-numeric: tabular-nums; }
 .knoten-status .punkt { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .status-pruefe .knoten-status .punkt { animation: pulsieren 1s ease-in-out infinite; }
-.knoten-details { list-style: none; margin: 0; padding: 0; font-size: .75rem; color: var(--text-leise); line-height: 1.35; overflow-wrap: anywhere; }
+.knoten-hinweis { font-size: .72rem; color: var(--text-leise); line-height: 1.35; overflow-wrap: anywhere; }
 
-.verbund-leitung { position: relative; align-self: stretch; display: flex; align-items: center; min-height: 40px; }
+.verbund-leitung { position: relative; min-height: 40px; }
 .verbund-leitung svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .verbund-leitung .linie {
     fill: none; stroke: var(--zustand); stroke-width: 2.5; vector-effect: non-scaling-stroke;
     stroke-linecap: round; stroke-dasharray: 2 7;
 }
-.verbund-leitung .linie.status-ok { stroke: var(--gruen); }
-.verbund-leitung .linie.status-warnung { stroke: var(--orange); }
-.verbund-leitung .linie.status-fehler { stroke: var(--rot); }
-.verbund-leitung .linie.status-unbekannt, .verbund-leitung .linie.status-pruefe { stroke: var(--grau); }
 /* Funktionierende Leitungen "fließen" */
-.verbund-leitung.status-ok .linie, .verbund-leitung .linie.status-ok { animation: fliessen 1.1s linear infinite; }
-.verbund-leitung .linie.rueckwaerts { animation-direction: reverse; }
+.verbund-leitung.status-ok .linie { animation: fliessen 1.1s linear infinite; }
 .verbund-leitung.status-unbekannt .linie, .verbund-leitung.status-pruefe .linie { opacity: .5; }
 .leitung-text {
-    position: absolute; left: 50%; top: calc(50% + 8px); transform: translateX(-50%);
-    font-size: .66rem; color: var(--text-leise); white-space: nowrap; text-align: center;
+    position: absolute; left: 50%; transform: translateX(-50%);
+    font-size: .68rem; color: var(--text-leise); text-align: center; line-height: 1.25;
+    width: 100%; padding: 0 4px;
 }
-.verbund-leitung.gabel .leitung-text { top: calc(50% - 4px); left: 30%; background: var(--karte-solid); padding: 0 3px; border-radius: 4px; }
+.leitung-l1 .leitung-text, .leitung-l3 .leitung-text { top: calc(50% - 26px); }
+.leitung-l2 .leitung-text, .leitung-l4 .leitung-text { top: calc(50% + 8px); }
 @keyframes fliessen { to { stroke-dashoffset: -18; } }
 .bi.drehen { display: inline-block; animation: drehen .8s linear infinite; }
 
-/* Schmaler als 1200 px: Knoten untereinander, Leitungen senkrecht */
-@media (max-width: 1199.98px) {
-    .verbund { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
-    .verbund-leitung { min-height: 38px; justify-content: center; }
+/* Schmaler als 1000 px: Kästen untereinander, Leitungen senkrecht */
+@media (max-width: 999.98px) {
+    .verbund { display: flex; flex-direction: column; align-items: stretch; }
+    .verbund-leitung { min-height: 38px; display: flex; align-items: center; }
     .verbund-leitung svg { display: none; }
     .verbund-leitung::before {
-        content: ""; position: absolute; left: 50%; top: 4px; bottom: 4px; width: 0;
+        content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 0;
         border-left: 2.5px dotted var(--zustand);
     }
-    .verbund-leitung .leitung-text, .verbund-leitung.gabel .leitung-text {
-        position: static; transform: none; margin-left: calc(50% + 12px); background: none;
-    }
-    .verbund-leitung { justify-content: flex-start; }
-    /* Reihenfolge: Power BI nach dem Login, mit eigener Leitung davor */
-    .verbund-knoten[style*="au"] { margin-top: 10px; }
+    .verbund-leitung .leitung-text { position: static; transform: none; margin-left: calc(50% + 12px); width: auto; text-align: left; }
+    /* Reihenfolge: Browser → Vercel → Datenbank → Anmeldung, GitHub mit Abstand darunter */
+    .verbund-knoten[style*="br"] { order: 0; } .leitung-l1 { order: 1; }
+    .verbund-knoten[style*="vc"] { order: 2; } .leitung-l3 { order: 3; }
+    .verbund-knoten[style*="db"] { order: 4; } .leitung-l4 { order: 5; }
+    .verbund-knoten[style*="au"] { order: 6; }
+    .leitung-l2 { display: none; }
+    .verbund-knoten[style*="gh"] { order: 7; margin-top: 22px; }
 }
 
 /* ---------- Datenmodell ---------- */
@@ -1917,6 +1907,17 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center;
     padding: 2px 12px; font-size: .74rem; line-height: 1.45;
 }
+/* Thema der Tabelle: farbiger Streifen oben und Farbe des Symbols */
+.gruppe-orte     { --gruppe: var(--akzent); }
+.gruppe-stoerung { --gruppe: var(--orange); }
+.gruppe-personen { --gruppe: var(--lila); }
+.gruppe-material { --gruppe: var(--gruen); }
+.gruppe-sonst    { --gruppe: var(--grau); }
+.er-tabelle { border-top: 3px solid var(--gruppe); }
+.er-tabelle .er-kopf > .bi { color: var(--gruppe); }
+.er-gruppe { display: inline-flex; align-items: center; gap: 6px; }
+.er-gruppe-farbe { width: 12px; height: 12px; border-radius: 4px; background: var(--gruppe); }
+.er-weitere { padding: 2px 12px 0 34px; font-size: .7rem; color: var(--text-leise); }
 .er-spaltenname { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .er-typ { color: var(--text-leise); font-size: .68rem; white-space: nowrap; }
 .er-ziel { display: none; }
@@ -2151,8 +2152,20 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .karten-knopf:hover { background: var(--karte-solid); }
 .karten-knopf[aria-pressed="false"] { color: var(--text-leise); }
 .karten-pin[aria-pressed="false"] { color: var(--text); }
-.karten-pin.angepinnt, .karten-pin.angepinnt:hover { background: var(--akzent); color: var(--akzent-text); border-color: transparent; }
-.karten-pin.angepinnt i { animation: pin-setzen .35s var(--weich); }
+/* Angepinnt: zart in der Akzentfarbe getönt, der Pin durchgestrichen (= Klick entfernt den Favoriten).
+   Selektor mit .explorer-buehne, weil die Bühne die Knopf-Flächen sonst überschreibt. */
+.explorer-buehne .karten-pin.angepinnt, .explorer-buehne .karten-pin.angepinnt:hover {
+    --pin-flaeche: color-mix(in srgb, var(--akzent) 16%, var(--karte-solid));
+    background: var(--pin-flaeche); color: var(--akzent); border-color: color-mix(in srgb, var(--akzent) 45%, transparent);
+}
+.explorer-buehne .karten-pin.angepinnt:hover { --pin-flaeche: color-mix(in srgb, var(--akzent) 26%, var(--karte-solid)); }
+.pin-symbol { position: relative; display: inline-grid; place-items: center; }
+.karten-pin.angepinnt .pin-symbol { animation: pin-setzen .35s var(--weich); }
+.karten-pin.angepinnt .pin-symbol::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 2px; height: 22px; border-radius: 2px;
+    background: currentColor; box-shadow: 0 0 0 1.5px var(--pin-flaeche);
+    transform: translate(-50%, -50%) rotate(-45deg);
+}
 @keyframes pin-setzen { from { transform: translateY(-6px) rotate(-20deg); } to { transform: none; } }
 .karten-hinweis {
     position: absolute; top: 62px; right: 14px; z-index: 6; max-width: min(320px, calc(100% - 28px));
@@ -2327,3 +2340,68 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* 2D → 3D: „3D“ ist sofort gewählt und pulsiert leicht, bis die Szene bereit ist */
 .raum-schalter button.wird-geladen { animation: laedt-puls .8s ease-in-out infinite alternate; }
 @keyframes laedt-puls { to { opacity: .55; } }
+
+/* =====================================================================
+ * Mitarbeiter (app/mitarbeiter/) – Teamliste und Chat
+ * ================================================================== */
+.avatar {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: .74rem; font-weight: 700; letter-spacing: .02em;
+    background: var(--akzent-zart); color: var(--akzent);
+}
+.mitarbeiter-name { display: flex; gap: 10px; align-items: flex-start; }
+.mitarbeiter-name strong { font-weight: 600; }
+.mitarbeiter-tabelle td { vertical-align: middle; }
+.mitarbeiter-tabelle tr.ich td { background: color-mix(in srgb, var(--akzent) 6%, transparent); }
+.mitarbeiter-tabelle tr.im-chat td { background: var(--akzent-zart); }
+.ich-marke {
+    margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: .66rem; font-weight: 700;
+    background: var(--akzent); color: var(--akzent-text); vertical-align: 1px;
+}
+.mitarbeiter-offen { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.mitarbeiter-offen .mini-balken { min-width: 48px; width: 48px; flex: none; }
+.mitarbeiter-schreiben { width: 34px; height: 34px; color: var(--akzent); }
+
+/* Chat: auf großen Bildschirmen bleibt er beim Scrollen der Liste sichtbar */
+@media (min-width: 1200px) { .chat { position: sticky; top: 20px; } }
+.chat { display: flex; flex-direction: column; }
+.chat-offen { height: min(640px, calc(100dvh - 40px)); }
+.chat-leer { text-align: center; padding: 24px 8px; color: var(--text-leise); }
+.chat-leer > .bi { font-size: 2rem; display: block; margin-bottom: 8px; color: var(--akzent); }
+.chat-hinweis { color: var(--text-leise); font-size: .85rem; text-align: center; margin: 20px 0; }
+.chat-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.chat-liste button {
+    width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+    padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text);
+    transition: background-color var(--uebergang);
+}
+.chat-liste button:hover, .chat-liste button:focus-visible { background: var(--fuellung); }
+.chat-liste button.ungelesen strong { font-weight: 700; }
+.chat-treffer { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--linie); }
+.chat-zeile { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat-vorschau { font-size: .82rem; color: var(--text-leise); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-zahl {
+    flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+    display: grid; place-items: center; font-size: .7rem; font-weight: 700; color: #fff; background: var(--rot);
+}
+.chat-kopf { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--linie); }
+.chat-partner { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.chat-verlauf {
+    flex: 1; min-height: 160px; overflow-y: auto; overscroll-behavior: contain;
+    display: flex; flex-direction: column; gap: 6px; padding: 14px 2px;
+}
+.chat-tag { align-self: center; font-size: .7rem; color: var(--text-leise); padding: 2px 10px; border-radius: 999px; background: var(--fuellung); margin: 6px 0; }
+.chat-blase {
+    align-self: flex-start; max-width: 82%;
+    padding: 8px 12px; border-radius: 16px 16px 16px 4px;
+    background: var(--karte-solid); border: 1px solid var(--linie);
+    display: flex; flex-direction: column; gap: 2px;
+    animation: hochgleiten .25s var(--weich) backwards;
+}
+.chat-blase.meine { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: var(--akzent); border-color: transparent; color: var(--akzent-text); }
+.chat-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.4; }
+.chat-zeit { align-self: flex-end; font-size: .66rem; opacity: .7; display: inline-flex; gap: 4px; align-items: center; }
+.chat-eingabe { display: flex; gap: 8px; align-items: flex-end; padding-top: 12px; border-top: 1px solid var(--linie); }
+.chat-eingabe textarea { resize: none; min-height: 40px; max-height: 120px; field-sizing: content; border-radius: 20px; padding: 8px 14px; }
+.chat-senden { flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; }

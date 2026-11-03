@@ -1052,7 +1052,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
   useFrame((_, dt) => {
     const ziel = flach ? 1 : 0;
     if (!welt.current || flachStand.current === ziel) return;
-    const schritt = Math.min(dt, 1 / 30) / (ziel ? 0.9 : 1.3);
+    const schritt = vorschau ? 1 : Math.min(dt, 1 / 30) / (ziel ? 0.9 : 1.3);   // unsichtbar: sofort
     flachStand.current = ziel ? Math.min(1, flachStand.current + schritt) : Math.max(0, flachStand.current - schritt);
     welt.current.scale.y = 1 - 0.985 * easing(flachStand.current);
     if (flachStand.current === 1) onFlachFertig?.();   // ganz flach → jetzt darf die 2D-Zeichnung überblenden
@@ -1471,6 +1471,13 @@ export default function Werk3D(props) {
   // Unsichtbar vorbereitete Szene (vorschau): nach den ersten Bildern anhalten, bis sie gebraucht wird –
   // so zeichnet im Hintergrund nichts, während man noch über die Landkarte fährt
   const [pause, setPause] = useState(false);
+  // Wird eine Szene unsichtbar vorbereitet bzw. behalten: Kamera senkrecht von oben, Gebäude flach, wenn sie
+  // beim Umschalten 2D → 3D erst wachsen sollen (aufbauen) – so passt sie deckungsgleich zur Zeichnung
+  useEffect(() => {
+    if (!vorschau) return;
+    setKamera('oben');
+    setFlach(Boolean(aufbauen));
+  }, [vorschau, aufbauen]);
   // Ändert sich die vorbereitete Ebene (z. B. andere Halle), kurz weiterzeichnen – die Kamera springt dorthin
   useEffect(() => {
     if (!vorschau || !fertig) { setPause(false); return undefined; }

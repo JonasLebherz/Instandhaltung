@@ -4,13 +4,11 @@
  * Prüft gleichzeitig:
  *  - Supabase-Datenbank: Abfrage mit Zeitmessung, Region und Verbindungsart (Port)
  *  - Supabase-Login:     Gesundheits-Schnittstelle des Login-Dienstes
- *  - Vercel:             läuft diese App dort? Welcher Stand (Commit) ist veröffentlicht?
- *  - GitHub:             neuester Stand im Repository (nur bei öffentlichem Repository lesbar)
- *  - Claude / Codex:     Anteil der letzten Commits, die von KI-Assistenten stammen
- *  - Power BI:           sind die Views für Power BI vorhanden?
+ *  - Vercel:             läuft diese App dort? In welcher Region?
+ *  - GitHub:             ist der Code dort und wird er über Vercel veröffentlicht?
  *
  * Jede Prüfung liefert { status: 'ok' | 'warnung' | 'fehler' | 'unbekannt', … }.
- * Es werden nie Zugangsdaten ausgegeben – nur Regionen, Zeiten und Commit-Infos.
+ * Es werden nie Zugangsdaten ausgegeben – nur Regionen und Zeiten.
  */
 import { sql } from '@/lib/db';
 import { aktuellerBenutzer, loginAktiv } from '@/lib/auth';
@@ -58,7 +56,7 @@ export async function GET() {
   const zweig = env.VERCEL_GIT_COMMIT_REF ?? null;
   const veroeffentlicht = env.VERCEL_GIT_COMMIT_SHA ?? null;
 
-  const [datenbank, login, githubStand, powerbi] = await Promise.all([
+  const [datenbank, login, githubStand] = await Promise.all([
     // 1. Datenbank
     pruefen(async () => {
       const [z] = await sql`SELECT current_setting('server_version') AS version, pg_database_size(current_database())::bigint AS groesse`;
@@ -80,70 +78,27 @@ export async function GET() {
       return { status: 'ok', version: daten.version ?? null };
     }),
 
-    // 3. GitHub: neuester Commit des Zweigs und die letzten Commits (für Claude/Codex)
+    // 3. GitHub: neuester Stand des Zweigs (nur bei öffentlichem Repository lesbar)
     pruefen(async () => {
       if (!repo) return { status: 'unbekannt', grund: 'lokal' };
-      const antwort = await github(`/repos/${repo}/commits?sha=${encodeURIComponent(zweig ?? '')}&per_page=30`);
-      if (antwort.status === 404) return { status: 'unbekannt', grund: 'privat', repo, zweig };
-      if (antwort.status === 403 || antwort.status === 429) return { status: 'unbekannt', grund: 'limit', repo, zweig };
-      if (!antwort.ok) return { status: 'fehler', meldung: `HTTP ${antwort.status}`, repo, zweig };
-      const commits = (await antwort.json()).map((c) => ({
-        sha: c.sha, nachricht: c.commit?.message ?? '', datum: c.commit?.committer?.date ?? null,
-      }));
-      return { status: 'ok', repo, zweig, commits };
-    }),
-
-    // 4. Power BI: Views vorhanden?
-    pruefen(async () => {
-      const views = await sql`
-        SELECT c.relname AS name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = 'public' AND c.relkind = 'v' ORDER BY c.relname`;
-      return { status: views.length > 0 ? 'ok' : 'warnung', views: views.map((v) => v.name) };
+      const antwort = await github(`/repos/${repo}/commits?sha=${encodeURIComponent(zweig ?? '')}&per_page=1`);
+      if (antwort.status === 404) return { status: 'unbekannt', grund: 'privat' };
+      if (antwort.status === 403 || antwort.status === 429) return { status: 'unbekannt', grund: 'limit' };
+      if (!antwort.ok) return { status: 'fehler', meldung: `HTTP ${antwort.status}` };
+      const [neuester] = await antwort.json();
+      return { status: !veroeffentlicht || neuester?.sha === veroeffentlicht ? 'ok' : 'warnung' };
     }),
   ]);
 
   // Vercel: Angaben stellt Vercel selbst als Umgebungsvariablen bereit
-  const vercel = env.VERCEL
-    ? {
-      status: 'ok', umgebung: env.VERCEL_ENV ?? null, region: env.VERCEL_REGION ?? null,
-      commit: veroeffentlicht, nachricht: (env.VERCEL_GIT_COMMIT_MESSAGE ?? '').split('\n')[0] || null,
-      autor: env.VERCEL_GIT_COMMIT_AUTHOR_LOGIN ?? env.VERCEL_GIT_COMMIT_AUTHOR_NAME ?? null, repo, zweig,
-    }
-    : { status: 'warnung', grund: 'lokal' };
+  const vercel = env.VERCEL ? { status: 'ok', region: env.VERCEL_REGION ?? null } : { status: 'warnung', grund: 'lokal' };
 
-  // GitHub → Vercel: Ist der neueste Stand von GitHub schon veröffentlicht?
-  let githubErgebnis = { ...githubStand };
-  if (githubStand.status === 'ok') {
-    const neuester = githubStand.commits[0];
-    githubErgebnis = {
-      status: !veroeffentlicht || neuester?.sha === veroeffentlicht ? 'ok' : 'warnung',
-      repo, zweig, ms: githubStand.ms,
-      neuester: neuester ? { sha: neuester.sha, nachricht: neuester.nachricht.split('\n')[0], datum: neuester.datum } : null,
-      aktuell: !veroeffentlicht || neuester?.sha === veroeffentlicht,
-    };
-  } else if (githubStand.grund === 'privat' || githubStand.grund === 'limit') {
-    // Privat oder Limit: GitHub ist trotzdem verbunden, wenn Vercel einen Commit kennt
-    githubErgebnis = { ...githubStand, status: veroeffentlicht ? 'ok' : 'unbekannt' };
-  }
-
-  // Claude & Codex: Wer hat die letzten Commits geschrieben? (Kennung in der Commit-Nachricht)
-  const commits = githubStand.commits ?? [];
-  const vonClaude = commits.filter((c) => /claude/i.test(c.nachricht));
-  const vonCodex = commits.filter((c) => /codex/i.test(c.nachricht));
-  const ki = commits.length > 0
-    ? {
-      status: vonClaude.length + vonCodex.length > 0 ? 'ok' : 'unbekannt',
-      anzahl: commits.length, claude: vonClaude.length, codex: vonCodex.length,
-      zuletzt: vonClaude[0]?.datum ?? vonCodex[0]?.datum ?? null,
-    }
-    : {
-      status: /claude|codex/i.test(env.VERCEL_GIT_COMMIT_MESSAGE ?? '') ? 'ok' : 'unbekannt',
-      grund: repo ? 'nur-vercel' : 'lokal',
-      letzterVonKi: /claude|codex/i.test(env.VERCEL_GIT_COMMIT_MESSAGE ?? ''),
-    };
+  // Privat oder Abfragegrenze: GitHub ist trotzdem verbunden, wenn Vercel einen veröffentlichten Stand kennt
+  const githubErgebnis = githubStand.grund === 'privat' || githubStand.grund === 'limit'
+    ? { ...githubStand, status: veroeffentlicht ? 'ok' : 'unbekannt' } : githubStand;
 
   return Response.json({
     zeit: new Date().toISOString(),
-    knoten: { ki, github: githubErgebnis, vercel, datenbank, login, powerbi },
+    knoten: { github: githubErgebnis, vercel, datenbank, login },
   }, { headers: { 'Cache-Control': 'no-store' } });
 }

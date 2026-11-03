@@ -190,8 +190,16 @@ export default function KartenExplorer({
     let wahl = start.ansicht === '2d' || start.ansicht === '3d' ? start.ansicht : null;
     try { wahl ??= localStorage.getItem('kartenansicht'); } catch { /* z. B. privater Modus */ }
     const drei = kann && (wahl ? wahl === '3d' : window.innerWidth >= 768);
-    setDreiD(drei);
     if (drei) dreiDVorladen();
+    // Werk bzw. Halle in 3D: sofort den 2D-Plan zeigen und die 3D-Szene darüber einblenden, sobald sie fertig
+    // ist (wie beim Umschalten 2D → 3D) – statt einer leeren Fläche, solange die Szene aufgebaut wird
+    if (drei && ebene.standortId && !ruhig()) {
+      setAufbau(ebene);
+      setVorbereitung(ebene);
+      return;
+    }
+    setDreiD(drei);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const ruhig = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   // Favoriten: Adressen der angepinnten Ansichten (für den Zustand des Pin-Knopfs)
@@ -229,9 +237,10 @@ export default function KartenExplorer({
       dreiDVorladen();
       ton('sanft');
       // Schon im Hintergrund vorbereitet (siehe „Vorwärmen“ unten)? Dann sofort überblenden – kein Warten
+      // (auch eine nach 3D → 2D behaltene Szene desselben Werks zählt – sie springt dann zur richtigen Halle)
       const fertigVorbereitet = bereit.current.has(raumSchluessel(ebene))
-        && vorbereitung?.standortId === ebene.standortId && (vorbereitung?.gebaeudeId ?? null) === (ebene.gebaeudeId ?? null);
-      if (fertigVorbereitet) { aufbauFertig(ebene); return; }
+        && [vorbereitung, ...behalten].some((e) => e?.standortId === ebene.standortId);
+      if (fertigVorbereitet) { setVorbereitung(ebene); aufbauFertig(ebene); return; }
       setAufbau(ebene);
       setVorbereitung(ebene);
       return;
@@ -241,6 +250,12 @@ export default function KartenExplorer({
   }
   // 2D → 3D: Ebene, deren Szene gerade (flach) vorbereitet wird; Sicherheitsnetz nach 5 s
   const [aufbau, setAufbau] = useState(null);
+  // Behaltene 3D-Szenen: Nach dem Verlassen (3D → 2D, Herauszoomen, Favorit) wird eine Szene nicht abgebaut,
+  // sondern bleibt unsichtbar und angehalten erhalten. Das Abbauen einer Szene friert den Browser spürbar ein
+  // (Aufräumen aller Formen und Texturen) – und beim Zurückwechseln müsste sie neu aufgebaut werden.
+  // Höchstens zwei bleiben; ältere werden erst abgebaut, wenn Ruhe ist.
+  const [behalten, setBehalten] = useState([]);
+  const behalte = (e) => setBehalten((alt) => [e, ...alt.filter((x) => x.standortId !== e.standortId)]);
   const raumSchluessel = (e) => `raum-${e.standortId}`;
   function aufbauFertig(ziel = aufbau) {
     if (!ziel) return;
@@ -256,6 +271,13 @@ export default function KartenExplorer({
     const notfall = setTimeout(() => aufbauRef.current(), 5000);
     return () => clearTimeout(notfall);
   }, [aufbau]);
+  useEffect(() => {
+    if (uebergang || behalten.length <= 2) return undefined;
+    const spaeter = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1500));
+    const abbrechen = window.cancelIdleCallback ?? clearTimeout;
+    const id = spaeter(() => setBehalten((alt) => alt.slice(0, 2)), { timeout: 4000 });
+    return () => abbrechen(id);
+  }, [uebergang, behalten]);
   function abbrechenZuZeichnung() {
     if (!zuZeichnung.current) return;
     clearTimeout(zuZeichnung.current.notfall);
@@ -275,6 +297,7 @@ export default function KartenExplorer({
     setUebergang({ von: laufend.ebene, vonSchluessel: schluesselVon(laufend.ebene), vonRaum: true, richtung: 'blende', dauer: 700 });
     setDreiD(false);
     setVerlassen(null);
+    behalte(laufend.ebene);
   }
   // Schlüssel der 2D-Ebene, die aus 3D heraus entstanden ist: Ihre Kacheln fliegen nicht noch einmal herein
   // (bleibt so, solange die Ebene besteht – ein Entfernen der Klasse würde die Animation neu starten)
@@ -363,6 +386,7 @@ export default function KartenExplorer({
     setAufbau(null);
     if (schluesselVon(neueEbene) === ohneEinblenden) setOhneEinblenden(null);   // neu hinein: wieder mit Einblenden
     const vonRaum = istRaum(ebene);
+    if (vonRaum) behalte(ebene);
     // Aus 3D heraus ins Land: Kamera steigt in die Vogelperspektive, gleichzeitig zoomt die Karte heraus
     if (vonRaum && richtung === 'raus' && !ruhig()) setVerlassen('hoch');
     ton(richtung);
@@ -538,6 +562,7 @@ export default function KartenExplorer({
     setVerlassen(null);
     setVorbereitung(null);
     setWartet(null);
+    if (istRaum(ebene)) behalte(ebene);
     setUebergang({ von: ebene, vonSchluessel: schluesselVon(ebene), vonRaum: istRaum(ebene), richtung: 'sprung', dauer: 500 });
     setDreiD(drei);
     setEbene(zielEbene);
@@ -664,8 +689,11 @@ export default function KartenExplorer({
           ...(uebergang && uebergang.vonSchluessel !== schluessel
             ? [{ e: uebergang.von, schl: uebergang.vonSchluessel, raum3d: uebergang.vonRaum, rolle: 'alt' }] : []),
           // unsichtbar vorbereitetes 3D-Werk (wird beim Wechsel zur neuen Ebene – gleicher Schlüssel, kein Neuaufbau)
-          ...(vorbereitung && raumMoeglich && raumSchluessel(vorbereitung) !== schluessel && raumSchluessel(vorbereitung) !== uebergang?.vonSchluessel
-            ? [{ e: vorbereitung, schl: raumSchluessel(vorbereitung), raum3d: true, rolle: 'vorschau' }] : []),
+          // sowie behaltene Szenen (siehe „behalten“) – alle unsichtbar und angehalten
+          ...(raumMoeglich ? [vorbereitung, ...behalten].filter(Boolean)
+            .filter((e, i, liste) => liste.findIndex((x) => x.standortId === e.standortId) === i)
+            .filter((e) => raumSchluessel(e) !== schluessel && raumSchluessel(e) !== uebergang?.vonSchluessel)
+            .map((e) => ({ e, schl: raumSchluessel(e), raum3d: true, rolle: 'vorschau' })) : []),
           { e: ebene, schl: schluessel, raum3d: raum, rolle: 'neu' },
         ].map(({ e, schl, raum3d, rolle }) => {
           const aktiv = rolle === 'neu';
@@ -709,7 +737,8 @@ export default function KartenExplorer({
                     aria-pressed={Boolean(angepinnt)} onClick={pinnen}
                     aria-label={angepinnt ? t('Aus den Favoriten entfernen') : t('Diese Ansicht anpinnen')}
                     title={angepinnt ? t('Aus den Favoriten entfernen') : t('Diese Ansicht anpinnen')}>
-              <i className={`bi ${angepinnt ? 'bi-pin-angle-fill' : 'bi-pin-angle'}`} aria-hidden="true" />
+              {/* Angepinnt: Pin durchgestrichen (Strich per CSS) – Klick entfernt den Favoriten */}
+              <span className="pin-symbol" aria-hidden="true"><i className="bi bi-pin-angle" /></span>
             </button>
           )}
           {raumMoeglich && (stufeName === 'werk' || stufeName === 'gebaeude') && (

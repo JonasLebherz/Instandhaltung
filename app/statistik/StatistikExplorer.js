@@ -35,7 +35,6 @@ const SCHICHTEN = [
   { name: T('Spätschicht'), zeit: '14–22', passt: (h) => h >= 14 && h < 22 },
   { name: T('Nachtschicht'), zeit: '22–6', passt: (h) => h >= 22 || h < 6 },
 ];
-const BLOECKE = [0, 3, 6, 9, 12, 15, 18, 21];   // Uhrzeit in 3-Stunden-Blöcken
 // Alter offener Aufträge in Tagen
 const ALTERSSTUFEN = [
   { name: T('unter 1 Tag'), ab: 0, bis: 1 }, { name: T('1–3 Tage'), ab: 1, bis: 3 }, { name: T('3–7 Tage'), ab: 3, bis: 7 },
@@ -121,7 +120,6 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
       .sort((x, y) => y.anzahl - x.anzahl);
 
     // Wochentag (1 = Montag) × 3-Stunden-Block
-    const heat = Array.from({ length: 7 }, (_, tag) => BLOECKE.map((b) => liste.filter((e) => e.wochentag === tag + 1 && e.stunde >= b && e.stunde < b + 3).length));
 
     // Prioritäten und Schichten
     const prioritaeten = Object.keys(PRIORITAET_LISTE).map((p) => ({ prioritaet: p, anzahl: liste.filter((e) => e.prioritaet === p).length }));
@@ -195,7 +193,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     }).filter((st) => st.maschinen > 0);
 
     return {
-      liste, maschinenAnzahl: maschinenIds.size, kennzahlen, proMonat, ursachen, heat, prioritaeten, schichten, proTechniker, ersatzteile,
+      liste, maschinenAnzahl: maschinenIds.size, kennzahlen, proMonat, ursachen, prioritaeten, schichten, proTechniker, ersatzteile,
       verfuegbarkeit, reaktion, reaktionGesamt, pareto, ausfallTyp, alter, wiederholt, nachAlter,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -493,22 +491,12 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             </div>
           </div>
 
-          {/* Ursachen und Wochentag × Uhrzeit */}
-          <div className="row g-4">
-            <div className="col-lg-5">
-              <section className="karte" style={{ '--i': 9 }}>
-                <h2 className="abschnitt-titel">{t('Störursachen')}</h2>
-                <Diagramm art="balken" labels={a.ursachen.map((u) => t(u.ursache))} werte={a.ursachen.map((u) => u.anzahl)} hoehe={300}
-                          einheit={t('Störungen')} spalte={t('Ursache')} beschreibung={t('Balkendiagramm: Störungen nach Ursache')} />
-              </section>
-            </div>
-            <div className="col-lg-7">
-              <section className="karte" style={{ '--i': 10 }}>
-                <h2 className="abschnitt-titel">{t('Wann treten Störungen auf?')}</h2>
-                <Heatmap heat={a.heat} t={t} />
-              </section>
-            </div>
-          </div>
+          {/* Ursachen */}
+          <section className="karte" style={{ '--i': 9 }}>
+            <h2 className="abschnitt-titel">{t('Störursachen')}</h2>
+            <Diagramm art="balken" labels={a.ursachen.map((u) => t(u.ursache))} werte={a.ursachen.map((u) => u.anzahl)} hoehe={260}
+                      einheit={t('Störungen')} spalte={t('Ursache')} beschreibung={t('Balkendiagramm: Störungen nach Ursache')} />
+          </section>
 
           {/* Prioritäten und Schichten */}
           <div className="row g-4">
@@ -677,54 +665,5 @@ function BalkenListe({ zeilen }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-/**
- * Wochentag × Uhrzeit: je dunkler ein Feld, desto mehr Störungen wurden in
- * diesem 3-Stunden-Block gemeldet. Eine Farbe, fünf Stufen; Werte im Tooltip
- * und in der Tabelle darunter.
- */
-function Heatmap({ heat, t }) {
-  const max = Math.max(1, ...heat.flat());
-  const tagFormat = new Intl.DateTimeFormat(t.locale, { weekday: 'short', timeZone: 'UTC' });
-  const tage = Array.from({ length: 7 }, (_, i) => tagFormat.format(new Date(Date.UTC(2026, 0, 5 + i))));   // 05.01.2026 = Montag
-  const stufeVon = (n) => (n === 0 ? 0 : Math.max(1, Math.ceil((n / max) * 4)));
-  const block = (b) => `${b}–${b + 3}`;
-  return (
-    <>
-      <div className="heatmap" role="img" aria-label={t('Wochentag und Uhrzeit der Störungen')}>
-        <span />
-        {BLOECKE.map((b) => <span key={b} className="heat-kopf">{b}</span>)}
-        {heat.map((zeile, tag) => (
-          <div key={tage[tag]} className="d-contents">
-            <span className="heat-tag">{tage[tag]}</span>
-            {zeile.map((n, i) => (
-              <span key={BLOECKE[i]} className={`heat-zelle s${stufeVon(n)}`}
-                    title={t('{tag}, {zeit} Uhr: {n} Störungen', { tag: tage[tag], zeit: block(BLOECKE[i]), n })} />
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="heat-legende" aria-hidden="true">
-        <span>{t('wenige')}</span>
-        {[0, 1, 2, 3, 4].map((x) => <i key={x} className={`heat-zelle s${x}`} />)}
-        <span>{t('viele Störungen')}</span>
-        <span className="ms-auto">{t('Uhrzeit (deutsche Zeit)')}</span>
-      </div>
-      <details className="mt-2">
-        <summary className="klein">{t('Als Tabelle anzeigen')}</summary>
-        <div className="tabelle-rahmen">
-          <table className="tabelle mt-2">
-            <thead><tr><th>{t('Tag')}</th>{BLOECKE.map((b) => <th key={b} className="zahl">{block(b)}</th>)}</tr></thead>
-            <tbody>
-              {heat.map((zeile, tag) => (
-                <tr key={tage[tag]}><td>{tage[tag]}</td>{zeile.map((n, i) => <td key={BLOECKE[i]} className="zahl">{n}</td>)}</tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
-    </>
   );
 }

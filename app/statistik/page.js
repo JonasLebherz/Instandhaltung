@@ -100,14 +100,13 @@ export default async function StatistikSeite({ searchParams }) {
       JOIN land l      ON l.kuerzel = st.land_kuerzel
       ORDER BY l.hauptsitz DESC, l.name, st.name, g.kuerzel, m.anlagennummer`,
 
-    // Jede Störmeldung des Zeitraums mit ihrem Auftrag. Monat, Wochentag und Stunde
+    // Jede Störmeldung des Zeitraums mit ihrem Auftrag. Monat und Stunde
     // nach deutscher Zeit; Reparatur- und Ausfallzeit nur für erledigte Aufträge, Reaktionszeit ab Arbeitsbeginn.
     sql`
       SELECT s.id AS meldung_id, w.id AS auftrag_id, s.maschine_id, s.zeitpunkt,
              s.prioritaet::text AS prioritaet, s.ursache_kategorie::text AS ursache,
              w.status::text AS status, w.techniker_id, left(s.beschreibung, 90) AS beschreibung,
              to_char(s.zeitpunkt AT TIME ZONE 'Europe/Berlin', 'YYYY-MM')        AS monat,
-             EXTRACT(ISODOW FROM s.zeitpunkt AT TIME ZONE 'Europe/Berlin')::int AS wochentag,
              EXTRACT(HOUR FROM s.zeitpunkt AT TIME ZONE 'Europe/Berlin')::int   AS stunde,
              CASE WHEN w.status = 'erledigt'
                   THEN EXTRACT(EPOCH FROM (w.ende_zeit - w.start_zeit)) / 60 END::float AS reparatur_min,

@@ -45,8 +45,15 @@ const BEREICHE = [
     titel: T('Instandhaltung'),
     seiten: [
       { pfad: '/melden', text: T('Störung melden'), symbol: 'bi-exclamation-triangle', symbolAktiv: 'bi-exclamation-triangle-fill' },
-      { pfad: '/auftraege', text: T('Aufträge'), symbol: 'bi-clipboard-check', symbolAktiv: 'bi-clipboard-check-fill', zaehler: true },
+      { pfad: '/auftraege', text: T('Aufträge'), symbol: 'bi-clipboard-check', symbolAktiv: 'bi-clipboard-check-fill', zaehler: 'auftraege' },
       { pfad: '/maschinen', text: T('Maschinen'), symbol: 'bi-cpu', symbolAktiv: 'bi-cpu-fill' },
+    ],
+  },
+  {
+    titel: T('Team'),
+    seiten: [
+      // zaehler 'nachrichten': rote Zahl ungelesener Nachrichten der gewählten Person
+      { pfad: '/mitarbeiter', text: T('Mitarbeiter'), symbol: 'bi-people', symbolAktiv: 'bi-people-fill', zaehler: 'nachrichten' },
     ],
   },
   {
@@ -111,6 +118,7 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
   const [fenster, setFenster] = useState(null);           // 'sprache' | 'darstellung' | 'konto' | null
   const [darstellung, setDarstellung] = useState('automatisch');
   const [offeneAuftraege, setOffeneAuftraege] = useState(null);   // Zahl neben "Aufträge"
+  const [ungelesen, setUngelesen] = useState(0);                   // Zahl neben "Mitarbeiter" (Chat)
   const [personWahl, setPersonWahl] = useState(false);            // Fenster "Person wechseln"
   const leisteRef = useRef(null);
   // Ton der Kamerafahrten in der Karte (lib/ton.js) – an/aus im Konto-Menü
@@ -147,6 +155,26 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
       .then((daten) => { if (aktuell && daten) setOffeneAuftraege(daten.anzahl); })
       .catch(() => { /* ohne Zahl weiter */ });
     return () => { aktuell = false; };
+  }, [pfad]);
+
+  // Ungelesene Nachrichten: beim Start, nach Seitenwechsel, alle 30 Sekunden, nach dem Lesen im Chat
+  // ("nachrichtenwechsel") und nach einem Personenwechsel ("favoritenwechsel", siehe PersonWahl.js)
+  useEffect(() => {
+    let aktuell = true;
+    const holen = () => fetch('/api/nachrichten', { cache: 'no-store' })
+      .then((antwort) => (antwort.ok ? antwort.json() : null))
+      .then((daten) => { if (aktuell && daten) setUngelesen(daten.ungelesen ?? 0); })
+      .catch(() => { /* ohne Zahl weiter */ });
+    // Nach einem Personenwechsel ist das Cookie erst kurz danach gesetzt
+    const spaeter = () => setTimeout(holen, 300);
+    holen();
+    const takt = setInterval(() => { if (document.visibilityState === 'visible') holen(); }, 30000);
+    window.addEventListener('nachrichtenwechsel', holen);
+    window.addEventListener('favoritenwechsel', spaeter);
+    return () => {
+      aktuell = false; clearInterval(takt);
+      window.removeEventListener('nachrichtenwechsel', holen); window.removeEventListener('favoritenwechsel', spaeter);
+    };
   }, [pfad]);
 
   // Menüs schließen bei Seitenwechsel, Klick daneben oder Escape-Taste
@@ -226,7 +254,8 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
               <ul>
                 {bereich.seiten.map((seite) => {
                   const aktiv = istAktiv(seite);
-                  const zahl = seite.zaehler && offeneAuftraege > 0 ? offeneAuftraege : null;
+                  const wert = { auftraege: offeneAuftraege, nachrichten: ungelesen }[seite.zaehler];
+                  const zahl = wert > 0 ? wert : null;
                   return [
                     <li key={seite.pfad}>
                       <Link href={seite.pfad} className={`leiste-link${aktiv ? ' aktiv' : ''}`}
@@ -235,7 +264,8 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                             onPointerEnter={seite.pfad === '/karte' || seite.pfad === '/melden' ? dreiDVorladen : undefined}
                             aria-current={aktiv ? 'page' : undefined}
                             // Eingeklappt ist der Text unsichtbar – der Name für Screenreader steht deshalb hier
-                            aria-label={zahl ? t('{seite} ({n} offen)', { seite: t(seite.text), n: zahl }) : t(seite.text)}>
+                            aria-label={!zahl ? t(seite.text) : seite.zaehler === 'nachrichten'
+                              ? t('{seite} ({n} ungelesen)', { seite: t(seite.text), n: zahl }) : t('{seite} ({n} offen)', { seite: t(seite.text), n: zahl })}>
                         <span className="leiste-symbol">
                           <i className={`bi ${aktiv ? seite.symbolAktiv : seite.symbol}`} aria-hidden="true" />
                           <LadeRing />
