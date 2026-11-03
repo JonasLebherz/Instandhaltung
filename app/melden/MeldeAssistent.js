@@ -16,7 +16,7 @@ import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeFormular from './MeldeFormular';
 import { useT } from '@/components/SpracheKontext';
 
-export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, vorauswahlStandort, vorauswahlLand = null }) {
+export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, vorauswahlStandort, vorauswahlLand = null, eigenesWerk = null }) {
   const { standorte, gebaeude, maschinen } = daten;
   const t = useT();
   const [maschineId, setMaschineId] = useState(vorauswahlMaschine);
@@ -39,7 +39,7 @@ export default function MeldeAssistent({ daten, startwerte, vorauswahlMaschine, 
   }
 
   if (!maschine) {
-    return <KartenExplorer daten={daten} modus="auswahl" start={kartenStart} onMaschine={waehleMaschine} />;
+    return <KartenExplorer daten={daten} modus="auswahl" start={kartenStart} onMaschine={waehleMaschine} eigenesWerk={eigenesWerk} />;
   }
 
   return (

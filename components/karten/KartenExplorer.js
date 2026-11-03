@@ -37,8 +37,11 @@ import { T } from '@/lib/sprache';
 import { startAusAdresse } from '@/lib/karten/adresse';
 import { laenderAus, landKarte, weltVerhaeltnis } from '@/lib/karten/laender';
 import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
-import { ton, tonAn, tonSetzen } from '@/lib/ton';
-import { favoritenLesen, favoritHinzufuegen, favoritEntfernen, FAVORITEN_WECHSEL, FAVORIT_OEFFNEN, FAVORIT_SYMBOLE, MAX_FAVORITEN } from '@/lib/favoriten';
+import { ton } from '@/lib/ton';
+import {
+  favoritenLesen, favoritHinzufuegen, favoritEntfernen, personFavorit, personAusBrowser,
+  FAVORITEN_WECHSEL, FAVORIT_OEFFNEN, FAVORIT_SYMBOLE, MAX_FAVORITEN, KARTEN_ADRESSE,
+} from '@/lib/favoriten';
 
 // 3D-Ansicht für Werk und Halle: three.js wird nur im Browser und nur bei Bedarf geladen
 const Werk3D = dynamic(() => import('./raum/Werk3D'), { ssr: false, loading: () => <div className="raum-laden" /> });
@@ -146,6 +149,8 @@ function seitenverhaeltnis(ebene, standort, gebaeude, karte, laender) {
 
 export default function KartenExplorer({
   daten, modus = 'anzeige', start = {}, onMaschine, groesse = 'gross', adresseMitfuehren = false,
+  eigenesWerk = null,   // Werk der gewählten Person (beim Melden: Hinweis, in den Listen zuerst)
+  kompakt = false,      // kleines Kartenfenster (Übersicht): ohne Info-Spalte, Pfad, Legende und Werkzeuge
 }) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
   const melden = modus === 'auswahl';   // Störung melden: eigenes Aussehen, keine Störungszahlen
@@ -174,19 +179,12 @@ export default function KartenExplorer({
     if (drei) dreiDVorladen();
   }, []);
   const ruhig = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  // Ton der Kamerafahrten an/aus (Lautsprecher-Knopf, gemerkt in lib/ton.js)
-  const [tonEin, setTonEin] = useState(true);
-  useEffect(() => {
-    const lesen = () => setTonEin(tonAn());
-    lesen();
-    window.addEventListener('kartentonwechsel', lesen);
-    return () => window.removeEventListener('kartentonwechsel', lesen);
-  }, []);
   // Favoriten: Adressen der angepinnten Ansichten (für den Zustand des Pin-Knopfs)
   const [favoriten, setFavoriten] = useState([]);
   const [pinHinweis, setPinHinweis] = useState(null);
   useEffect(() => {
-    const lesen = () => setFavoriten(favoritenLesen());
+    // Das Werk der gewählten Person zählt als Favorit („Mein Werk“, siehe lib/favoriten.js)
+    const lesen = () => setFavoriten([...[personFavorit(personAusBrowser())].filter(Boolean), ...favoritenLesen()]);
     lesen();
     window.addEventListener(FAVORITEN_WECHSEL, lesen);
     return () => window.removeEventListener(FAVORITEN_WECHSEL, lesen);
@@ -209,9 +207,35 @@ export default function KartenExplorer({
     }
     abbrechenZuZeichnung();
     setVerlassen(null);
+    // 2D → 3D: wie 3D → 2D rückwärts. Szene unsichtbar und flach von oben vorbereiten (deckungsgleich mit der
+    // Zeichnung), dann überblenden; danach wachsen die Gebäude, während die Kamera in die Schrägansicht kippt
+    if (drei && !dreiD && raumMoeglich && ebene.standortId && !ruhig()) {
+      dreiDVorladen();
+      ton('sanft');
+      setAufbau(ebene);
+      setVorbereitung(ebene);
+      return;
+    }
     setDreiD(drei);
     setUebergang(null);
   }
+  // 2D → 3D: Ebene, deren Szene gerade (flach) vorbereitet wird; Sicherheitsnetz nach 5 s
+  const [aufbau, setAufbau] = useState(null);
+  const raumSchluessel = (e) => `raum-${e.standortId}`;
+  function aufbauFertig() {
+    if (!aufbau) return;
+    setUebergang({ von: aufbau, vonSchluessel: schluesselVon(aufbau), vonRaum: false, richtung: 'blende', dauer: 700 });
+    setDreiD(true);
+    setAufbau(null);
+    setVorbereitung(null);
+  }
+  const aufbauRef = useRef(aufbauFertig);
+  aufbauRef.current = aufbauFertig;
+  useEffect(() => {
+    if (!aufbau) return undefined;
+    const notfall = setTimeout(() => aufbauRef.current(), 5000);
+    return () => clearTimeout(notfall);
+  }, [aufbau]);
   function abbrechenZuZeichnung() {
     if (!zuZeichnung.current) return;
     clearTimeout(zuZeichnung.current.notfall);
@@ -251,6 +275,7 @@ export default function KartenExplorer({
   }
   function szeneBereit(schluessel) {
     bereit.current.add(schluessel);
+    if (aufbau && raumSchluessel(aufbau) === schluessel) { aufbauFertig(); return; }
     if (wartet && schluesselVon(wartet) === schluessel) {
       const ziel = wartet;
       setWartet(null);
@@ -302,6 +327,7 @@ export default function KartenExplorer({
       return;
     }
     abbrechenZuZeichnung();   // laufendes 3D → 2D abbrechen
+    setAufbau(null);
     if (schluesselVon(neueEbene) === ohneEinblenden) setOhneEinblenden(null);   // neu hinein: wieder mit Einblenden
     const vonRaum = istRaum(ebene);
     // Aus 3D heraus ins Land: Kamera steigt in die Vogelperspektive, gleichzeitig zoomt die Karte heraus
@@ -343,7 +369,23 @@ export default function KartenExplorer({
   })();
   const angepinnt = favoriten.find((f) => f.adresse === favoritAdresse) ?? null;
   const pinRef = useRef(null);
+  // Aktuelle Ansicht melden – die Seitenleiste markiert den passenden Favoriten
+  useEffect(() => {
+    if (!adresseMitfuehren) return undefined;
+    window.kartenAdresse = favoritAdresse;
+    window.dispatchEvent(new CustomEvent(KARTEN_ADRESSE, { detail: favoritAdresse }));
+    return undefined;
+  }, [adresseMitfuehren, favoritAdresse]);
+  useEffect(() => () => {
+    if (!adresseMitfuehren) return;
+    window.kartenAdresse = null;
+    window.dispatchEvent(new CustomEvent(KARTEN_ADRESSE, { detail: null }));
+  }, [adresseMitfuehren]);
   function pinnen() {
+    if (angepinnt?.person) {
+      setPinHinweis(t('Dein Werk steht immer in den Favoriten'));
+      return;
+    }
     if (angepinnt) {
       favoritEntfernen(angepinnt.id);
       setPinHinweis(t('Aus den Favoriten entfernt'));
@@ -516,7 +558,7 @@ export default function KartenExplorer({
       {melden ? (
         <MeldeSchritte schritt={schrittNr} werte={[land && t(land.name), standort?.name, aktuellesGebaeude?.bezeichnung]}
                        onSchritt={(nr) => [zuWelt, zuLandRaus, zuStandort][nr - 1]?.()} />
-      ) : (
+      ) : kompakt ? null : (
       <nav className="brotkrumen explorer-pfad" aria-label={t('Pfad')}>
         <button type="button" onClick={zuWelt} disabled={stufeName === 'welt'}>
           <i className="bi bi-globe2" aria-hidden="true" /> {t('Weltweit')}
@@ -540,6 +582,15 @@ export default function KartenExplorer({
           </>
         )}
       </nav>
+      )}
+
+      {/* Beim Melden im eigenen Werk: kurzer Hinweis, andere Werke bleiben über die Schritt-Leiste wählbar */}
+      {melden && eigenesWerk && standort?.id === eigenesWerk && (
+        <div className="eigenes-werk-hinweis">
+          <i className="bi bi-house-door-fill" aria-hidden="true" />
+          <span>{t('Dein Werk: {name}', { name: standort.name })}</span>
+          <button type="button" className="link-knopf" onClick={zuLandRaus}>{t('anderes Werk wählen')}</button>
+        </div>
       )}
 
       {/* Weltebene: Bühne so hoch wie die (breite) Weltkarte, damit oben und unten nichts leer bleibt.
@@ -566,8 +617,8 @@ export default function KartenExplorer({
           ...(uebergang && uebergang.vonSchluessel !== schluessel
             ? [{ e: uebergang.von, schl: uebergang.vonSchluessel, raum3d: uebergang.vonRaum, rolle: 'alt' }] : []),
           // unsichtbar vorbereitetes 3D-Werk (wird beim Wechsel zur neuen Ebene – gleicher Schlüssel, kein Neuaufbau)
-          ...(vorbereitung && schluesselVon(vorbereitung) !== schluessel && schluesselVon(vorbereitung) !== uebergang?.vonSchluessel
-            ? [{ e: vorbereitung, schl: schluesselVon(vorbereitung), raum3d: true, rolle: 'vorschau' }] : []),
+          ...(vorbereitung && raumMoeglich && raumSchluessel(vorbereitung) !== schluessel && raumSchluessel(vorbereitung) !== uebergang?.vonSchluessel
+            ? [{ e: vorbereitung, schl: raumSchluessel(vorbereitung), raum3d: true, rolle: 'vorschau' }] : []),
           { e: ebene, schl: schluessel, raum3d: raum, rolle: 'neu' },
         ].map(({ e, schl, raum3d, rolle }) => {
           const aktiv = rolle === 'neu';
@@ -578,8 +629,8 @@ export default function KartenExplorer({
                    + `${aktiv && uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`
                    + `${rolle === 'alt' && uebergang?.richtung === 'raus' ? ' ebene-weich' : ''}`
                    + `${schl === ohneEinblenden ? ' ohne-einblenden' : ''}`
-                   // Hinein ins 3D-Werk: weiche Ränder, solange die Szene noch klein ist (kein hartes Rechteck)
-                   + `${aktiv && raum3d && uebergang?.richtung === 'rein' ? ' ebene-weich-ein' : ''}`}
+                   // Hineinzoomen (alle Ebenen): weiche, runde Ränder, solange die neue Ebene noch klein ist – kein Rechteck
+                   + `${aktiv && uebergang?.richtung === 'rein' ? ' ebene-weich-ein' : ''}`}
                  style={aktiv && uebergang ? { '--uebergang-dauer': `${uebergang.dauer}ms` } : undefined}>
               {raum3d ? (
                 <>
@@ -591,7 +642,7 @@ export default function KartenExplorer({
                   </div>
                   <Werk3D standort={standortVon(e)} {...werkDaten(e.standortId)} gebaeudeId={e.gebaeudeId}
                           verlassen={rolle === 'alt' ? { blende: 'flach', sprung: null }[uebergang?.richtung] ?? 'hoch' : aktiv ? verlassen : null}
-                          vorschau={rolle === 'vorschau'} onFlach={aktiv ? zeichnungUeberblenden : undefined} starten={aktiv && !uebergang} onBereit={() => szeneBereit(schl)}
+                          vorschau={rolle === 'vorschau'} aufbauen={rolle === 'vorschau' && aufbau !== null} onFlach={aktiv ? zeichnungUeberblenden : undefined} starten={aktiv && !uebergang} onBereit={() => szeneBereit(schl)}
                           maschineId={aktiv ? maschineId : null} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
                 </>
               ) : ebeneZeichnen(e, aktiv)}
@@ -599,15 +650,10 @@ export default function KartenExplorer({
           );
         })}
 
-        {/* Oben rechts: Ton an/aus, Ansicht anpinnen (nicht beim Melden) und Umschalter 2D / 3D (nur Werk und Halle) */}
-        <div className="karten-werkzeuge">
-          <button type="button" className="rund-knopf karten-knopf" aria-pressed={tonEin}
-                  onClick={() => { tonSetzen(!tonEin); if (!tonEin) setTimeout(() => ton('sanft'), 0); }}
-                  aria-label={tonEin ? t('Ton der Kamerafahrten ausschalten') : t('Ton der Kamerafahrten einschalten')}
-                  title={tonEin ? t('Ton aus') : t('Ton an')}>
-            <i className={`bi ${tonEin ? 'bi-volume-up' : 'bi-volume-mute'}`} aria-hidden="true" />
-          </button>
-          {!melden && (
+        {/* Oben rechts: Ansicht anpinnen (ab Land, nicht beim Melden) und Umschalter 2D / 3D (nur Werk und Halle); Ton im Konto-Menü */}
+        {!kompakt && <div className="karten-werkzeuge">
+          {/* Pin erst ab Land – die Weltkarte ist ohnehin der Start */}
+          {!melden && stufeName !== 'welt' && (
             <button type="button" ref={pinRef} className={`rund-knopf karten-knopf karten-pin${angepinnt ? ' angepinnt' : ''}`}
                     aria-pressed={Boolean(angepinnt)} onClick={pinnen}
                     aria-label={angepinnt ? t('Aus den Favoriten entfernen') : t('Diese Ansicht anpinnen')}
@@ -621,12 +667,15 @@ export default function KartenExplorer({
               <button type="button" aria-pressed={dreiD} onClick={() => ansichtWaehlen(true)}>3D</button>
             </div>
           )}
-        </div>
+        </div>}
         {pinHinweis && <div className="karten-hinweis" role="status">{pinHinweis}</div>}
       </div>
-      {!melden && <Legende />}
+      {!melden && !kompakt && <Legende />}
     </div>
   );
+
+  // Kleines Kartenfenster (Übersicht): nur die Bühne
+  if (kompakt) return <div className="explorer-kompakt">{buehne}</div>;
 
   return (
     <div className={`row g-4${melden ? ' explorer-melden' : ''}`}>
@@ -639,7 +688,7 @@ export default function KartenExplorer({
                       laender={laender} land={land} webgl={webgl}
                       standort={standort} gebaeudeAktuell={aktuellesGebaeude} maschineId={maschineId}
                       onLand={zuLand} onWerk={zuWerk} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt}
-                      onAuswahlAufheben={() => setMaschineId(null)} />
+                      onAuswahlAufheben={() => setMaschineId(null)} eigenesWerk={eigenesWerk} />
         </div>
       </div>
     </div>
@@ -651,16 +700,19 @@ export default function KartenExplorer({
  * ================================================================== */
 function InfoSpalte({
   stufe: ebeneName, modus, daten, laender, land, standort, gebaeudeAktuell, maschineId, webgl,
-  onLand, onWerk, onGebaeude, onMaschine, onAuswahlAufheben,
+  onLand, onWerk, onGebaeude, onMaschine, onAuswahlAufheben, eigenesWerk = null,
 }) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
   const t = useT();
 
   /* ---------- Ebene Welt: alle Länder ---------- */
   if (ebeneName === 'welt') {
-    const sortiert = modus === 'auswahl'
-      ? laender
-      : [...laender].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || Number(b.hauptsitz) - Number(a.hauptsitz));
+    const eigenesLand = standorte.find((st) => st.id === eigenesWerk)?.land ?? null;
+    const sortiert = (modus === 'auswahl'
+      ? [...laender]
+      : [...laender].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || Number(b.hauptsitz) - Number(a.hauptsitz)))
+      // Land der gewählten Person zuerst
+      .sort((a, b) => Number(b.kuerzel === eigenesLand) - Number(a.kuerzel === eigenesLand));
     return (
       <section className="karte explorer-seite" style={{ '--i': 1 }}>
         <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Land aus der Liste wählen') : t('Länder')}</h2>
@@ -672,6 +724,7 @@ function InfoSpalte({
                   <span className="ort-titel">
                     {t(l.name)}
                     {l.hauptsitz && <span className="hauptsitz-abzeichen"><i className="bi bi-star-fill" aria-hidden="true" /> {t('Hauptsitz')}</span>}
+                    {l.kuerzel === eigenesLand && <span className="hauptsitz-abzeichen eigenes-abzeichen"><i className="bi bi-house-door-fill" aria-hidden="true" /> {t('Dein Land')}</span>}
                   </span>
                   <span className="ort-unter">
                     {l.werke === 1 ? t('1 Werk') : t('{n} Werke', { n: l.werke })} · {t('{n} Maschinen', { n: l.maschinen })}
@@ -691,9 +744,11 @@ function InfoSpalte({
   /* ---------- Ebene Land: Werke des Landes ---------- */
   if (ebeneName === 'land' && land) {
     const werkeHier = standorte.filter((st) => st.land === land.kuerzel);
-    const sortiert = modus === 'auswahl'
+    const sortiert = (modus === 'auswahl'
       ? [...werkeHier].sort((a, b) => a.stadt.localeCompare(b.stadt))
-      : [...werkeHier].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || a.stadt.localeCompare(b.stadt));
+      : [...werkeHier].sort((a, b) => b.offen - a.offen || b.hoch - a.hoch || a.stadt.localeCompare(b.stadt)))
+      // Werk der gewählten Person zuerst
+      .sort((a, b) => Number(b.id === eigenesWerk) - Number(a.id === eigenesWerk));
     return (
       <section className="karte explorer-seite" style={{ '--i': 1 }}>
         <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Werk aus der Liste wählen') : t('Standorte')}</h2>
@@ -702,7 +757,10 @@ function InfoSpalte({
             <li key={st.id}>
               <button type="button" onClick={() => onWerk(st)} className={modus === 'auswahl' ? '' : `stufe-${stufe(st.offen, st.hoechste_prioritaet)}`}>
                 <span>
-                  <span className="ort-titel">{st.name}</span>
+                  <span className="ort-titel">
+                    {st.name}
+                    {st.id === eigenesWerk && <span className="hauptsitz-abzeichen eigenes-abzeichen"><i className="bi bi-house-door-fill" aria-hidden="true" /> {t('Dein Werk')}</span>}
+                  </span>
                   <span className="ort-unter">{t(st.schwerpunkt)} · {t('{n} Gebäude', { n: st.gebaeude })} · {t('{n} Maschinen', { n: st.maschinen })}</span>
                 </span>
                 {modus === 'auswahl'
@@ -822,7 +880,10 @@ function InfoSpalte({
         {offeneDerMaschine.length === 0
           ? <p className="text-leise"><i className="bi bi-check-circle me-1" style={{ color: 'var(--gruen)' }} />{t('Die Maschine läuft störungsfrei.')}</p>
           : <OffeneListe auftraege={offeneDerMaschine} />}
-        <Link href={`/melden?maschine=${auswahl.id}`} className="btn btn-primary w-100 mt-3">
+        <Link href={`/maschinen/${auswahl.id}`} className="btn btn-outline-secondary w-100 mt-3 maschinenhistorie-link">
+          <i className="bi bi-clock-history" aria-hidden="true" /> {t('Maschinenhistorie')}
+        </Link>
+        <Link href={`/melden?maschine=${auswahl.id}`} className="btn btn-primary w-100 mt-2">
           <i className="bi bi-exclamation-triangle" aria-hidden="true" /> {t('Störung an dieser Maschine melden')}
         </Link>
       </section>

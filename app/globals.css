@@ -303,6 +303,17 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     box-shadow: 0 1px 3px rgba(0, 0, 0, .08), inset 0 1px 0 rgba(255, 255, 255, .6);
 }
 .leiste-link.aktiv .leiste-symbol i { color: var(--akzent); }
+/* Hellmodus: aktiver Eintrag edler – Symbol in einem kleinen dunklen Quadrat wie das Logo, Fläche dezent graphit getönt */
+:root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) {
+    background: color-mix(in srgb, var(--akzent) 6%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--akzent) 9%, transparent);
+}
+:root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) .leiste-symbol {
+    border-radius: 9px;
+    background: linear-gradient(180deg, var(--logo-oben), var(--logo-unten));
+    box-shadow: inset 0 0 0 1px var(--logo-rand), 0 2px 6px rgba(0, 0, 0, .18);
+}
+:root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) .leiste-symbol i { color: var(--logo-zeichen); font-size: 1rem; }
 .leiste-symbol {
     position: relative;
     flex: 0 0 30px;
@@ -356,47 +367,59 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 
 /* ---------- Favoriten (angepinnte Kartenansichten) unter „Störungskarte“ ---------- */
-.favoriten { margin: 2px 0 4px; }
+/* Eigener, leicht abgesetzter Bereich, eingerückt unter dem Eintrag „Störungskarte“ */
+.favoriten {
+    margin: 4px 0 6px 14px; padding: 4px;
+    border-radius: 14px; background: var(--fuellung); box-shadow: inset 0 0 0 1px var(--linie);
+}
 .favoriten-titel {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 4px 12px 2px 52px;
-    font-size: .68rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-leise);
+    padding: 4px 8px 4px 10px;
+    font-size: .68rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--text-leise);
     white-space: nowrap;
 }
+.favoriten-titel i { color: var(--akzent); margin-right: 3px; }
 .favoriten-anzahl { font-weight: 500; letter-spacing: 0; font-variant-numeric: tabular-nums; }
-.favoriten-leer { margin: 2px 12px 4px 52px; font-size: .75rem; line-height: 1.3; color: var(--text-leise); }
+.favoriten-leer { margin: 0 8px 6px 10px; font-size: .75rem; line-height: 1.3; color: var(--text-leise); }
 .favoriten ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
-/* Aufgeklappt: viele Favoriten scrollen in sich, damit die Leiste unten nicht übersteht */
-:root[data-leiste="auf"] .favoriten ul { max-height: min(380px, 36vh); overflow-y: auto; }
 .favorit { position: relative; }
-.favorit-link { min-height: 36px; padding-left: 26px; padding-right: 58px; font-size: .88rem; }
+.favorit-link { min-height: 38px; padding-left: 6px; padding-right: 34px; gap: 8px; font-size: .86rem; border-radius: 10px; }
 .favorit-link .leiste-symbol { flex-basis: 26px; height: 26px; }
 .favorit-symbol {
     width: 24px; height: 24px; border-radius: 7px;
-    display: grid; place-items: center; font-size: .78rem;
+    display: grid; place-items: center; font-size: .76rem;
     color: var(--logo-zeichen);
     background: linear-gradient(180deg, var(--logo-oben), var(--logo-unten));
     box-shadow: inset 0 0 0 1px var(--logo-rand);
 }
-.favorit-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.favorit-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+.favorit-name small { display: block; font-size: .64rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--text-leise); }
 .favorit-ansicht {
-    flex: none; font-size: .64rem; font-weight: 700; padding: 1px 6px; border-radius: 6px;
-    background: var(--fuellung); color: var(--text-leise);
+    flex: none; font-size: .62rem; font-weight: 700; padding: 1px 6px; border-radius: 6px;
+    background: var(--karte-solid); color: var(--text-leise); box-shadow: inset 0 0 0 1px var(--linie);
 }
-.favorit-aktionen {
+/* Aktiver Favorit: die Karte zeigt gerade genau diese Ansicht */
+.favorit-link.aktiv { background: var(--karte-solid); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.favorit-link.aktiv .favorit-ansicht { background: var(--akzent); color: var(--akzent-text); box-shadow: none; }
+/* „…“-Knopf je Eintrag – öffnet das Menü (Umbenennen, 2D/3D, Entfernen) */
+.favorit-mehr {
     position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
-    display: flex; gap: 2px; opacity: 0; transition: opacity .15s ease;
-}
-.favorit:hover .favorit-aktionen, .favorit:focus-within .favorit-aktionen { opacity: 1; }
-@media (hover: none) { .favorit-aktionen { opacity: 1; } }
-.favorit-aktionen button {
     width: 26px; height: 26px; border: 0; border-radius: 8px; display: grid; place-items: center;
-    background: transparent; color: var(--text-leise); font-size: .78rem;
+    background: transparent; color: var(--text-leise); font-size: .9rem; opacity: 0; transition: opacity .15s ease, background-color .15s ease;
 }
-.favorit-aktionen button:hover { background: var(--fuellung); color: var(--text); }
-.favorit-bearbeiten { padding: 3px 4px 3px 26px; }
+.favorit:hover .favorit-mehr, .favorit:focus-within .favorit-mehr, .favorit.menue-offen .favorit-mehr { opacity: 1; }
+@media (hover: none) { .favorit-mehr { opacity: 1; } }
+.favorit-mehr:hover, .favorit.menue-offen .favorit-mehr { background: var(--karte-solid); color: var(--text); }
+/* Menü liegt fest im Fenster (position: fixed, Lage aus dem Knopf) – so schneidet die Leiste nichts ab */
+.aufklapp-menue.favorit-menue { position: fixed; right: auto; bottom: auto; z-index: 1100; min-width: 220px; background: var(--karte-solid); transform-origin: top left; }
+.favorit-menue .menue-titel { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.favorit-menue .menue-info small { display: block; max-width: 230px; white-space: normal; color: var(--text-leise); }
+.aufklapp-menue button.text-gefahr, .aufklapp-menue button.text-gefahr i { color: var(--rot); }
+/* Umbenennen direkt in der Zeile, gleiche Höhe wie der Eintrag */
+.favorit-bearbeiten { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 4px 0 6px; }
+.favorit-bearbeiten .leiste-symbol { flex: 0 0 26px; height: 26px; }
 .favorit-bearbeiten input {
-    width: 100%; height: 32px; padding: 0 10px; border-radius: 10px; font-size: .88rem;
+    flex: 1; min-width: 0; height: 30px; padding: 0 8px; border-radius: 8px; font-size: .86rem;
     border: 1px solid var(--akzent); background: var(--karte-solid); color: var(--text); outline: none;
 }
 /* Gerade angepinnt: Eintrag erscheint, wenn das fliegende Schild ankommt */
@@ -452,23 +475,18 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     :root:not([data-leiste="auf"]) .leiste-marke .leiste-text { display: none; }
     :root:not([data-leiste="auf"]) .leiste-kopf { justify-content: center; }
     :root:not([data-leiste="auf"]) .konto-name small { display: none; }
-    /* Favoriten eingeklappt: nur das Symbol, Name als Sprechblase; Umbenennen/Entfernen als kleine Leiste darunter */
-    :root:not([data-leiste="auf"]) .favoriten-titel { font-size: 0; padding: 0; height: 0; }
+    /* Favoriten eingeklappt: nur das Symbol (Name als Sprechblase), „…“ klein am Rand beim Darüberfahren */
+    :root:not([data-leiste="auf"]) .favoriten { margin: 4px 0; padding: 3px 0; background: transparent; box-shadow: none; }
+    :root:not([data-leiste="auf"]) .favoriten-titel { font-size: 0; padding: 0; height: 1px; margin: 2px 14px 4px; background: var(--linie); }
     :root:not([data-leiste="auf"]) .favoriten-leer { display: none; }
     :root:not([data-leiste="auf"]) .favorit-link { padding: 0 10px; justify-content: flex-start; }
     :root:not([data-leiste="auf"]) .favorit-link .leiste-symbol { flex-basis: 30px; }
-    :root:not([data-leiste="auf"]) .favorit-aktionen {
-        right: auto; left: calc(100% + 22px); top: calc(50% + 20px); transform: none;
-        padding: 3px; border-radius: 10px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
-        visibility: hidden; z-index: 3;
-    }
-    /* unsichtbare Brücke über die Lücke, damit die Leiste beim Hinüberfahren nicht verschwindet */
-    :root:not([data-leiste="auf"]) .favorit-aktionen::before { content: ''; position: absolute; right: 100%; top: -24px; bottom: 0; width: 26px; }
-    :root:not([data-leiste="auf"]) .favorit:hover .favorit-aktionen,
-    :root:not([data-leiste="auf"]) .favorit:focus-within .favorit-aktionen { visibility: visible; }
+    :root:not([data-leiste="auf"]) .favorit-mehr { right: -2px; width: 18px; height: 22px; font-size: .75rem; border-radius: 6px; }
     :root:not([data-leiste="auf"]) .favorit-bearbeiten {
-        position: absolute; left: calc(100% + 22px); top: 50%; transform: translateY(-50%); width: 220px; padding: 0; z-index: 4;
+        position: absolute; left: calc(100% + 16px); top: 50%; transform: translateY(-50%); width: 240px; z-index: 4;
+        padding: 4px; border-radius: 12px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
     }
+    :root:not([data-leiste="auf"]) .favorit-bearbeiten .leiste-symbol { display: none; }
 }
 
 /* Die schmale Leiste oben gibt es nur auf dem Smartphone */
@@ -584,6 +602,11 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 .aufklapp-menue button:hover { background: var(--fuellung); }
 .aufklapp-menue button .haken { margin-left: auto; color: var(--akzent); }
+/* Kleiner Ein/Aus-Schalter im Menü (z. B. Ton bei Kamerafahrten) */
+.mini-schalter { margin-left: auto; position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--fuellung-stark, var(--linie)); transition: background-color var(--uebergang); flex: none; }
+.mini-schalter::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--karte-solid); box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .2s var(--weich); }
+.mini-schalter.an { background: var(--akzent); }
+.mini-schalter.an::after { transform: translateX(12px); }
 .aufklapp-menue .menue-info { padding: 8px 10px; font-size: .9rem; }
 .aufklapp-menue .menue-info small { color: var(--text-leise); display: block; }
 
@@ -2193,3 +2216,66 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     border: 1px solid var(--linie);
 }
 .maschine-detail-3d canvas { touch-action: none; }
+
+/* ---------- Favorit-Kachel (Übersicht), Hinweis „Dein Werk“ beim Melden, kleines Kartenfenster ---------- */
+.favorit-kachel-stern { color: var(--akzent); font-size: .85em; }
+.favorit-kachel-leer {
+    width: 100%; min-height: 150px; display: grid; place-items: center; align-content: center; gap: 4px;
+    border: 1.5px dashed var(--linie); border-radius: 16px; background: transparent; color: var(--text-leise);
+    transition: background-color var(--uebergang), border-color var(--uebergang);
+}
+.favorit-kachel-leer:hover { background: var(--fuellung); border-color: var(--text-leise); color: var(--text); }
+.favorit-kachel-leer i { font-size: 1.6rem; }
+.favorit-kachel-leer strong { color: var(--text); }
+.favorit-kachel-leer span { font-size: .8rem; max-width: 240px; text-align: center; }
+.favorit-kachel-laden { height: 220px; display: grid; place-items: center; color: var(--text-leise); position: relative; }
+.favorit-wahl { width: min(460px, 100%); }
+.favorit-wahl .ort-liste { padding: 0 22px; overflow-y: auto; }
+.favorit-wahl > .btn { margin: 0 22px 22px; width: auto !important; }
+.favorit-wahl .ort-liste button { gap: 12px; }
+.explorer-kompakt .explorer-buehne { --buehne-h: 240px; }
+.explorer-kompakt .buehne-kopf { transform: scale(.9); transform-origin: top left; max-width: calc(111% - 24px); }
+.link-knopf { border: 0; background: none; padding: 0; color: var(--akzent); font: inherit; font-weight: 500; }
+.link-knopf:hover { text-decoration: underline; }
+.eigenes-werk-hinweis {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 12px;
+    border-radius: 12px; font-size: .88rem; background: var(--orange-bg); color: var(--text);
+}
+.eigenes-werk-hinweis i { color: var(--orange); }
+.eigenes-abzeichen { color: var(--text); background: var(--fuellung); }
+
+/* ---------- Maschinen-Seite und -Liste ---------- */
+.maschinen-kopf { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.maschinen-kopf .detail-symbol { flex: none; }
+.titel-link { color: inherit; }
+.titel-link:hover { color: inherit; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+.maschinen-link { display: flex; align-items: center; gap: 10px; color: var(--text); }
+.maschinen-link:hover { color: var(--text); text-decoration: none; }
+.maschinen-link:hover strong { text-decoration: underline; }
+.ampel-punkt { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 1px; margin-right: 4px; }
+.ampel-punkt.ampel-gruen { background: var(--gruen); }
+.ampel-punkt.ampel-orange { background: var(--orange); }
+.ampel-punkt.ampel-rot { background: var(--rot); }
+/* Maschinenhistorie als Zeitstrahl: Punkt je Eintrag, offene Störungen farbig */
+.historie { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--linie); display: grid; gap: 2px; }
+.historie-eintrag { position: relative; }
+.historie-eintrag::before {
+    content: ''; position: absolute; left: -21px; top: 18px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--karte-solid); border: 2px solid var(--text-leise);
+}
+.historie-eintrag.offen::before { border-color: var(--orange); background: var(--orange); }
+.historie-eintrag a {
+    display: grid; grid-template-columns: 130px minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
+    padding: 10px 12px; border-radius: 12px; color: var(--text);
+}
+.historie-eintrag a:hover { background: var(--fuellung); text-decoration: none; color: var(--text); }
+.historie-datum { font-size: .82rem; color: var(--text-leise); font-variant-numeric: tabular-nums; }
+.historie-text { min-width: 0; display: grid; gap: 2px; }
+.historie-text strong { font-weight: 600; }
+.historie-massnahme { font-style: italic; }
+.historie-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 767.98px) {
+    .historie-eintrag a { grid-template-columns: minmax(0, 1fr) auto; }
+    .historie-datum { grid-column: 1 / -1; }
+    .historie-pills { grid-column: 1; justify-content: flex-start; }
+}

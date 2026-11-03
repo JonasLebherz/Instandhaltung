@@ -28,6 +28,7 @@ import Logo from './Logo';
 import PersonWahl, { RollenAbzeichen, PERSON_WAEHLEN } from './PersonWahl';
 import AnsichtWahl from './AnsichtWahl';
 import Favoriten from './Favoriten';
+import { ton, tonAn, tonSetzen } from '@/lib/ton';
 
 /** Seiten, nach Bereichen gruppiert. "symbolAktiv" ist die gefüllte Variante für die aktuelle Seite. */
 // Texte mit T() markiert – übersetzt werden sie beim Anzeigen mit t()
@@ -45,6 +46,7 @@ const BEREICHE = [
     seiten: [
       { pfad: '/melden', text: T('Störung melden'), symbol: 'bi-exclamation-triangle', symbolAktiv: 'bi-exclamation-triangle-fill' },
       { pfad: '/auftraege', text: T('Aufträge'), symbol: 'bi-clipboard-check', symbolAktiv: 'bi-clipboard-check-fill', zaehler: true },
+      { pfad: '/maschinen', text: T('Maschinen'), symbol: 'bi-cpu', symbolAktiv: 'bi-cpu-fill' },
     ],
   },
   {
@@ -103,6 +105,14 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
   const [offeneAuftraege, setOffeneAuftraege] = useState(null);   // Zahl neben "Aufträge"
   const [personWahl, setPersonWahl] = useState(false);            // Fenster "Person wechseln"
   const leisteRef = useRef(null);
+  // Ton der Kamerafahrten in der Karte (lib/ton.js) – an/aus im Konto-Menü
+  const [tonEin, setTonEin] = useState(true);
+  useEffect(() => {
+    const lesen = () => setTonEin(tonAn());
+    lesen();
+    window.addEventListener('kartentonwechsel', lesen);
+    return () => window.removeEventListener('kartentonwechsel', lesen);
+  }, []);
 
   // Beim Start: Zustand der Leiste (vom Skript im Layout gesetzt) und gespeicherte Darstellung übernehmen
   useEffect(() => {
@@ -227,7 +237,7 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                         </span>
                       </Link>
                     </li>,
-                    seite.favoriten && <Favoriten key="favoriten" onOeffnen={() => setMobilOffen(false)} />,
+                    seite.favoriten && <Favoriten key="favoriten" person={person} onOeffnen={() => setMobilOffen(false)} />,
                   ];
                 })}
               </ul>
@@ -332,6 +342,12 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                 {/* Ansicht: nur ein Land bzw. Werk anzeigen (Standard: alles) */}
                 <div className="menue-titel">{t('Ansicht')}</div>
                 <AnsichtWahl ansicht={ansicht} />
+                <div className="menue-trenner" />
+                <button type="button" role="menuitemcheckbox" aria-checked={tonEin} className="ton-schalter"
+                        onClick={() => { tonSetzen(!tonEin); if (!tonEin) setTimeout(() => ton('sanft'), 0); }}>
+                  <i className={`bi ${tonEin ? 'bi-volume-up' : 'bi-volume-mute'}`} /> {t('Ton bei Kamerafahrten')}
+                  <span className={`mini-schalter${tonEin ? ' an' : ''}`} aria-hidden="true" />
+                </button>
                 <div className="menue-trenner" />
                 <form action={abmelden}>
                   <button type="submit" role="menuitem"><i className="bi bi-box-arrow-right" /> {t('Abmelden')}</button>

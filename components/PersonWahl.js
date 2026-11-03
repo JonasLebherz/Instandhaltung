@@ -37,8 +37,13 @@ export function PersonWaehlenKnopf({ children, className = 'btn btn-primary' }) 
 
 /** Person im Cookie speichern (oder löschen) – ein Jahr gültig */
 export function personSpeichern(person) {
-  const wert = person ? encodeURIComponent(JSON.stringify({ id: person.id, name: person.name, rolle: person.rolle, stadt: person.stadt ?? null })) : '';
+  // werk/werkname: Werk der Person (Kürzel klein wie in der Kartenadresse) – für den Favoriten „Mein Werk“
+  const wert = person ? encodeURIComponent(JSON.stringify({
+    id: person.id, name: person.name, rolle: person.rolle, stadt: person.stadt ?? null, werk: person.werk ?? null, werkname: person.standort ?? null,
+  })) : '';
   document.cookie = `person=${wert}; path=/; max-age=${person ? 31536000 : 0}; samesite=lax`;
+  // Karte und Seitenleiste lesen „Mein Werk“ (Favorit aus der Person) neu
+  window.dispatchEvent(new Event('favoritenwechsel'));
 }
 
 /** Kleines Abzeichen für die Rolle */

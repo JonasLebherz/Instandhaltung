@@ -130,7 +130,7 @@ export default async function AuftragSeite({ params }) {
           <StatusPill status={auftrag.status} />
           <PrioritaetPill prioritaet={auftrag.prioritaet} />
         </div>
-        <h1>{auftrag.maschine}</h1>
+        <h1><Link href={`/maschinen/${auftrag.maschine_id}`} className="titel-link" title={t('Maschinenhistorie')}>{auftrag.maschine}</Link></h1>
         <p>
           {t('Störmeldung Nr. {n}', { n: auftrag.stoermeldung_id })} · {auftrag.standort} · {auftrag.gebaeude} · {auftrag.anlagennummer}{' '}
           <Link href={`/karte?werk=${auftrag.standort_kuerzel.toLowerCase()}&halle=${auftrag.gebaeude_kuerzel.toLowerCase()}&maschine=${auftrag.maschine_id}`}

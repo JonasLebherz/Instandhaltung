@@ -11,7 +11,7 @@ export async function GET() {
   if (!(await aktuellerBenutzer())) return Response.json({ fehler: 'Nicht angemeldet' }, { status: 401 });
   try {
     const personen = await sql`
-      SELECT p.id, p.name, p.rolle::text AS rolle, st.stadt, st.name AS standort, t.qualifikation,
+      SELECT p.id, p.name, p.rolle::text AS rolle, st.stadt, st.name AS standort, lower(st.kuerzel) AS werk, t.qualifikation,
              l.name AS land, COALESCE(l.hauptsitz, false) AS hauptsitz,
              -- Offene Aufträge, die dem Techniker der Person zugewiesen sind (nur Instandhaltung)
              (SELECT COUNT(*)::int FROM wartungsauftrag w

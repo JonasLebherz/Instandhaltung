@@ -15,6 +15,7 @@
  */
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import { ampelZustand } from '@/lib/karten/ampel';
 import { Gehaeuse, Viele, useCanvasTextur, canvasTextur } from './Bausteine';
 import { useT } from '@/components/SpracheKontext';
@@ -121,10 +122,58 @@ function Roboter({ p, groesse, f, aktiv }) {
 }
 
 /**
+ * LED-Anzeige oben auf der Ampel: Zahl der offenen Störungen in leuchtenden Ziffern (rot/orange bei Störung,
+ * grün bei 0). Texturen werden je Zahl und Farbe nur einmal erzeugt und von allen Maschinen geteilt.
+ * Die Anzeige dreht sich zur Kamera (nur um die senkrechte Achse) – so ist sie von überall lesbar.
+ */
+const ledTexturen = new Map();
+function ledTextur(zahl, farbe) {
+  const schluessel = `${zahl}-${farbe}`;
+  if (!ledTexturen.has(schluessel)) {
+    const textur = canvasTextur(128, 80, (g, w, h) => {
+      g.fillStyle = '#0b0d10'; g.fillRect(0, 0, w, h);
+      // Raster wie bei echten LED-Punkten
+      g.fillStyle = 'rgba(255,255,255,0.04)';
+      for (let x = 2; x < w; x += 4) for (let y = 2; y < h; y += 4) g.fillRect(x, y, 2, 2);
+      g.font = '700 64px ui-monospace, Menlo, Consolas, monospace';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.shadowColor = farbe; g.shadowBlur = 14;
+      g.fillStyle = farbe;
+      g.fillText(zahl > 99 ? '99+' : String(zahl), w / 2, h / 2 + 3);
+    });
+    textur.wrapS = textur.wrapT = THREE.ClampToEdgeWrapping;
+    ledTexturen.set(schluessel, textur);
+  }
+  return ledTexturen.get(schluessel);
+}
+const blickHilfe = new THREE.Vector3();
+function LedAnzeige({ y, zahl, farbe, f }) {
+  const ref = useRef(null);
+  useFrame(({ camera }) => {
+    const g = ref.current;
+    if (!g) return;
+    g.getWorldPosition(blickHilfe);
+    g.lookAt(camera.position.x, blickHilfe.y, camera.position.z);
+  });
+  const textur = ledTextur(zahl, farbe);
+  return (
+    <group ref={ref} position={[0, y, 0]}>
+      {/* Gehäuse mit Halter */}
+      <mesh position={[0, -0.16, 0]}><cylinderGeometry args={[0.03, 0.03, 0.14, 8]} /><meshStandardMaterial color={f['maschine-dunkel']} /></mesh>
+      <mesh><boxGeometry args={[0.56, 0.36, 0.08]} /><meshStandardMaterial color="#1b1e22" roughness={0.5} metalness={0.3} /></mesh>
+      {/* Leuchtende Ziffern vorn und hinten (unbeleuchtetes Material – leuchtet auch im Dunkeln) */}
+      <mesh position={[0, 0, 0.042]}><planeGeometry args={[0.5, 0.31]} /><meshBasicMaterial map={textur} toneMapped={false} /></mesh>
+      <mesh position={[0, 0, -0.042]} rotation-y={Math.PI}><planeGeometry args={[0.5, 0.31]} /><meshBasicMaterial map={textur} toneMapped={false} /></mesh>
+    </group>
+  );
+}
+
+/**
  * Signalampel (Signalsäule) wie an echten Maschinen: rot oben, orange, grün unten.
  * Die passende Leuchte strahlt, die anderen sind dunkel. zustand = null: alle aus (beim Melden).
+ * anzeige: Zahl offener Störungen für die LED-Anzeige obendrauf (null = keine Anzeige, z. B. beim Melden)
  */
-export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1 }) {
+export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null }) {
   const leuchten = [['rot', 0.38], ['orange', 0.2], ['gruen', 0.02]];
   return (
     <group position={p} scale={groesse}>
@@ -147,6 +196,9 @@ export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1 }) {
         </mesh>
       )}
       <Rolle p={[0, hoehe + 0.05, 0]} r={0.1} l={0.06} farbe={f['maschine-dunkel']} />
+      {anzeige !== null && zustand && (
+        <LedAnzeige y={hoehe + 0.33} zahl={anzeige} farbe={f[`ampel-${anzeige > 0 ? zustand : 'gruen'}`]} f={f} />
+      )}
     </group>
   );
 }
@@ -724,7 +776,7 @@ const k = (f) => f.maschine;
  * Maschine mit Ampel an der Ecke (lokale Achsen wie MaschinenForm). Die Ampel leuchtet immer – auch beim Melden.
  * detail: "voll" (Infofenster: alle Einzelheiten) oder "mittel" (Halle: Bedienpult und typische Teile, sparsamer).
  */
-export function MaschineMitAmpel({ m, L, W, f, bewegt, detail = null, ampelGroesse = 1 }) {
+export function MaschineMitAmpel({ m, L, W, f, bewegt, detail = null, ampelGroesse = 1, anzeige = null }) {
   const zustand = ampelZustand(m);
   const laeuft = bewegt && zustand !== 'rot';
   // Leuchten mindestens 0,4 m über der Maschine – sonst verdeckt z. B. eine Presse ihre eigene Ampel
@@ -734,7 +786,7 @@ export function MaschineMitAmpel({ m, L, W, f, bewegt, detail = null, ampelGroes
       <MaschinenForm typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} />
       <Namensschild m={m} L={L} W={W} f={f} />
       {detail && <Details m={m} zustand={zustand} typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} voll={detail === 'voll'} />}
-      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} hoehe={ampelHoehe} />
+      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} hoehe={ampelHoehe} anzeige={anzeige} />
     </>
   );
 }

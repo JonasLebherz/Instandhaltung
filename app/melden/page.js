@@ -58,7 +58,9 @@ export default async function MeldenSeite({ searchParams }) {
       </div>
       <MeldeAssistent daten={daten} startwerte={startwerte}
                       vorauswahlMaschine={vorauswahlMaschine} vorauswahlStandort={vorauswahlStandort}
-                      vorauswahlLand={vorauswahlMaschine || vorauswahlStandort ? null : ansicht.land} />
+                      vorauswahlLand={vorauswahlMaschine || vorauswahlStandort ? null : ansicht.land}
+                      // Werk der gewählten Person: Start dort, in den Listen zuerst und markiert
+                      eigenesWerk={person?.standort_id ?? null} />
     </>
   );
 }

@@ -384,12 +384,14 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.screenshot({ path: SHOTS + 'r-werk-3d.png' });
   await p.click('.raum-halle:has-text("H1")');
   const offenH1 = Number(sql("SELECT count(DISTINCT m.id) FROM maschine m JOIN gebaeude g ON g.id=m.gebaeude_id JOIN standort s ON s.id=g.standort_id JOIN stoermeldung sm ON sm.maschine_id=m.id JOIN wartungsauftrag w ON w.stoermeldung_id=sm.id WHERE s.kuerzel='ALB' AND g.kuerzel='H1' AND w.status <> 'erledigt'"));
-  await p.waitForFunction((n) => document.querySelectorAll('.raum-marke .zaehl-marke').length >= n, offenH1, { timeout: 60000 }).catch(() => {});
-  pruefe('3D: Halle – Adresse und Störungen an den Maschinen', /halle=h1/.test(p.url()) && (await p.$$eval('.raum-marke .zaehl-marke', (z) => z.length)) === offenH1, `${p.url()} ${offenH1}`);
+  await p.waitForSelector('.raum[data-stoerungsanzeigen]', { timeout: 60000 }).catch(() => {});
+  // Die Zahl steht jetzt als LED-Anzeige auf der Ampel (3D); geprüft wird die Zahl der Maschinen mit Anzeige > 0
+  pruefe('3D: Halle – Adresse und LED-Anzeigen an den Maschinen mit Störung', /halle=h1/.test(p.url())
+    && Number(await p.getAttribute('.raum', 'data-stoerungsanzeigen')) === offenH1 && (await p.$$('.raum-marke .zaehl-marke')).length === 0, `${p.url()} ${offenH1}`);
   await p.waitForTimeout(1500);
   await p.screenshot({ path: SHOTS + 'r-halle-3d.png' });
   if (offenH1 > 0) {
-    await p.click('.raum-marke:has(.zaehl-marke) >> nth=0'); await p.waitForTimeout(800);
+    await p.click('.explorer-info .ort-liste button >> nth=0'); await p.waitForTimeout(800);
     pruefe('3D: Klick auf Maschine zeigt Details', (await p.textContent('main')).includes('Störung an dieser Maschine melden') && /maschine=\d+/.test(p.url()));
     await p.waitForSelector('.maschine-detail-3d canvas', { timeout: 60000 }).catch(() => {});
     const ampel = await p.getAttribute('.ampel-zeile', 'class');
@@ -408,7 +410,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.explorer-info button:has-text("ALB-H1-01")');
   await p.waitForSelector('#beschreibung', { timeout: 15000 }).catch(() => {});
   pruefe('Melden 3D: Maschine gewählt, Formular offen', (await p.$('#beschreibung')) !== null && (await p.textContent('.auswahl-chip')).includes('ALB-H1-01'));
-  await p.goto(BASE + '/karte?werk=alb'); await p.waitForSelector('.raum.fertig', { timeout: 60000 }).catch(() => {});
+  await p.goto(BASE + '/karte?werk=alb'); await p.waitForSelector('.ebene-neu .raum.fertig', { timeout: 60000 }).catch(() => {});
   await p.click('.raum-schalter button:has-text("2D")');
   // 3D → 2D: Kamera fährt erst nach oben, Gebäude werden flach, dann Überblendung (gut 2 s), dann ist die 3D-Szene weg
   await p.waitForTimeout(300);
@@ -416,12 +418,16 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.waitForFunction(() => !document.querySelector('.raum'), null, { timeout: 30000 }).catch(() => {});
   pruefe('2D: Lageplan wieder da, Wahl gemerkt', (await p.$('.ebene-neu .lageplan')) !== null && (await p.evaluate(() => localStorage.getItem('kartenansicht'))) === '2d');
 
-  // Ton-Knopf: schaltet das „Wusch“ ab, Wahl gemerkt
-  await p.click('.karten-werkzeuge button[aria-label*="Ton"]');
-  pruefe('Ton: Lautsprecher-Knopf schaltet ab und merkt es', (await p.evaluate(() => localStorage.getItem('kartenton'))) === 'aus'
-    && (await p.getAttribute('.karten-werkzeuge button[aria-label*="Ton"]', 'aria-pressed')) === 'false');
-  await p.click('.karten-werkzeuge button[aria-label*="Ton"]');
+  // Ton: an/aus im Konto-Menü der Seitenleiste (nicht mehr in der Karte), Wahl gemerkt
+  await p.click('.leiste-konto'); await p.click('.ton-schalter');
+  pruefe('Ton: Schalter im Konto-Menü schaltet ab und merkt es', (await p.evaluate(() => localStorage.getItem('kartenton'))) === 'aus'
+    && (await p.getAttribute('.ton-schalter', 'aria-checked')) === 'false' && (await p.$('.karten-werkzeuge button[aria-label*="Ton"]')) === null);
+  await p.click('.ton-schalter'); await p.keyboard.press('Escape');
 
+  // Pin erst ab Land (nicht auf der Weltkarte)
+  await p.click('.explorer-pfad button:has-text("Weltweit")'); await p.waitForTimeout(2000);
+  pruefe('Favoriten: kein Pin auf der Weltkarte', (await p.$('.karten-pin')) === null);
+  await p.goto(BASE + '/karte?werk=alb'); await p.waitForTimeout(1500);
   // Favoriten: Werk Albstadt in 2D anpinnen → Eintrag in der Seitenleiste unter „Störungskarte“
   await p.evaluate(() => localStorage.removeItem('kartenfavoriten'));
   await p.click('.karten-pin'); await p.waitForTimeout(1500);
@@ -430,7 +436,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     && (await p.$$eval('.favorit', (z) => z.length)) === 1 && (await p.textContent('.favorit')).includes('Stammwerk Albstadt')
     && (await p.getAttribute('.karten-pin', 'aria-pressed')) === 'true', JSON.stringify(await favs()));
   // Halle in 3D anpinnen (Adresse mit halle und ansicht=3d)
-  await p.click('.raum-schalter button:has-text("3D")'); await p.waitForSelector('.raum.fertig', { timeout: 60000 }).catch(() => {});
+  await p.click('.raum-schalter button:has-text("3D")'); await p.waitForSelector('.ebene-neu .raum.fertig', { timeout: 60000 }).catch(() => {});
   await p.click('.raum-halle:has-text("H2")'); await p.waitForTimeout(2000);
   await p.click('.karten-pin'); await p.waitForTimeout(1500);
   pruefe('Favoriten: Halle in 3D angepinnt', (await favs()).some((f) => f.adresse === '/karte?werk=alb&halle=h2&ansicht=3d' && f.art === 'halle'), JSON.stringify(await favs()));
@@ -440,8 +446,9 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.waitForSelector('.ebene-neu .lageplan', { timeout: 15000 }).catch(() => {});
   pruefe('Favoriten: Klick öffnet die Karte in genau dieser Ansicht (Werk, 2D)', (await p.$('.ebene-neu .lageplan')) !== null
     && (await p.textContent('.buehne-titel')) === 'Stammwerk Albstadt' && (await p.$('.raum')) === null);
-  // Umbenennen und Entfernen
-  await p.hover('.favorit >> nth=0'); await p.click('.favorit >> nth=0 >> button[title="Umbenennen"]');
+  pruefe('Favoriten: aktiver Favorit markiert', (await p.textContent('.favorit-link.aktiv')).includes('Stammwerk Albstadt'));
+  // Umbenennen und Entfernen über das „…“-Menü
+  await p.hover('.favorit >> nth=0'); await p.click('.favorit >> nth=0 >> .favorit-mehr'); await p.click('.favorit-menue button:has-text("Umbenennen")');
   await p.fill('.favorit-bearbeiten input', 'Mein Stammwerk'); await p.keyboard.press('Enter'); await p.waitForTimeout(200);
   pruefe('Favoriten: umbenennen', (await p.textContent('.favorit >> nth=0')).includes('Mein Stammwerk') && (await favs())[0].name === 'Mein Stammwerk');
   // Von einer anderen Seite: Halle 3D öffnet direkt in 3D
@@ -457,7 +464,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   });
   await p.click('.karten-pin'); await p.waitForTimeout(400);
   pruefe('Favoriten: höchstens 10, Hinweis statt elftem', (await favs()).length === 10 && (await p.textContent('.karten-hinweis')).includes('Höchstens 10'));
-  await p.hover('.favorit >> nth=0'); await p.click('.favorit >> nth=0 >> button[title="Entfernen"]'); await p.waitForTimeout(200);
+  await p.hover('.favorit >> nth=0'); await p.click('.favorit >> nth=0 >> .favorit-mehr'); await p.click('.favorit-menue button:has-text("Entfernen")'); await p.waitForTimeout(200);
   pruefe('Favoriten: entfernen', (await favs()).length === 9 && (await p.$$eval('.favorit', (z) => z.length)) === 9);
   await p.evaluate(() => { localStorage.removeItem('kartenfavoriten'); localStorage.setItem('kartenansicht', '2d'); });
   }
@@ -516,7 +523,13 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.waitForSelector('.hinweis-fehler');
   pruefe('Person: Produktion – Server lehnt Speichern ab', (await p.textContent('.hinweis-fehler')).includes('keine Aufträge bearbeiten') && sql(`SELECT status FROM wartungsauftrag WHERE id = ${freiId}`) === 'zugewiesen');
   await p.goto(BASE + '/melden'); await p.waitForTimeout(800);
-  pruefe('Person: Melden startet im eigenen Werk', (await p.$('.ebene-neu .lageplan')) !== null && (await p.textContent('.explorer-melden')).includes('Hamburg'));
+  pruefe('Person: Melden startet im eigenen Werk (mit Hinweis)', (await p.$('.ebene-neu .lageplan')) !== null && (await p.textContent('.explorer-melden')).includes('Hamburg')
+    && (await p.textContent('.eigenes-werk-hinweis')).includes('Dein Werk'));
+  // Mein Werk als fester Favorit in der Seitenleiste (Standard 3D)
+  pruefe('Person: „Mein Werk“ als Favorit (3D)', (await p.getAttribute('.favorit-eigenes .favorit-link', 'href')) === '/karte?werk=ham&ansicht=3d');
+  // Anderes Werk wählbar: über den Hinweis ins Land, eigenes Werk steht zuerst
+  await p.click('.eigenes-werk-hinweis button'); await p.waitForTimeout(1500);
+  pruefe('Person: anderes Werk wählbar, eigenes zuerst', (await p.$('.ebene-neu .dkarte')) !== null && (await p.textContent('.explorer-info .ort-liste li:first-child')).includes('Dein Werk'));
   await p.goto(BASE + '/melden?maschine=3'); await p.waitForTimeout(500);
   pruefe('Person: "Gemeldet von" vorbelegt', (await p.inputValue('#gemeldet_von')) === 'Julia Krause');
   await p.fill('#beschreibung', 'Test der Personenwahl beim Melden'); await waehle(p, 'ursache_kategorie', 'Sonstiges');
@@ -528,7 +541,28 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.leiste-konto'); await p.click('.konto-menue button:has-text("Person wechseln")');
   await p.click('.dialog-fuss button'); await p.waitForTimeout(800);
   await p.goto(BASE + '/'); await p.waitForTimeout(500);
-  pruefe('Person: "Ohne Person arbeiten" setzt zurück', await p.isVisible('.person-hinweis'));
+  pruefe('Person: "Ohne Person arbeiten" setzt zurück', await p.isVisible('.person-hinweis') && (await p.$('.favorit-eigenes')) === null);
+
+  // Maschinen: Liste, Seite mit Historie (Zahl gegen SQL)
+  await p.goto(BASE + '/maschinen'); await p.waitForTimeout(800);
+  pruefe('Maschinen: Liste mit allen Maschinen', (await p.$$eval('.maschinen-tabelle tbody tr', (z) => z.length)) === Number(sql('SELECT count(*) FROM maschine')));
+  await p.fill('#maschinen-suche', 'ALB-H1-01');
+  pruefe('Maschinen: Suche', (await p.$$eval('.maschinen-tabelle tbody tr', (z) => z.length)) === 1);
+  await p.click('.maschinen-link'); await p.waitForURL(/[/]maschinen[/][0-9]+$/); await p.waitForTimeout(600);
+  const mId = p.url().split('/').pop();
+  pruefe('Maschinen: Seite mit Historie, Zahl stimmt mit SQL', Number(await p.getAttribute('[data-anzahl]', 'data-anzahl')) === Number(sql(`SELECT count(*) FROM stoermeldung WHERE maschine_id = ${mId}`))
+    && (await p.textContent('h1')).length > 0 && (await p.$('.historie, .leer')) !== null);
+  const ersterAuftrag = await p.$('.historie-eintrag a');
+  if (ersterAuftrag) { await ersterAuftrag.click(); await p.waitForURL(/[/]auftraege[/][0-9]+$/); pruefe('Maschinen: Historie verlinkt den Auftrag', /[/]auftraege[/][0-9]+$/.test(p.url())); }
+  await p.goto(BASE + '/karte?maschine=' + mId); await p.waitForTimeout(1000);
+  await p.click('.maschinenhistorie-link'); await p.waitForURL(/[/]maschinen[/][0-9]+$/);
+  pruefe('Maschinen: Link aus der Karte', p.url().endsWith('/maschinen/' + mId));
+
+  // Übersicht: Kachel „Favorit“ – ohne Favoriten Hinweis im Auswahlfenster
+  await p.goto(BASE + '/'); await p.waitForTimeout(800);
+  await p.click('.favorit-kachel-leer'); await p.waitForSelector('.favorit-wahl');
+  pruefe('Übersicht: Favorit-Kachel, ohne Favoriten Hinweis', (await p.textContent('.favorit-wahl')).includes('Ansicht anpinnen'));
+  await p.keyboard.press('Escape');
 
   // 20. Ansicht (Konto): nur Werk Hamburg, danach wieder alles
   await p.goto(BASE + '/'); await p.waitForTimeout(800);

@@ -22,7 +22,7 @@
  * Beschriftungen (Hallen, Störungszahlen) sind echte Knöpfe (HTML) – bedienbar mit
  * Tastatur und Screenreader.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -47,12 +47,18 @@ const easing = (x) => 0.5 - 0.5 * Math.cos(Math.PI * x);
 /* ---------------------------------------------------------------------------
  * Kamera: fliegt zum Ziel (Werk oder Halle); Ziehen mit der Maus bricht den Flug ab
  * ------------------------------------------------------------------------- */
-/** onAngekommen(schluessel): Kamera ist am Ziel (für Abläufe wie 3D → 2D: erst oben, dann flach) */
-function Kamera({ ziel, bewegt, steuerung, onAngekommen }) {
+/**
+ * Kamerafahrt. Die Kamera fliegt auf einer Kugel um den Blickpunkt: Höhe, Neigung und Richtung ändern sich
+ * gleichzeitig (kein „erst hoch, dann drehen“), der Abstand gleichmäßig (logarithmisch).
+ * onFortschritt(schluessel, t): Stand der Fahrt 0…1 (für Abläufe wie 3D → 2D: Gebäude sinken schon ab der Hälfte)
+ */
+const kugelJetzt = new THREE.Spherical();
+const versatz = new THREE.Vector3();
+function Kamera({ ziel, bewegt, steuerung, onFortschritt }) {
   const { camera, invalidate } = useThree();
   const zustand = useRef({ schluessel: null, flug: null, abbruch: null });
-  const angekommen = useRef(onAngekommen);
-  angekommen.current = onAngekommen;
+  const fortschritt = useRef(onFortschritt);
+  fortschritt.current = onFortschritt;
   useEffect(() => { invalidate(); }, [ziel.schluessel, invalidate]);
 
   // Pro Bild: neues Ziel übernehmen (beim ersten Mal springen, danach fliegen)
@@ -72,9 +78,16 @@ function Kamera({ ziel, bewegt, steuerung, onAngekommen }) {
         steuer.target.copy(nachZiel);
         steuer.update();
         z.flug = null;
-        angekommen.current?.(ziel.schluessel);
+        fortschritt.current?.(ziel.schluessel, 1);
       } else {
-        z.flug = { t: 0, dauer: ziel.dauer ?? 1.1, vonPos: camera.position.clone(), vonZiel: steuer.target.clone(), nachPos, nachZiel };
+        const vonZiel = steuer.target.clone();
+        const von = new THREE.Spherical().setFromVector3(versatz.subVectors(camera.position, vonZiel));
+        const nach = new THREE.Spherical().setFromVector3(versatz.subVectors(nachPos, nachZiel));
+        // Richtung auf dem kürzesten Weg drehen
+        let dTheta = nach.theta - von.theta;
+        if (dTheta > Math.PI) dTheta -= 2 * Math.PI;
+        if (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+        z.flug = { t: 0, dauer: ziel.dauer ?? 1.1, von, nach, dTheta, vonZiel, nachZiel };
       }
       z.schluessel = ziel.schluessel;
       invalidate();
@@ -84,10 +97,16 @@ function Kamera({ ziel, bewegt, steuerung, onAngekommen }) {
     // Zeitschritt begrenzen: nach einem langsamen Bild (z. B. Texturen hochladen) soll der Flug nicht springen
     f.t = Math.min(1, f.t + Math.min(dt, 1 / 30) / f.dauer);
     const e = easing(f.t);
-    camera.position.lerpVectors(f.vonPos, f.nachPos, e);
     steuer.target.lerpVectors(f.vonZiel, f.nachZiel, e);
+    kugelJetzt.set(
+      f.von.radius * (f.nach.radius / f.von.radius) ** e,
+      f.von.phi + (f.nach.phi - f.von.phi) * e,
+      f.von.theta + f.dTheta * e,
+    );
+    camera.position.setFromSpherical(kugelJetzt).add(steuer.target);
     steuer.update();
-    if (f.t >= 1) { z.flug = null; angekommen.current?.(z.schluessel); } else invalidate();
+    fortschritt.current?.(z.schluessel, f.t);
+    if (f.t >= 1) z.flug = null; else invalidate();
   });
   return null;
 }
@@ -828,7 +847,7 @@ function gangInHalle(halle, maschinen) {
 /* ---------------------------------------------------------------------------
  * Szene
  * ------------------------------------------------------------------------- */
-function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, phase, kamera, flach, hintergrund, onKameraFertig, onFlachFertig }) {
+function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, phase, kamera, flach, hintergrund, onKameraFortschritt, onFlachFertig }) {
   const vonOben = kamera === 'oben';
   const t = useT();
   // Boden, Straßen, Wände und Dächer in den Farben des Landes (Wüste in Mexiko, Schnee in Russland …)
@@ -1007,13 +1026,18 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     && zufall(`${standort.kuerzel}${g.kuerzel}-solar`)() < 0.5).map((g) => g.id)), [gebaeude, gs, standort.kuerzel]);
 
   const welt = useRef(null);
-  const flachStand = useRef(0);
+  // Gebäude flach machen (3D → 2D) bzw. aus der Fläche wachsen lassen (2D → 3D, Szene beginnt flach)
+  const { invalidate } = useThree();
+  const flachStand = useRef(flach ? 1 : 0);
+  useLayoutEffect(() => { if (welt.current && flachStand.current === 1) welt.current.scale.y = 0.015; }, []);
   useFrame((_, dt) => {
     const ziel = flach ? 1 : 0;
     if (!welt.current || flachStand.current === ziel) return;
-    flachStand.current = ziel > flachStand.current ? Math.min(1, flachStand.current + Math.min(dt, 1 / 30) / 0.9) : 0;
+    const schritt = Math.min(dt, 1 / 30) / (ziel ? 0.9 : 1.3);
+    flachStand.current = ziel ? Math.min(1, flachStand.current + schritt) : Math.max(0, flachStand.current - schritt);
     welt.current.scale.y = 1 - 0.985 * easing(flachStand.current);
     if (flachStand.current === 1) onFlachFertig?.();   // ganz flach → jetzt darf die 2D-Zeichnung überblenden
+    invalidate();
   });
   const schatten = Math.max(B, T) * 0.7;
   const dimm = f.dunkel ? 0.78 : 1;
@@ -1034,7 +1058,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
                         shadow-mapSize={[1024, 1024]} shadow-bias={-0.0006}
                         shadow-camera-left={-schatten} shadow-camera-right={schatten}
                         shadow-camera-top={schatten} shadow-camera-bottom={-schatten} shadow-camera-far={400} />
-      <Kamera ziel={ziel} bewegt={bewegt} steuerung={steuerung} onAngekommen={onKameraFertig} />
+      <Kamera ziel={ziel} bewegt={bewegt} steuerung={steuerung} onFortschritt={onKameraFortschritt} />
       {/* Nur zoomen (Mausrad bzw. zwei Finger), dorthin wo der Zeiger steht – kein Drehen, kein Verschieben */}
       <OrbitControls ref={steuerung} makeDefault enableDamping dampingFactor={0.12} enableRotate={false} enablePan={false} zoomToCursor
                      minDistance={6} maxDistance={weite * 1.5} />
@@ -1332,18 +1356,18 @@ function HallenInneres({ halle, h, f, bewegt, aktiv, maschinen, maschineId, onMa
             )}
             {/* Maschine etwas größer als ihre Stellfläche in der Datenbank, damit sie gut zu erkennen ist */}
             <group position-y={0.12} rotation-y={m.tiefe_m > m.breite_m ? Math.PI / 2 : 0} scale={hervor || gewaehlt ? 1.18 : 1.12}>
-              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} detail="mittel" ampelGroesse={2.1} />
+              {/* Große Ampel mit LED-Anzeige (Zahl offener Störungen) – ragt deutlich über die Maschine */}
+              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} detail="mittel" ampelGroesse={3} anzeige={neutral ? null : m.offen} />
             </group>
             {/* Kurzname als Bodenmarkierung vorn auf dem Sockel – nichts schwebt über der Maschine */}
             <BodenSchild text={m.bezeichnung.split(' ').pop()} b={Math.min(m.breite_m * 1.12 + 0.6, 3.2)} z={m.tiefe_m * 0.56 + 0.95} f={f} />
-            {/* Störungszahl bzw. Auswahl klein an der vorderen Ecke des Sockels, beim Darüberfahren der volle Name */}
-            {aktiv && (mitStoerung || gewaehlt || hervor) && (
+            {/* Name beim Darüberfahren bzw. bei Auswahl klein an der vorderen Ecke des Sockels (die Zahl steht auf der Ampel) */}
+            {aktiv && (gewaehlt || hervor) && (
               <Html position={[-(m.breite_m * 0.56 + 0.3), 0.3, m.tiefe_m * 0.56 + 1.3]} center zIndexRange={[4, 1]}>
-                <button type="button" className={`raum-marke stufe-${mitStoerung ? stufe(m.offen, m.hoechste_prioritaet) : 'ruhig'}${gewaehlt ? ' gewaehlt' : ''}`}
-                        aria-label={`${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen, t)}`}
+                <button type="button" className={`raum-marke stufe-ruhig${gewaehlt ? ' gewaehlt' : ''}`}
+                        aria-label={neutral ? `${m.bezeichnung} (${m.anlagennummer})` : `${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen, t)}`}
                         aria-pressed={gewaehlt} data-ort={`m-${m.id}`} onClick={() => onMaschine(m)}>
-                  {mitStoerung && <span className="zaehl-marke">{m.offen}</span>}
-                  {(gewaehlt || hervor) && <span className="raum-marke-name">{m.bezeichnung} · {m.anlagennummer}</span>}
+                  <span className="raum-marke-name">{m.bezeichnung} · {m.anlagennummer}</span>
                 </button>
               </Html>
             )}
@@ -1375,7 +1399,7 @@ export default function Werk3D(props) {
   // Kamera: beginnt senkrecht von oben (dort landet die Kamerafahrt aus dem Land) und kippt, sobald die Ebene
   // aktiv ist, in die Schrägansicht. Verlassen: 'flach' = nach oben, dann sinken die Gebäude ab (→ 2D);
   // 'hoch' = Kamera steigt in die Vogelperspektive, während die Karte ins Land herauszoomt.
-  const { verlassen, starten, onBereit, vorschau, onFlach } = props;
+  const { verlassen, starten, onBereit, vorschau, onFlach, aufbauen } = props;
   // Unsichtbar vorbereitete Szene (vorschau): nach den ersten Bildern anhalten, bis sie gebraucht wird –
   // so zeichnet im Hintergrund nichts, während man noch über die Landkarte fährt
   const [pause, setPause] = useState(false);
@@ -1385,26 +1409,28 @@ export default function Werk3D(props) {
     return () => clearTimeout(warten);
   }, [vorschau, fertig]);
   const [kamera, setKamera] = useState('oben');
-  const [flach, setFlach] = useState(false);
+  // aufbauen (2D → 3D): Szene beginnt flach von oben (deckungsgleich mit der Zeichnung), die Gebäude wachsen,
+  // während die Kamera in die Schrägansicht kippt
+  const [flach, setFlach] = useState(Boolean(aufbauen));
   const [hintergrund, setHintergrund] = useState(false);   // Halleninneres vorbereiten erst, wenn Ruhe ist
   useEffect(() => { if (fertig) onBereit?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [fertig]);
   useEffect(() => {
     if (verlassen === 'hoch') { setKamera('hoch'); return undefined; }
     if (verlassen === 'flach') {
-      // Ablauf ohne feste Zeiten (auch auf langsamen Rechnern im Takt): Kamera fährt nach oben →
-      // kameraFertig setzt flach → Gebäude sinken ab → onFlach (KartenExplorer blendet zur Zeichnung über)
+      // Ablauf ohne feste Zeiten (auch auf langsamen Rechnern im Takt): Kamera steigt und dreht sich nach oben →
+      // ab der Hälfte der Fahrt sinken die Gebäude ab → onFlach (KartenExplorer blendet zur Zeichnung über)
       setKamera('oben');
       // schon oben (keine neue Fahrt, also keine Ankunft) oder ohne Bewegung: gleich flach machen
       if (!bewegt || kamera === 'oben') setFlach(true);
       return undefined;
     }
-    setFlach(false);
     if (!fertig || !starten) return undefined;
-    const warten = setTimeout(() => setKamera('normal'), bewegt ? 120 : 0);
+    // Kippen in die Schrägansicht und (falls flach) Gebäude wachsen lassen – gleichzeitig
+    const warten = setTimeout(() => { setKamera('normal'); setFlach(false); }, bewegt ? 120 : 0);
     return () => clearTimeout(warten);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fertig, starten, verlassen, bewegt]);
-  const kameraFertig = (schluessel) => { if (verlassen === 'flach' && schluessel.startsWith('oben')) setFlach(true); };
+  const kameraFortschritt = (schluessel, stand) => { if (verlassen === 'flach' && schluessel.startsWith('oben') && stand >= 0.5) setFlach(true); };
   const flachGemeldet = useRef(false);
   const flachFertig = () => { if (!flachGemeldet.current && verlassen === 'flach') { flachGemeldet.current = true; onFlach?.(); } };
   useEffect(() => { if (verlassen !== 'flach') flachGemeldet.current = false; }, [verlassen]);
@@ -1422,12 +1448,14 @@ export default function Werk3D(props) {
   }, [props.standort]);
   const t = useT();
   return (
-    <div className={`raum${fertig ? ' fertig' : ''}${props.verlassen ? ' verlassen' : ''}`} ref={rahmen}>
+    <div className={`raum${fertig ? ' fertig' : ''}${props.verlassen ? ' verlassen' : ''}`} ref={rahmen}
+         // Zahl der Maschinen mit LED-Anzeige > 0 in der geöffneten Halle (für Tests und Screenreader-Hinweis)
+         data-stoerungsanzeigen={props.gebaeudeId && !props.neutral ? props.maschinen.filter((m) => m.gebaeude_id === props.gebaeudeId && m.offen > 0).length : undefined}>
       {/* offsetSize: Größe ohne CSS-Transform messen (die Ebene wird beim Zoomen skaliert) */}
       <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar || !fertig || pause ? 'never' : bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
               camera={{ fov: 38, near: 0.5, far: 4000, position: [150, 200, 220] }} gl={{ antialias: true, alpha: true }}>
         <Szene {...props} f={f} bewegt={bewegt} phase={zeit.phase} kamera={kamera} flach={flach} hintergrund={hintergrund}
-               onKameraFertig={kameraFertig} onFlachFertig={flachFertig} />
+               onKameraFortschritt={kameraFortschritt} onFlachFertig={flachFertig} />
         <Vorbereiten onFertig={() => setFertig(true)} />
       </Canvas>
       <span className="raum-uhr" title={t('Ortszeit am Standort')}>

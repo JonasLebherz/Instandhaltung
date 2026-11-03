@@ -21,6 +21,7 @@ import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import { T } from '@/lib/sprache';
 import { standorteMitZahlen } from '@/lib/karten/daten';
 import KleineKarte from '@/components/karten/KleineKarte';
+import FavoritKachel from '@/components/FavoritKachel';
 import { aktuellePerson } from '@/lib/person';
 import { ansichtAusCookie, ansichtBedingung, ansichtAktiv } from '@/lib/ansicht';
 import { PersonWaehlenKnopf, RollenAbzeichen } from '@/components/PersonWahl';
@@ -297,6 +298,9 @@ export default async function Uebersicht() {
               ))}
             </ul>
           </section>
+
+          {/* Favorit: eine angepinnte Kartenansicht als kleines Fenster (Daten lädt die Kachel selbst) */}
+          <FavoritKachel />
 
           {/* Kleine Deutschlandkarte: Klick auf ein Werk öffnet die Störungskarte dort */}
           <section className="karte" style={{ '--i': 7 }}>

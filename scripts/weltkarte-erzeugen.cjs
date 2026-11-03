@@ -60,6 +60,19 @@ function zuschneiden(ring, x0, y0, x1, y1) {
   return aus;
 }
 
+/* ---------- Inseln neutral ---------- */
+// Kleine Inseln eines markierten Landes (z. B. Korsika bei Frankreich) werden nicht eingefärbt, sondern wie
+// die übrigen Länder grau gezeichnet: Sie sind für die Werke unwichtig und lenken nur ab.
+// Russland und die USA ausgenommen (dort gehören große Inseln bzw. Alaska sichtbar dazu).
+const INSELN_NEUTRAL = new Set(['DE', 'FR', 'PL', 'MX', 'CN', 'IN']);
+const flaeche = (ring) => { let a = 0; for (let i = 0; i < ring.length; i++) { const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length]; a += x0 * y1 - x1 * y0; } return Math.abs(a / 2); };
+/** Teilt die Ringe eines Landes in Festland (eingefärbt) und Inseln (< 3 % der größten Fläche, neutral) */
+function festlandUndInseln(code, rs) {
+  if (!INSELN_NEUTRAL.has(code) || rs.length < 2) return [rs, []];
+  const groesste = Math.max(...rs.map(flaeche));
+  return [rs.filter((r) => flaeche(r) >= groesste * 0.03), rs.filter((r) => flaeche(r) < groesste * 0.03)];
+}
+
 /* ---------- Weltkarte: Equal Earth ---------- */
 const [A1, A2, A3, A4, M] = [1.340264, -0.081106, 0.000893, 0.003796, Math.sqrt(3) / 2];
 function equalEarth(lat, lon) {
@@ -103,7 +116,10 @@ for (const f of ohneAntarktis) {
   const code = Object.keys(ISO).find((k) => ISO[k] === f.id);
   // kleine Inseln weglassen (weniger Daten)
   const rs = ringe(f.geometry).map((r) => zuschneiden(r.map(weltPunkt), -5, -5, WB + 5, WH + 5)).filter((r) => r.length > 2).filter((r) => { const xs = r.map((p) => p[0]), ys = r.map((p) => p[1]); return Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys) > 4; });
-  if (code) { weltPfade[code] = pfad(rs); weltMitten[code] = schwerpunkt(rs); weltKerne[code] = kern(rs); } else weltPfade.rest += pfad(rs);
+  if (code) {
+    const [fest, inseln] = festlandUndInseln(code, rs);
+    weltPfade[code] = pfad(fest); weltMitten[code] = schwerpunkt(fest); weltKerne[code] = kern(fest); weltPfade.rest += pfad(inseln);
+  } else weltPfade.rest += pfad(rs);
 }
 
 /* ---------- Länder: Mercator, auf den Ausschnitt eingepasst ---------- */
@@ -123,7 +139,7 @@ for (const [code, [lo0, lo1, la0, la1]] of Object.entries(ANSICHTEN)) {
     if (f.id === '010') continue;
     const rs = ringe(f.geometry).map((r) => zuschneiden(r.map(punkt), -R, -R, breite + R, hoehe + R)).filter((r) => r.length > 2 && gross(r));
     if (!rs.length) continue;
-    if (f.id === ISO[code]) land += pfad(rs); else nachbarn += pfad(rs);
+    if (f.id === ISO[code]) { const [fest, inseln] = festlandUndInseln(code, rs); land += pfad(fest); nachbarn += pfad(inseln); } else nachbarn += pfad(rs);
   }
   laender[code] = { ...v, land, nachbarn };
 }
@@ -148,7 +164,7 @@ const lupe = (() => {
     const rs = projiziert.map((ring) => zuschneiden(ring, cx - r, cy - r, cx + r, cy + r)).filter((ring) => ring.length > 2 && gross(ring));
     if (!rs.length) continue;
     const code = Object.keys(ISO).find((c) => ISO[c] === f.id);
-    if (code) { laender[code] = pfad(rs); mitten[code] = schwerpunkt(projiziert); } else rest += pfad(rs);
+    if (code) { const [fest, inseln] = festlandUndInseln(code, rs); laender[code] = pfad(fest); rest += pfad(inseln); mitten[code] = schwerpunkt(projiziert); } else rest += pfad(rs);
   }
   // Markierung in der Lupe: Länder, deren Mitte innerhalb der Lupe liegt (Russland nicht)
   const markiert = Object.keys(mitten).filter((c) => Math.hypot(mitten[c].x - cx, mitten[c].y - cy) < r * 0.8);

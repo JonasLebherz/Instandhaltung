@@ -449,7 +449,10 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             <section className="karte" style={{ '--i': 6 }}>
               <div className="karte-kopf">
                 <h2 className="abschnitt-titel">{t('Störungen dieser Maschine')}</h2>
-                <Link href={`/melden?maschine=${maschine.id}`}>{t('Störung melden')}</Link>
+                <span className="d-flex gap-3">
+                  <Link href={`/maschinen/${maschine.id}`}>{t('Maschinenhistorie')}</Link>
+                  <Link href={`/melden?maschine=${maschine.id}`}>{t('Störung melden')}</Link>
+                </span>
               </div>
               {a.liste.length === 0 ? (
                 <p className="leer"><i className="bi bi-check-circle" />{t('Keine Störungen im Zeitraum.')}</p>
