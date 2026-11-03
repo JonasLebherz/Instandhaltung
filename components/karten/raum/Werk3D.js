@@ -847,7 +847,7 @@ function gangInHalle(halle, maschinen) {
 /* ---------------------------------------------------------------------------
  * Szene
  * ------------------------------------------------------------------------- */
-function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, phase, kamera, flach, hintergrund, onKameraFortschritt, onFlachFertig }) {
+function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeude, onMaschine, f: fBasis, bewegt, neutral, phase, kamera, flach, hintergrund, onKameraFortschritt, onFlachFertig, vorschau }) {
   const vonOben = kamera === 'oben';
   const t = useT();
   // Boden, Straßen, Wände und Dächer in den Farben des Landes (Wüste in Mexiko, Schnee in Russland …)
@@ -1066,7 +1066,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
                         shadow-mapSize={[1024, 1024]} shadow-bias={-0.0006}
                         shadow-camera-left={-schatten} shadow-camera-right={schatten}
                         shadow-camera-top={schatten} shadow-camera-bottom={-schatten} shadow-camera-far={400} />
-      <Kamera ziel={ziel} bewegt={bewegt} steuerung={steuerung} onFortschritt={onKameraFortschritt} />
+      <Kamera ziel={ziel} bewegt={bewegt && !vorschau} steuerung={steuerung} onFortschritt={onKameraFortschritt} />
       {/* Nur zoomen (Mausrad bzw. zwei Finger), dorthin wo der Zeiger steht – kein Drehen, kein Verschieben */}
       <OrbitControls ref={steuerung} makeDefault enableDamping dampingFactor={0.12} enableRotate={false} enablePan={false} zoomToCursor
                      minDistance={6} maxDistance={weite * 1.5} />
@@ -1419,17 +1419,21 @@ export default function Werk3D(props) {
   // Kamera: beginnt senkrecht von oben (dort landet die Kamerafahrt aus dem Land) und kippt, sobald die Ebene
   // aktiv ist, in die Schrägansicht. Verlassen: 'flach' = nach oben, dann sinken die Gebäude ab (→ 2D);
   // 'hoch' = Kamera steigt in die Vogelperspektive, während die Karte ins Land herauszoomt.
-  const { verlassen, starten, onBereit, vorschau, onFlach, aufbauen, ruhen } = props;
+  const { verlassen, starten, onBereit, vorschau, onFlach, aufbauen, ruhen, onWeg } = props;
+  // Beim Abbauen melden (die Szene gilt dann nicht mehr als vorbereitet)
+  useEffect(() => () => onWeg?.(), []);   // eslint-disable-line react-hooks/exhaustive-deps
   // Erst „bereit“ melden, wenn wirklich Bilder gezeichnet sind – sonst wäre die Fläche während der Kamerafahrt leer
   const [gezeichnet, setGezeichnet] = useState(false);
   // Unsichtbar vorbereitete Szene (vorschau): nach den ersten Bildern anhalten, bis sie gebraucht wird –
   // so zeichnet im Hintergrund nichts, während man noch über die Landkarte fährt
   const [pause, setPause] = useState(false);
+  // Ändert sich die vorbereitete Ebene (z. B. andere Halle), kurz weiterzeichnen – die Kamera springt dorthin
   useEffect(() => {
     if (!vorschau || !fertig) { setPause(false); return undefined; }
+    setPause(false);
     const warten = setTimeout(() => setPause(true), 400);
     return () => clearTimeout(warten);
-  }, [vorschau, fertig]);
+  }, [vorschau, fertig, props.gebaeudeId]);
   const [kamera, setKamera] = useState('oben');
   // aufbauen (2D → 3D): Szene beginnt flach von oben (deckungsgleich mit der Zeichnung), die Gebäude wachsen,
   // während die Kamera in die Schrägansicht kippt

@@ -1501,7 +1501,8 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     display: flex;
     padding: var(--kopf-h) 22px 22px;
     overflow: auto;
-    will-change: transform, opacity;
+    /* kein dauerhaftes will-change: sonst zeichnet der Browser Texte nach einer Zoom-Fahrt nicht scharf neu
+       (Web-Animationen heben die Ebene während der Fahrt ohnehin auf die Grafikkarte) */
 }
 /* margin:auto zentriert – und lässt bei zu breitem Inhalt (Handy) seitlich scrollen */
 .ebene-inhalt {
@@ -1542,7 +1543,8 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 /* Zoom zwischen den Ebenen: Kamerafahrt per Web-Animation, siehe kamerafahrt() in KartenExplorer.js */
 /* Beschriftungen würden bei der Fahrt riesig mitwachsen – in der alten Ebene (und beim Herauszoomen
    in der neuen) deshalb ausblenden; die Karte selbst bleibt sichtbar */
-.ebene-alt :is(.karten-punkt, .lupe-titel, .plan-beschriftung, .gebaeude-name, .gebaeude-info, .zaehl-marke, .plan-maschine i, .maschine-modell),
+/* (nicht beim Überblenden 2D ↔ 3D: dort bleibt die alte Ebene vollständig, sonst flackern die Beschriftungen) */
+.ebene-alt:not(.ebene-blende) :is(.karten-punkt, .lupe-titel, .plan-beschriftung, .gebaeude-name, .gebaeude-info, .zaehl-marke, .plan-maschine i, .maschine-modell),
 .ohne-marken :is(.karten-punkt, .lupe-titel, .plan-beschriftung) { visibility: hidden; }
 
 .explorer-karte .karten-legende { margin: 12px 6px 2px; }
@@ -2290,12 +2292,13 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 @keyframes stillstand-blinken { 60% { opacity: .2; box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .ampel-rot .ampel-symbol i:nth-child(1), .ampel-punkt.ampel-rot { animation: none; } }
 
-/* ---------- Leistung: keine Hintergrund-Unschärfe über bewegten Inhalten ----------
-   backdrop-filter muss bei jeder Bewegung darunter neu berechnet werden. Während einer Kamerafahrt (im-flug)
-   und über der ständig gezeichneten 3D-Szene (buehne-raum) deshalb feste Flächen statt Glas. */
-.explorer-buehne.im-flug *, .explorer-buehne.buehne-raum * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-.explorer-buehne.buehne-raum .buehne-kopf, .explorer-buehne.buehne-raum .karten-knopf,
-.explorer-buehne.buehne-raum .raum-schalter, .explorer-buehne.buehne-raum .raum-halle { background: color-mix(in srgb, var(--karte-solid) 92%, transparent); }
+/* ---------- Leistung: keine Hintergrund-Unschärfe in der Kartenbühne ----------
+   backdrop-filter muss bei jeder Bewegung darunter neu berechnet werden (Kamerafahrten, 3D-Szene). Früher nur
+   während der Fahrt abgeschaltet – dann sprang das Aussehen am Ende der Fahrt um (sichtbares Flackern).
+   Deshalb in der Bühne immer fast deckende Flächen statt Glas. */
+.explorer-buehne * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.explorer-buehne .buehne-kopf, .explorer-buehne .karten-knopf,
+.explorer-buehne .raum-schalter, .explorer-buehne .raum-halle { background: color-mix(in srgb, var(--karte-solid) 90%, transparent); }
 
 /* ---------- Handy (schmale Bühne) ---------- */
 @media (max-width: 575.98px) {
@@ -2320,3 +2323,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .explorer-kompakt .raum-halle { font-size: .7rem; padding: 2px 3px 2px 7px; gap: 4px; }
 .explorer-kompakt .raum-uhr { font-size: .66rem; padding: 2px 7px; left: 8px; bottom: 8px; }
 .explorer-kompakt .buehne-kopf { padding-top: 3px; padding-bottom: 3px; }
+
+/* 2D → 3D: „3D“ ist sofort gewählt und pulsiert leicht, bis die Szene bereit ist */
+.raum-schalter button.wird-geladen { animation: laedt-puls .8s ease-in-out infinite alternate; }
+@keyframes laedt-puls { to { opacity: .55; } }

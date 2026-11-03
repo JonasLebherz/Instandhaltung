@@ -222,11 +222,16 @@ export default function KartenExplorer({
     }
     abbrechenZuZeichnung();
     setVerlassen(null);
+    if (!drei) setAufbau(null);   // 2D gewählt, während 3D noch vorbereitet wurde: abbrechen
     // 2D → 3D: wie 3D → 2D rückwärts. Szene unsichtbar und flach von oben vorbereiten (deckungsgleich mit der
     // Zeichnung), dann überblenden; danach wachsen die Gebäude, während die Kamera in die Schrägansicht kippt
     if (drei && !dreiD && raumMoeglich && ebene.standortId && !ruhig()) {
       dreiDVorladen();
       ton('sanft');
+      // Schon im Hintergrund vorbereitet (siehe „Vorwärmen“ unten)? Dann sofort überblenden – kein Warten
+      const fertigVorbereitet = bereit.current.has(raumSchluessel(ebene))
+        && vorbereitung?.standortId === ebene.standortId && (vorbereitung?.gebaeudeId ?? null) === (ebene.gebaeudeId ?? null);
+      if (fertigVorbereitet) { aufbauFertig(ebene); return; }
       setAufbau(ebene);
       setVorbereitung(ebene);
       return;
@@ -237,15 +242,15 @@ export default function KartenExplorer({
   // 2D → 3D: Ebene, deren Szene gerade (flach) vorbereitet wird; Sicherheitsnetz nach 5 s
   const [aufbau, setAufbau] = useState(null);
   const raumSchluessel = (e) => `raum-${e.standortId}`;
-  function aufbauFertig() {
-    if (!aufbau) return;
-    setUebergang({ von: aufbau, vonSchluessel: schluesselVon(aufbau), vonRaum: false, richtung: 'blende', dauer: 700 });
+  function aufbauFertig(ziel = aufbau) {
+    if (!ziel) return;
+    setUebergang({ von: ziel, vonSchluessel: schluesselVon(ziel), vonRaum: false, richtung: 'blende', dauer: 700 });
     setDreiD(true);
     setAufbau(null);
     setVorbereitung(null);
   }
   const aufbauRef = useRef(aufbauFertig);
-  aufbauRef.current = aufbauFertig;
+  aufbauRef.current = () => aufbauFertig();
   useEffect(() => {
     if (!aufbau) return undefined;
     const notfall = setTimeout(() => aufbauRef.current(), 5000);
@@ -290,13 +295,26 @@ export default function KartenExplorer({
   }
   function szeneBereit(schluessel) {
     bereit.current.add(schluessel);
-    if (aufbau && raumSchluessel(aufbau) === schluessel) { aufbauFertig(); return; }
+    if (aufbau && raumSchluessel(aufbau) === schluessel) { aufbauFertig(aufbau); return; }
     if (wartet && schluesselVon(wartet) === schluessel) {
       const ziel = wartet;
       setWartet(null);
       wechsle(ziel, 'rein');
     }
   }
+  // Vorwärmen: Steht man in 2D in einem Werk bzw. einer Halle, wird die 3D-Szene nach kurzer Ruhe unsichtbar
+  // (flach, Kamera von oben, danach angehalten) vorbereitet. Der Wechsel auf 3D beginnt dann sofort.
+  useEffect(() => {
+    if (!webgl || dreiD || !ebene.standortId || uebergang || aufbau || kompakt || ruhig() || window.innerWidth < 768) return undefined;
+    let abbruch = null;
+    const warten = setTimeout(() => {
+      const los = () => { dreiDVorladen(); setVorbereitung({ ...ebene }); };
+      if ('requestIdleCallback' in window) { const id = window.requestIdleCallback(los, { timeout: 2000 }); abbruch = () => window.cancelIdleCallback(id); } else los();
+    }, 1200);
+    return () => { clearTimeout(warten); abbruch?.(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webgl, dreiD, ebene.standortId, ebene.gebaeudeId, uebergang, aufbau, kompakt]);
+
   // Sicherheitsnetz: nach 2,5 s ohne fertige Szene trotzdem losfliegen
   useEffect(() => {
     if (!wartet) return undefined;
@@ -659,6 +677,7 @@ export default function KartenExplorer({
                  className={`explorer-ebene ebene-${rolle}${raum3d ? ' ebene-raum' : ''}`
                    + `${aktiv && uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`
                    + `${rolle === 'alt' && uebergang?.richtung === 'raus' ? ' ebene-weich' : ''}`
+                   + `${rolle === 'alt' && (uebergang?.richtung === 'blende' || uebergang?.richtung === 'sprung') ? ' ebene-blende' : ''}`
                    + `${schl === ohneEinblenden ? ' ohne-einblenden' : ''}`}
 >
               {raum3d ? (
@@ -671,7 +690,8 @@ export default function KartenExplorer({
                   </div>
                   <Werk3D standort={standortVon(e)} {...werkDaten(e.standortId)} gebaeudeId={e.gebaeudeId}
                           verlassen={rolle === 'alt' ? { blende: 'flach', sprung: null }[uebergang?.richtung] ?? 'hoch' : aktiv ? verlassen : null}
-                          vorschau={rolle === 'vorschau'} aufbauen={rolle === 'vorschau' && aufbau !== null}
+                          vorschau={rolle === 'vorschau'} aufbauen={rolle === 'vorschau' && !dreiD}
+                          onWeg={() => bereit.current.delete(schl)}
                           ruhen={aktiv && uebergang?.richtung === 'rein'} onFlach={aktiv ? zeichnungUeberblenden : undefined} starten={aktiv && !uebergang} onBereit={() => szeneBereit(schl)}
                           maschineId={aktiv ? maschineId : null} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
                 </>
@@ -694,8 +714,9 @@ export default function KartenExplorer({
           )}
           {raumMoeglich && (stufeName === 'werk' || stufeName === 'gebaeude') && (
             <div className="sprach-schalter raum-schalter" role="group" aria-label={t('Darstellung der Karte')}>
-              <button type="button" aria-pressed={!dreiD} onClick={() => ansichtWaehlen(false)}>2D</button>
-              <button type="button" aria-pressed={dreiD} onClick={() => ansichtWaehlen(true)}>3D</button>
+              {/* Sofortige Rückmeldung: „3D“ ist gleich gewählt, solange die Szene noch vorbereitet wird (pulsiert) */}
+              <button type="button" aria-pressed={!dreiD && !aufbau} onClick={() => ansichtWaehlen(false)}>2D</button>
+              <button type="button" aria-pressed={dreiD || Boolean(aufbau)} className={aufbau ? 'wird-geladen' : undefined} onClick={() => ansichtWaehlen(true)}>3D</button>
             </div>
           )}
         </div>}

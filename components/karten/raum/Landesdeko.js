@@ -759,75 +759,155 @@ function Bruecke({ x, z, breite, f }) {
 }
 
 /**
- * Fernsicht: die Gegend rund um das Werk bis zum Horizont – Felder im Flickenteppich, Waldstücke
- * (Baumart des Landes), Nachbarbetriebe mit Schornsteinen. Alles als Instanzen (wenige Zeichenaufrufe),
- * fest je Werk (Pseudozufall aus dem Kürzel). Der Dunst der Szene blendet nach hinten weich aus.
+ * Wie städtisch die Umgebung eines Werks ist: 0 = Kleinstadt (Gewerbegebiet am Ortsrand, dahinter Felder),
+ * 1 = Stadt (Industriegebiet, kleine Silhouette), 2–3 = Großstadt/Metropole (dichtes Industriegebiet,
+ * Hochhäuser im Dunst). Nach Stadtname, unbekannte Städte gelten als Stadt.
+ */
+export const STADTGROESSE = {
+  Shanghai: 3, Shenzhen: 3, Houston: 2.4, Berlin: 2.2, Detroit: 2, Hamburg: 2, München: 2, Pune: 2,
+  Stuttgart: 1.5, Köln: 1.5, Lyon: 1.4, Wrocław: 1.2, Dortmund: 1.2, Hannover: 1.2, Leipzig: 1.2, Nürnberg: 1.2, Querétaro: 1.2,
+  Albstadt: 0, Kaluga: 0.4,
+};
+
+/**
+ * Fernsicht: die Gegend rund um das Werk bis zum Horizont – ein Industriegebiet statt Ackerland:
+ * Straßenraster, Grundstücke mit Hallen unterschiedlicher Höhe (teils Lagerhallen mit Andockstellen),
+ * Parkplätze, Silos, Schornsteine, Baumreihen an den Straßen. Bei größeren Städten dahinter eine
+ * Hochhaus-Silhouette im Dunst, bei kleinen Orten am Rand noch Felder und Wald.
+ * Alles als Instanzen (wenige Zeichenaufrufe), fest je Werk (Pseudozufall aus dem Kürzel).
  */
 function Fernsicht({ standort, gs, f, stil, n, fluss, landstrasse }) {
+  const groesse = STADTGROESSE[standort.stadt] ?? 1;
   const teile = useMemo(() => {
     const z = zufall(`${standort.kuerzel}-fernsicht`);
     const { B, T } = gs;
     const innen = (x, y, rand) => Math.abs(x) < B / 2 + UMLAND_RAND + rand && y > -T / 2 - UMLAND_RAND - rand && y < T / 2 + UMLAND_VORN + rand;
-    const amFluss = (x) => fluss && Math.abs(x - (-B / 2 - 14)) < 18;
+    const amFluss = (x) => fluss && Math.abs(x - (-B / 2 - 14)) < 22;
     const anStrasse = (y, t) => Math.abs(y - landstrasse) < t / 2 + 8;
+    const dunkel = f.dunkel;
+    const ton = (hell, dunk) => (dunkel ? dunk : hell);
+    const HALLEN = [ton('#d9dde2', '#5b616b'), ton('#c7cdd5', '#535a63'), ton('#e4e1da', '#625f59'), ton('#b9c1cb', '#4b525b'), ton('#dfe4e8', '#575e66')];
+    const DAECHER = [ton('#9aa3ad', '#3e444c'), ton('#7f8a96', '#363c44'), ton('#a8a29a', '#46423d'), ton('#6f8fa8', '#33475a')];
+    const grundstuecke = [];
+    const strassen = [];
+    const hallen = [];
+    const daecher = [];
+    const tore = [];
+    const parkplaetze = [];
+    const silos = [];
+    const schlote = [];
     const felder = [];
     const kronen = [];
     const staemme = [];
     const kegel = [];
-    const hallen = [];
-    const schlote = [];
-    const feldFarben = [...(stil.feld ? n(stil.feld) : []), n(stil.umland), n(stil.gras ?? stil.umland)];
-    // Felder in einem lockeren Raster bis ca. 900 m
-    for (let gx = -900; gx < 900; gx += 70) {
-      for (let gy = -900; gy < 900; gy += 55) {
-        const b = 45 + z() * 30;
-        const t = 35 + z() * 25;
-        const x = gx + z() * 15;
-        const y = gy + z() * 12;
-        if (innen(x, y, 30) || amFluss(x) || anStrasse(y, t) || z() < 0.25) continue;
-        felder.push({ p: [x, 0.03, y], g: [b, 0.02, t], farbe: feldFarben[Math.floor(z() * feldFarben.length)] });
+    const tuerme = [];
+    const turmKronen = [];
+    // Industriegebiet: Blöcke im Raster, Reichweite und Dichte wachsen mit der Stadtgröße
+    const reichweite = 420 + groesse * 160;
+    const raster = 120;
+    const strassenBreite = 12;
+    for (let gx = -reichweite; gx <= reichweite; gx += raster) {
+      // Straßen in Nord-Süd-Richtung
+      if (!amFluss(gx)) strassen.push({ p: [gx - raster / 2, 0.06, 0], g: [strassenBreite * 0.75, 0.02, reichweite * 2] });
+    }
+    for (let gy = -reichweite; gy <= reichweite; gy += raster) {
+      if (!anStrasse(gy - raster / 2, 20)) strassen.push({ p: [0, 0.06, gy - raster / 2], g: [reichweite * 2, 0.02, strassenBreite * 0.75] });
+    }
+    for (let gx = -reichweite; gx <= reichweite; gx += raster) {
+      for (let gy = -reichweite; gy <= reichweite; gy += raster) {
+        const b = raster - strassenBreite - 6;
+        const t = raster - strassenBreite - 6;
+        if (innen(gx, gy, 55) || amFluss(gx) || anStrasse(gy, t)) continue;
+        const abstand = Math.hypot(gx, gy);
+        // Kleinstadt: außen Felder statt Gewerbe
+        if (groesse < 1 && abstand > 300 + groesse * 300) {
+          felder.push({ p: [gx, 0.03, gy], g: [b, 0.02, t], farbe: (stil.feld ? n(stil.feld) : [n(stil.umland)])[Math.floor(z() * 2) % (stil.feld ? 2 : 1)] });
+          continue;
+        }
+        if (z() < 0.12) continue;                       // ab und zu ein freies Grundstück (Wiese)
+        grundstuecke.push({ p: [gx, 0.05, gy], g: [b, 0.02, t] });
+        // 1–2 Hallen je Grundstück, Rest Parkplatz
+        const anzahl = z() < 0.45 ? 2 : 1;
+        for (let i = 0; i < anzahl; i += 1) {
+          const hb = (anzahl === 2 ? b * 0.42 : b * (0.55 + z() * 0.3));
+          const ht = t * (0.45 + z() * 0.3);
+          const hh = 7 + z() * (6 + groesse * 4) + (z() < 0.15 ? 10 : 0);   // manche hohe Lager
+          const hx = gx + (anzahl === 2 ? (i ? 1 : -1) * b * 0.24 : (z() - 0.5) * (b - hb) * 0.6);
+          const hy = gy - t / 2 + ht / 2 + 4;
+          const farbe = HALLEN[Math.floor(z() * HALLEN.length)];
+          hallen.push({ p: [hx, hh / 2, hy], g: [hb, hh, ht], farbe });
+          daecher.push({ p: [hx, hh + 0.25, hy], g: [hb + 0.6, 0.5, ht + 0.6], farbe: DAECHER[Math.floor(z() * DAECHER.length)] });
+          // Lager: Andockstellen (dunkle Tore) an der Vorderseite
+          if (z() < 0.5) {
+            for (let d = -2; d <= 2; d += 1) tore.push({ p: [hx + d * Math.min(4.5, hb / 6), 2, hy + ht / 2 + 0.05], g: [3, 3.6, 0.2] });
+          }
+          if (z() < 0.18 + groesse * 0.05) schlote.push({ p: [hx + hb * 0.35, (hh + 18) / 2, hy - ht * 0.2], g: [1.8, hh + 18, 1.8] });
+        }
+        parkplaetze.push({ p: [gx, 0.07, gy + t / 2 - 9], g: [b * 0.8, 0.02, 12] });
+        if (z() < 0.25) {
+          for (let k = 0; k < 3; k += 1) silos.push({ p: [gx + b / 2 - 6 - k * 5, 6, gy - t / 2 + 8], g: [4, 12, 4] });
+        }
+        // Baumreihe an der Straße (vorn am Grundstück)
+        if (z() < 0.6) {
+          for (let k = 0; k < 6; k += 1) {
+            const x = gx - b / 2 + 6 + k * (b - 12) / 5;
+            const y = gy + t / 2 + 3;
+            staemme.push({ p: [x, 1.2, y], g: [0.4, 2.4, 0.4] });
+            kronen.push({ p: [x, 3.6, y], g: [3.6, 3.2, 3.6] });
+          }
+        }
       }
     }
-    // Waldstücke
-    const nadel = ['kegel', 'birke'].includes(stil.baum) || stil.baum === 'mix';
-    for (let w = 0; w < 26; w += 1) {
-      const wx = (z() - 0.5) * 1500;
-      const wy = (z() - 0.5) * 1500;
-      if (innen(wx, wy, 60)) continue;
-      for (let i = 0; i < 14; i += 1) {
-        const x = wx + (z() - 0.5) * 60;
-        const y = wy + (z() - 0.5) * 40;
-        if (amFluss(x) || anStrasse(y, 4) || innen(x, y, 20)) continue;
-        const g = 0.8 + z() * 0.8;
-        staemme.push({ p: [x, 1.2 * g, y], g: [0.5 * g, 2.4 * g, 0.5 * g] });
-        if (nadel && z() < 0.6) kegel.push({ p: [x, 4.2 * g, y], g: [3.6 * g, 6 * g, 3.6 * g] });
-        else kronen.push({ p: [x, 3.8 * g, y], g: [4 * g, 3.6 * g, 4 * g] });
+    // Kleinstadt: Waldstücke weiter draußen
+    if (groesse < 1) {
+      for (let w = 0; w < 20; w += 1) {
+        const wx = (z() - 0.5) * 1700;
+        const wy = (z() - 0.5) * 1700;
+        if (Math.hypot(wx, wy) < 500) continue;
+        for (let i = 0; i < 14; i += 1) {
+          const x = wx + (z() - 0.5) * 60;
+          const y = wy + (z() - 0.5) * 40;
+          if (amFluss(x) || anStrasse(y, 4)) continue;
+          const g = 0.8 + z() * 0.8;
+          staemme.push({ p: [x, 1.2 * g, y], g: [0.5 * g, 2.4 * g, 0.5 * g] });
+          if (z() < 0.5) kegel.push({ p: [x, 4.2 * g, y], g: [3.6 * g, 6 * g, 3.6 * g] });
+          else kronen.push({ p: [x, 3.8 * g, y], g: [4 * g, 3.6 * g, 4 * g] });
+        }
       }
     }
-    // Nachbarbetriebe: Hallen in Grautönen, manche mit Schornstein
-    for (let i = 0; i < 18; i += 1) {
-      const winkel = z() * Math.PI * 2;
-      const r = 320 + z() * 600;
-      const x = Math.cos(winkel) * r;
-      const y = Math.sin(winkel) * r;
-      if (amFluss(x) || anStrasse(y, 50)) continue;
-      const b = 40 + z() * 70;
-      const t = 25 + z() * 40;
-      const h = 8 + z() * 10;
-      hallen.push({ p: [x, h / 2, y], g: [b, h, t], farbe: ['#c9ced6', '#b7bec8', '#d6d2c8', '#a9b1bb'][i % 4] });
-      if (z() < 0.4) schlote.push({ p: [x + b * 0.3, (h + 20) / 2, y], g: [2, h + 20, 2] });
+    // Stadt-Silhouette hinter dem Werk (im Dunst): Hochhäuser, je größer die Stadt, desto mehr und höher
+    if (groesse >= 1) {
+      const anzahl = Math.round(14 + groesse * 16);
+      const GLAS = [ton('#9fb0c0', '#3f4b58'), ton('#b8c4cf', '#4a5562'), ton('#8a9aa8', '#37424e'), ton('#c9cfd6', '#55606b')];
+      for (let i = 0; i < anzahl; i += 1) {
+        const x = (z() - 0.5) * (500 + groesse * 260);
+        const y = -reichweite - 140 - z() * (180 + groesse * 60);
+        const h = 30 + z() ** 2 * (40 + groesse * 70);
+        const b = 14 + z() * 16;
+        const t = 14 + z() * 16;
+        tuerme.push({ p: [x, h / 2, y], g: [b, h, t], farbe: GLAS[Math.floor(z() * GLAS.length)] });
+        if (h > 80 && z() < 0.5) turmKronen.push({ p: [x, h + 6, y], g: [1, 12, 1] });   // Antenne
+      }
     }
-    return { felder, kronen, staemme, kegel, hallen, schlote };
+    return { grundstuecke, strassen, hallen, daecher, tore, parkplaetze, silos, schlote, felder, kronen, staemme, kegel, tuerme, turmKronen };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [standort.kuerzel, gs, f.dunkel, fluss, landstrasse]);
+  }, [standort.kuerzel, gs, f.dunkel, fluss, landstrasse, groesse]);
   return (
     <>
       <Viele teile={teile.felder} schatten={false} rauheit={1} />
+      <Viele teile={teile.grundstuecke} farbe={f.beton} schatten={false} rauheit={1} />
+      <Viele teile={teile.strassen} farbe={f.strasse} schatten={false} rauheit={1} />
+      <Viele teile={teile.parkplaetze} farbe={f.strasse} schatten={false} rauheit={1} />
+      <Viele teile={teile.hallen} schatten={false} rauheit={0.8} />
+      <Viele teile={teile.daecher} schatten={false} rauheit={0.7} />
+      <Viele teile={teile.tore} farbe={f['maschine-dunkel']} schatten={false} />
+      <Viele teile={teile.silos} form="zyl" farbe={f.tank} schatten={false} metall={0.3} rauheit={0.5} />
+      <Viele teile={teile.schlote} form="zyl" farbe={f.tank} schatten={false} />
       <Viele teile={teile.staemme} form="zyl" farbe={f.stamm} schatten={false} />
       <Viele teile={teile.kronen} form="kugel" farbe={f.baum} schatten={false} rauheit={0.95} />
       <Viele teile={teile.kegel} form="kegel" farbe="#3e6b47" schatten={false} rauheit={0.95} />
-      <Viele teile={teile.hallen} schatten={false} />
-      <Viele teile={teile.schlote} form="zyl" farbe={f.tank} schatten={false} />
+      <Viele teile={teile.tuerme} schatten={false} rauheit={0.35} metall={0.25} />
+      <Viele teile={teile.turmKronen} form="zyl" farbe={f.tank} schatten={false} />
     </>
   );
 }
@@ -905,7 +985,7 @@ function Umgebung({ standort, gs, f }) {
         )}
       <Boden x={gs.tor.x + gs.tor.b / 2 - B / 2} z={T / 2 + 2.3} b={gs.tor.b} t={4.6} farbe={f.strasse} />
       {/* Feld neben dem Werk */}
-      {stil.feld && <Feld x={(fluss ? 1 : -1) * (B / 2 + UMLAND_RAND / 2)} z={-T * 0.12} b={UMLAND_RAND - 6} t={T * 0.55} farben={n(stil.feld)} />}
+      {stil.feld && (STADTGROESSE[standort.stadt] ?? 1) < 1 && <Feld x={(fluss ? 1 : -1) * (B / 2 + UMLAND_RAND / 2)} z={-T * 0.12} b={UMLAND_RAND - 6} t={T * 0.55} farben={n(stil.feld)} />}
       {/* Berge hinten (Mexiko kahl, Russland nicht – dort liegt der Schnee schon auf dem Boden) */}
       {land === 'MX' && [-0.38, -0.12, 0.18].map((a, i) => (
         <Berg key={i} x={a * breite} z={-T / 2 - 16} r={11 + i * 2} h={14 + (i % 2) * 6} farbe={f.dunkel ? '#9d7a52' : '#c4935f'} />

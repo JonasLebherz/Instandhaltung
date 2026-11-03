@@ -396,7 +396,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.buehne-kopf button[aria-label="Herauszoomen"]'); await p.waitForTimeout(1500);
   pruefe('3D: zurück zum Werk ohne Neuladen der Szene', p.url().endsWith('/karte?werk=alb') && (await p.$$eval('.raum canvas', (z) => z.length)) === 1, p.url());
   await p.click('.raum-schalter button:has-text("2D")');
-  await p.waitForFunction(() => !document.querySelector('.raum'), null, { timeout: 30000 }).catch(() => {});
+  await p.waitForFunction(() => document.querySelector('.ebene-neu .lageplan') && !document.querySelector('.ebene-neu .raum, .ebene-alt'), null, { timeout: 30000 }).catch(() => {});
   // Melden in 3D: neutral (keine Störungszahlen), Maschine über die Liste wählen
   await p.click('.raum-schalter button:has-text("3D")'); await p.waitForTimeout(300);
   await p.goto(BASE + '/melden?standort=' + sql("SELECT id FROM standort WHERE kuerzel='ALB'"));
@@ -411,7 +411,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   // 3D → 2D: Kamera fährt erst nach oben, Gebäude werden flach, dann Überblendung (gut 2 s), dann ist die 3D-Szene weg
   await p.waitForTimeout(300);
   pruefe('3D → 2D: Szene bleibt erst stehen (Kamera hoch, Gebäude flach)', (await p.$('.raum.verlassen')) !== null && (await p.$('.ebene-neu .lageplan')) === null);
-  await p.waitForFunction(() => !document.querySelector('.raum'), null, { timeout: 30000 }).catch(() => {});
+  await p.waitForFunction(() => document.querySelector('.ebene-neu .lageplan') && !document.querySelector('.ebene-neu .raum, .ebene-alt'), null, { timeout: 30000 }).catch(() => {});
   pruefe('2D: Lageplan wieder da, Wahl gemerkt', (await p.$('.ebene-neu .lageplan')) !== null && (await p.evaluate(() => localStorage.getItem('kartenansicht'))) === '2d');
 
   // Ton: an/aus im Konto-Menü der Seitenleiste (nicht mehr in der Karte), Wahl gemerkt
