@@ -20,7 +20,7 @@ Jeder Push nach GitHub wird von Vercel automatisch veröffentlicht. Deshalb vor 
 - Datenänderungen laufen nur über Server-Aktionen in `app/aktionen.js`: erst Login prüfen, dann Eingaben prüfen (`{ fehler, eingabe }` zurückgeben), dann speichern (bei mehreren Schritten in `sql.begin`), dann `flash()`, `revalidatePath('/', 'layout')` und `redirect()`.
 - Formulare sind Client-Komponenten mit `useActionState`, `noValidate` und Fehleranzeige über `components/Feldfehler.js`.
 - Zeiten: In der Datenbank als `TIMESTAMPTZ`, angezeigt in Europe/Berlin über `lib/format.js`.
-- Design: Farben nur über die CSS-Variablen in `app/globals.css`, jeweils hell **und** dunkel. Karten mit `.karte`, Status als Pills (`components/Pills.js`). Animationen müssen bei `prefers-reduced-motion` aus sein.
+- Design: Glas im Apple-Stil mit Akzent Petrol und ruhigem Hintergrund „Morgendunst“ (keine bunten Farbwolken, soll nicht nach KI-Vorlage aussehen). Farben nur über die CSS-Variablen in `app/globals.css`, jeweils hell **und** dunkel. Karten mit `.karte`, Status als Pills (`components/Pills.js`). Animationen müssen bei `prefers-reduced-motion` aus sein.
 - Störungskarte (`app/karte/`, `components/karten/`): Eine Zoom-Karte (`KartenExplorer.js`) für Welt → Land → Werk → Gebäude, ohne Neuladen. Positionen kommen in Metern aus der Datenbank und werden prozentual über ein SVG gelegt. Details stehen in `CLAUDE.md` unter „Störungskarte“.
 - Navigation: Seitenleiste links (`components/Seitenleiste.js`). Neue Seiten dort in `BEREICHE` eintragen. Details in `CLAUDE.md` unter „Seitenleiste & Logo“.
 - Statistik (`app/statistik/`) und Datenbasis (`app/datenbasis/`): Aufbau in `CLAUDE.md` in den gleichnamigen Abschnitten. Pro Seite höchstens 5 Datenbankabfragen gleichzeitig.

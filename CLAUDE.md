@@ -169,7 +169,7 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 - Zustand in `<html data-leiste="auf|zu">`, gemerkt in `localStorage` unter `seitenleiste`. Das Start-Skript in `app/layout.js` setzt ihn vor dem ersten Anzeigen (ohne Wahl: ab 1200 px offen). Die Breite steuert `--leiste-b`, der Inhalt rückt per `.app-rahmen` daneben.
 - Eingeklappt wird der Text zur Sprechblase beim Darüberfahren. Unter 768 px gibt es oben `.mobil-kopf`, die Leiste fährt dann von links herein.
 - Neue Seiten in `BEREICHE` in `Seitenleiste.js` eintragen (mit `symbol` und gefüllter Variante `symbolAktiv`). Unter „Störungskarte“ stehen die Favoriten (`components/Favoriten.js`).
-- Aktiver Eintrag im Hellmodus: Symbol in einem kleinen Quadrat in der Akzentfarbe (`--akzent`, Verlauf zu `--akzent-hover`, Symbol `--akzent-text`), Fläche dezent getönt; der Dunkelmodus bleibt wie er ist.
+- Aktiver Eintrag: heller Glas-Streifen (`--glas-linse`) mit feinem Schatten, Symbol in der Akzentfarbe – kein dunkler Block.
 - Logo: `components/Logo.js` – schlicht und dunkel: fast schwarzes Quadrat mit Sechskantmutter als feiner weißer Linie (Farben `--logo-*`, im Dunkelmodus etwas heller mit feinem Rand). Beim Darüberfahren dreht sich die Mutter. Das Browser-Symbol `app/icon.svg` hat dieselbe Form mit festen Farben.
 
 ## Personen & Rollen
@@ -190,11 +190,11 @@ Lokales Testen ohne Supabase: `.env.local` mit `DATABASE_URL=postgresql://…@lo
 Angelehnt an die Apple Human Interface Guidelines, aber **ohne** Apple-Logos oder Markenzeichen.
 
 - Alle Farben sind CSS-Variablen in `app/globals.css`, mit einem hellen Satz in `:root` und einem dunklen in `:root[data-theme="dark"]`. Nie feste Farben in Komponenten verwenden.
-- „Glas“-Optik (dezent, angelehnt an Liquid Glass): `--karte` ist halbtransparent, dazu `backdrop-filter: var(--glas-unschaerfe)`, `border: 1px solid var(--glas-rand)` und `box-shadow: var(--glas-kante), var(--schatten)`. Der weiche Hintergrund entsteht in `body::before`. Wo eine feste Farbe nötig ist (z. B. Chart.js), `--karte-solid` verwenden. Bei `prefers-reduced-transparency` gibt es feste Flächen.
+- „Glas“-Optik (angelehnt an Apples Liquid Glass): `--karte` ist stark durchscheinend, darüber `--glas-licht` als Verlauf (Lichtkante oben), dazu `backdrop-filter: var(--glas-unschaerfe)`, `border: 1px solid var(--glas-rand)` und `box-shadow: var(--glas-kante), var(--schatten)` (Lichtkante + feine Haarlinie außen). Der Hintergrund „Morgendunst“ entsteht in `body::before` (`--umgebung-licht/-kuehl/-dunst/-verlauf`: warmes Licht oben links, kühles Stahlblau unten rechts) – getönt, damit das Glas sichtbar ist, aber **bewusst ohne bunte Farbwolken oder Leuchteffekte** (soll nicht nach KI-Vorlage aussehen). Wo eine feste Farbe nötig ist (z. B. Chart.js), `--karte-solid` verwenden. Bei `prefers-reduced-transparency` gibt es feste Flächen.
 - Einblend-Animationen mit `backwards` statt `both`, sonst blockieren sie hinterher Hover-Transformationen.
 - Hell/Dunkel: Ein Skript in `app/layout.js` setzt `data-theme` und `data-bs-theme` vor dem ersten Anzeigen. Die Auswahl steht in `localStorage` unter `darstellung` (`hell`, `dunkel` oder leer = automatisch). Beim Umschalten wird das Event `darstellungswechsel` ausgelöst, die Diagramme färben sich daraufhin neu ein.
 - Karten (`.karte`) gleiten versetzt ein. Die Reihenfolge steuert `style={{ '--i': n }}`. Kennzahlen zählen hoch (`components/Zaehler.js`), Balken wachsen. Bei `prefers-reduced-motion` ist alles aus.
-- Akzentfarbe Graphit wie das Logo: `#1d1d1f` (dunkel hell `#f2f2f7`, Schrift darauf `--akzent-text`). Kein Blau als Auswahlfarbe. In 3D eigener ruhiger Stahlton `--raum-akzent`, Schilder und Firmenflagge graphit (`f.marke`). Status und Priorität werden als Pills angezeigt (`components/Pills.js`), immer mit Text.
+- Akzentfarbe **Petrol** `#1f7a80` (dunkel `#2a9aa1`, Schrift darauf `--akzent-text` weiß) – klar getrennt von den Statusfarben Rot/Orange/Grün. Kein kräftiges Blau. Auswahl in der Seitenleiste wie bei Apple: heller Glas-Streifen (`--glas-linse`), nur das Symbol in der Akzentfarbe; 2D/3D-Schalter als Segment-Schalter mit hellem Knopf. In 3D eigener ruhiger Stahlton `--raum-akzent`, Schilder und Firmenflagge graphit (`f.marke`). Status und Priorität werden als Pills angezeigt (`components/Pills.js`), immer mit Text.
 - Tablet und Handy müssen bedienbar sein: kein seitliches Scrollen der Seite, Tabellenspalten werden ab `md`/`lg` eingeblendet.
 
 ## Datenmodell (siehe `supabase/schema.sql`)

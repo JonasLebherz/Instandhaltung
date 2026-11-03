@@ -26,7 +26,7 @@
  * ================================================================== */
 
 :root {
-    --hintergrund: #eef0f4;
+    --hintergrund: #dfe3e8;
     --karte-solid: #ffffff;          /* feste Fläche, z. B. für Diagramm-Punkte */
     --text: #1d1d1f;
     --logo-oben: #2c2c30; --logo-unten: #0c0c0e; --logo-rand: rgba(255, 255, 255, .06); --logo-zeichen: #f5f5f7;
@@ -38,23 +38,27 @@
     --fuellung: rgba(118, 118, 128, .10);   /* Balken-Hintergrund, Sekundär-Buttons */
     --fuellung-hover: rgba(118, 118, 128, .17);
 
-    /* Glas: halbtransparente Flächen mit Unschärfe und Lichtkante */
-    --karte: rgba(255, 255, 255, .62);
-    --karte-erhoeht: rgba(255, 255, 255, .82);   /* Menüs, Navigation */
-    --glas-rand: rgba(255, 255, 255, .7);
-    --glas-kante: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 -1px 0 rgba(255, 255, 255, .25);
-    --glas-unschaerfe: blur(22px) saturate(175%);
-    --glas-linse: rgba(255, 255, 255, .92);      /* aktiver Navigationspunkt */
+    /* Glas (angelehnt an Apples „Liquid Glass“): stark durchscheinende Flächen mit Unschärfe,
+       Lichtkante oben (--glas-licht als Verlauf), feiner Haarlinie außen und weichem Schatten */
+    --karte: rgba(255, 255, 255, .42);
+    --glas-licht: rgba(255, 255, 255, .26);      /* heller oben, läuft nach unten aus */
+    --karte-erhoeht: rgba(255, 255, 255, .72);   /* Menüs, Navigation */
+    --glas-rand: rgba(255, 255, 255, .55);
+    --glas-kante: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 -1px 0 rgba(255, 255, 255, .18), 0 0 0 .5px rgba(0, 0, 0, .07);
+    --glas-unschaerfe: blur(28px) saturate(190%);
+    --glas-linse: rgba(255, 255, 255, .8);       /* aktiver Navigationspunkt: heller Glas-Streifen */
 
-    /* Weicher Hintergrund: drei sehr blasse Farbflächen */
-    --umgebung-1: rgba(0, 113, 227, .13);
-    --umgebung-2: rgba(175, 82, 222, .10);
-    --umgebung-3: rgba(48, 176, 199, .10);
+    /* Hintergrund „Morgendunst“: warmes Licht oben links, kühles Stahlblau unten rechts –
+       ruhig wie ein unscharfes Foto, bewusst ohne bunte Farbwolken. Darauf wird das Glas sichtbar. */
+    --umgebung-licht: rgba(255, 246, 232, .95);
+    --umgebung-kuehl: rgba(150, 170, 195, .75);
+    --umgebung-dunst: rgba(185, 205, 215, .6);
+    --umgebung-verlauf: linear-gradient(155deg, #e9e6e0 0%, #d9dfe6 55%, #c9d2dc 100%);
 
-    --akzent: #1d1d1f;               /* Graphit wie das Logo – schlicht statt Blau */
-    --akzent-hover: #3a3a3c;
-    --akzent-zart: rgba(29, 29, 31, .07);
-    --akzent-ring: rgba(29, 29, 31, .16);
+    --akzent: #1f7a80;               /* Petrol: ruhig, technisch, klar getrennt von Rot/Orange/Grün */
+    --akzent-hover: #186166;
+    --akzent-zart: rgba(31, 122, 128, .12);
+    --akzent-ring: rgba(31, 122, 128, .26);
     --akzent-text: #ffffff;          /* Schrift auf Akzentflächen */
 
     /* Status-Farben: jeweils Hintergrund (zart) + Schrift (kräftig) */
@@ -102,21 +106,24 @@
     --fuellung: rgba(255, 255, 255, .08);
     --fuellung-hover: rgba(255, 255, 255, .13);
 
-    --karte: rgba(30, 30, 34, .55);
-    --karte-erhoeht: rgba(40, 40, 44, .82);
-    --glas-rand: rgba(255, 255, 255, .09);
-    --glas-kante: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 -1px 0 rgba(255, 255, 255, .02);
-    --glas-linse: rgba(255, 255, 255, .13);
+    --karte: rgba(255, 255, 255, .05);
+    --glas-licht: rgba(255, 255, 255, .04);
+    --karte-erhoeht: rgba(40, 42, 48, .78);
+    --glas-rand: rgba(255, 255, 255, .10);
+    --glas-kante: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 .5px rgba(0, 0, 0, .5);
+    --glas-unschaerfe: blur(28px) saturate(170%);
+    --glas-linse: rgba(255, 255, 255, .12);
 
-    --umgebung-1: rgba(41, 151, 255, .16);
-    --umgebung-2: rgba(191, 90, 242, .12);
-    --umgebung-3: rgba(48, 176, 199, .08);
+    --umgebung-licht: rgba(80, 88, 100, .35);
+    --umgebung-kuehl: rgba(40, 60, 70, .35);
+    --umgebung-dunst: rgba(30, 50, 60, .25);
+    --umgebung-verlauf: linear-gradient(160deg, #15181d, #0b0d10);
 
-    --akzent: #f2f2f7;               /* im Dunkeln hell, Schrift darauf dunkel */
-    --akzent-hover: #ffffff;
-    --akzent-zart: rgba(255, 255, 255, .1);
-    --akzent-ring: rgba(255, 255, 255, .22);
-    --akzent-text: #1d1d1f;
+    --akzent: #2a9aa1;               /* Petrol, im Dunkeln etwas heller für guten Kontrast */
+    --akzent-hover: #36adb4;
+    --akzent-zart: rgba(42, 154, 161, .18);
+    --akzent-ring: rgba(42, 154, 161, .34);
+    --akzent-text: #ffffff;
 
     --gruen-bg: rgba(48, 209, 88, .16);   --gruen: #30d158;
     --orange-bg: rgba(255, 159, 10, .16); --orange: #ff9f0a;
@@ -145,8 +152,9 @@
 
 /* Wer "Transparenz reduzieren" eingestellt hat, bekommt feste Flächen */
 @media (prefers-reduced-transparency: reduce) {
-    :root { --karte: #ffffff; --karte-erhoeht: #ffffff; --glas-unschaerfe: none; --umgebung-1: transparent; --umgebung-2: transparent; --umgebung-3: transparent; }
-    :root[data-theme="dark"] { --karte: #1c1c1e; --karte-erhoeht: #2c2c2e; }
+    :root { --karte: #ffffff; --karte-erhoeht: #ffffff; --glas-unschaerfe: none; --glas-licht: transparent;
+            --umgebung-licht: transparent; --umgebung-kuehl: transparent; --umgebung-dunst: transparent; --umgebung-verlauf: #eef0f4; }
+    :root[data-theme="dark"] { --karte: #1c1c1e; --karte-erhoeht: #2c2c2e; --umgebung-verlauf: #050507; }
 }
 
 /* =====================================================================
@@ -174,10 +182,10 @@ body::before {
     z-index: -1;
     pointer-events: none;
     background:
-        radial-gradient(38% 42% at 12% 8%, var(--umgebung-1), transparent 70%),
-        radial-gradient(34% 40% at 92% 18%, var(--umgebung-2), transparent 70%),
-        radial-gradient(42% 44% at 70% 96%, var(--umgebung-3), transparent 70%);
-    filter: blur(20px);
+        radial-gradient(55% 45% at 8% 0%, var(--umgebung-licht), transparent 70%),
+        radial-gradient(60% 55% at 100% 100%, var(--umgebung-kuehl), transparent 72%),
+        radial-gradient(45% 40% at 85% 10%, var(--umgebung-dunst), transparent 70%),
+        var(--umgebung-verlauf);
 }
 
 a {
@@ -229,10 +237,11 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     flex-direction: column;
     gap: 6px;
     padding: 14px 12px 12px;
-    background: var(--karte);
+    background: linear-gradient(180deg, var(--glas-licht), transparent 70%), var(--karte);
     backdrop-filter: var(--glas-unschaerfe);
     -webkit-backdrop-filter: var(--glas-unschaerfe);
-    border-right: 1px solid var(--linie);
+    border-right: .5px solid var(--linie);
+    box-shadow: inset -1px 0 0 var(--glas-rand);
     transition: width .3s var(--weich), transform .3s var(--weich);
 }
 
@@ -300,20 +309,10 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     color: var(--text);
     background: var(--glas-linse);
     font-weight: 600;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .08), inset 0 1px 0 rgba(255, 255, 255, .6);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08), inset 0 1px 0 rgba(255, 255, 255, .7), 0 0 0 .5px rgba(0, 0, 0, .05);
 }
+:root[data-theme="dark"] .leiste-link.aktiv { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12); }
 .leiste-link.aktiv .leiste-symbol i { color: var(--akzent); }
-/* Hellmodus: aktiver Eintrag edler – Symbol in einem kleinen dunklen Quadrat wie das Logo, Fläche dezent graphit getönt */
-:root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) {
-    background: color-mix(in srgb, var(--akzent) 6%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--akzent) 9%, transparent);
-}
-:root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) .leiste-symbol {
-    border-radius: 9px;
-    background: linear-gradient(180deg, var(--akzent-hover), var(--akzent));
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), 0 2px 6px color-mix(in srgb, var(--akzent) 30%, transparent);
-}
-:root:not([data-theme="dark"]) .leiste-link.aktiv:not(.favorit-link) .leiste-symbol i { color: var(--akzent-text); font-size: 1rem; }
 .leiste-symbol {
     position: relative;
     flex: 0 0 30px;
@@ -649,7 +648,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 /* ---------- Karten ---------- */
 
 .karte {
-    background: var(--karte);
+    background: linear-gradient(180deg, var(--glas-licht), transparent 60%), var(--karte);
     backdrop-filter: var(--glas-unschaerfe);
     -webkit-backdrop-filter: var(--glas-unschaerfe);
     border: 1px solid var(--glas-rand);
@@ -1474,8 +1473,8 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     border-radius: 16px;
     background:
         radial-gradient(120% 90% at 50% 0%, var(--zeile-hover), transparent 70%),
-        var(--fuellung);
-    border: 1px solid var(--linie);
+        color-mix(in srgb, var(--karte-solid) 22%, transparent);
+    border: 1px solid var(--glas-rand);
     isolation: isolate;
 }
 .explorer-buehne.buehne-mittel { --buehne-h: clamp(400px, 58vh, 580px); }
@@ -1675,7 +1674,8 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     padding: 4px 10px; border-radius: 999px;
     transition: background-color var(--uebergang), color var(--uebergang);
 }
-.sprach-schalter button[aria-pressed="true"] { background: var(--karte-solid); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+.sprach-schalter button[aria-pressed="true"] { background: var(--karte-solid); color: var(--text); box-shadow: 0 1px 4px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04); }
+:root[data-theme="dark"] .sprach-schalter button[aria-pressed="true"] { background: rgba(255, 255, 255, .2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15); }
 
 /* =====================================================================
  * 6. Statistik mit Zoom (app/statistik/StatistikExplorer.js)
