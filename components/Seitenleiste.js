@@ -88,6 +88,14 @@ function LadeRing() {
   return <span className={`leiste-laden${pending ? ' aktiv' : ''}`} aria-hidden="true" />;
 }
 
+/** 3D-Teil der Karte (three.js) im Voraus laden, einmal je Seitenaufruf */
+let dreiDGeladen = false;
+function dreiDVorladen() {
+  if (dreiDGeladen) return;
+  dreiDGeladen = true;
+  import('./karten/raum/Werk3D');
+}
+
 /** Initialen für das Konto-Symbol, z. B. "Jonas Lebherz" → "JL" */
 function initialen(name) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((teil) => teil[0].toUpperCase()).join('') || '?';
@@ -223,6 +231,8 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                     <li key={seite.pfad}>
                       <Link href={seite.pfad} className={`leiste-link${aktiv ? ' aktiv' : ''}`}
                             onClick={() => setMobilOffen(false)}
+                            // Karte: 3D-Code schon beim Darüberfahren laden – die Karte ist dann schneller bereit
+                            onPointerEnter={seite.pfad === '/karte' || seite.pfad === '/melden' ? dreiDVorladen : undefined}
                             aria-current={aktiv ? 'page' : undefined}
                             // Eingeklappt ist der Text unsichtbar – der Name für Screenreader steht deshalb hier
                             aria-label={zahl ? t('{seite} ({n} offen)', { seite: t(seite.text), n: zahl }) : t(seite.text)}>

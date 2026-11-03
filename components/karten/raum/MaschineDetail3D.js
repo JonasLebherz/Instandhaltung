@@ -29,7 +29,7 @@ export default function MaschineDetail3D({ maschine }) {
     <div className="maschine-detail-3d" ref={rahmen}>
       <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar ? 'never' : bewegt ? 'always' : 'demand'}
               camera={{ fov: 32, near: 0.1, far: 200, position: [abstand * 0.62, blickHoehe + abstand * 0.42, abstand * 0.95] }}
-              onCreated={({ camera }) => camera.lookAt(0, blickHoehe, 0.2)} gl={{ antialias: true, alpha: true }}>
+              onCreated={({ camera, gl }) => { camera.lookAt(0, blickHoehe, 0.2); gl.debug.checkShaderErrors = false; }} gl={{ antialias: true, alpha: true }}>
         {/* in der Halle immer Tageslicht; im Dunkelmodus etwas gedämpft */}
         <hemisphereLight args={['#ffffff', f.hallenboden, f.dunkel ? 0.8 : 1]} />
         <directionalLight position={[5, 9, 6]} intensity={f.dunkel ? 1.25 : 1.6} castShadow shadow-mapSize={[1024, 1024]} />

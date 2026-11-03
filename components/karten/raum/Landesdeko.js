@@ -420,6 +420,57 @@ export function Baum3D({ art, groesse = 1, i = 0, f }) {
 }
 
 /** Bürogebäude im Landesstil (Mitte unten, Maße aus werkGestaltung) */
+/**
+ * Viele Bäume auf einmal als Instanzen: dieselben Formen wie Baum3D, aber je Teileart (Stamm, Kugel, Kegel,
+ * Quader) nur ein Zeichenaufruf statt drei bis acht je Baum. baeume: [{ x, z, art, groesse, i }]
+ */
+const baumHilfe = { m: new THREE.Matrix4(), g: new THREE.Matrix4(), p: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3(), e: new THREE.Euler() };
+function baumTeile(stil, f) {
+  const stamm = f.stamm;
+  switch (stil) {
+    case 'kegel': return [['zyl', [0, 1, 0], [0.5, 2, 0.5], stamm], ['kegel', [0, 3.6, 0], [3.8, 4.2, 3.8], '#3e6b47'], ['kegel', [0, 5.4, 0], [2.6, 2.8, 2.6], '#447650']];
+    case 'kaktus': return [['zyl', [0, 2, 0], [0.85, 4, 0.85], '#4f8a3c'], ['box', [0.6, 1.8, 0], [0.8, 0.26, 0.26], '#4f8a3c'], ['zyl', [0.95, 2.5, 0], [0.5, 1.4, 0.5], '#4f8a3c'],
+      ['box', [-0.55, 2.6, 0], [0.7, 0.24, 0.24], '#4f8a3c'], ['zyl', [-0.85, 3.1, 0], [0.44, 1.1, 0.44], '#4f8a3c']];
+    case 'palme': return [['zyl', [0, 3, 0], [0.42, 6, 0.42], '#8b6b4e'],
+      ...Array.from({ length: 7 }, (_, j) => ['box', [Math.cos((j / 7) * Math.PI * 2) * 1.1, 5.8, Math.sin((j / 7) * Math.PI * 2) * 1.1], [2.4, 0.06, 0.45], '#3f8f3a', [0, -(j / 7) * Math.PI * 2, -0.45]])];
+    case 'birke': return [['zyl', [0, 2.6, 0], [0.35, 5.2, 0.35], '#f1f1ec'], ...[1.2, 2.3, 3.4].map((y) => ['box', [0, y, 0.16], [0.18, 0.08, 0.04], '#2b2b2b']),
+      ['kugel', [0, 5.4, 0], [2.6, 3.64, 2.6], f.dunkel ? '#86a466' : '#a6c97f']];
+    case 'pappel': return [['zyl', [0, 1, 0], [0.42, 2, 0.42], stamm], ['kugel', [0, 5, 0], [2.25, 7.8, 2.25], f.baum]];
+    default: return [['zyl', [0, 1.2, 0], [0.55, 2.4, 0.55], stamm], ['kugel', [0, 3.8, 0], [3.6, 3.6, 3.6], f.baum],
+      ['kugel', [0.95, 3.3, 0.35], [2.5, 2.5, 2.5], f.baum], ['kugel', [-0.75, 3.4, -0.55], [2.7, 2.7, 2.7], f.baum]];
+  }
+}
+export function BaumGruppe({ baeume, f }) {
+  const formen = useMemo(() => {
+    const listen = { box: [], zyl: [], kugel: [], kegel: [] };
+    const h = baumHilfe;
+    baeume.forEach(({ x, z, art, groesse = 1, i = 0 }) => {
+      const stil = art === 'mix' ? (i % 2 ? 'kegel' : 'rund') : art;
+      const skala = groesse * (stil === 'kaktus' ? 1.3 : stil === 'palme' ? 1.2 : 1);
+      // Drehung der ganzen Pflanze wie in Baum3D (Laubbaum um die Hochachse, Palme leicht geneigt)
+      const dreh = stil === 'palme' ? [0, 0, (i % 3 - 1) * 0.08] : ['rund', 'kegel'].includes(stil) || !['kaktus', 'birke', 'pappel'].includes(stil) ? [0, stil === 'kegel' ? 0 : i * 1.7, 0] : [0, 0, 0];
+      h.g.compose(h.p.set(x, 0, z), h.q.setFromEuler(h.e.set(...dreh)), h.s.set(skala, skala, skala));
+      baumTeile(stil, f).forEach(([form, pos, groesseTeil, farbe, drehTeil]) => {
+        h.m.compose(h.p.set(...pos), h.q.setFromEuler(h.e.set(...(drehTeil ?? [0, 0, 0]))), h.s.set(...groesseTeil));
+        h.m.premultiply(h.g);
+        const p = new THREE.Vector3(); const q = new THREE.Quaternion(); const sk = new THREE.Vector3();
+        h.m.decompose(p, q, sk);
+        const r = new THREE.Euler().setFromQuaternion(q);
+        listen[form].push({ p: [p.x, p.y, p.z], r: [r.x, r.y, r.z], g: [sk.x, sk.y, sk.z], farbe });
+      });
+    });
+    return listen;
+  }, [baeume, f.stamm, f.baum, f.dunkel]);
+  return (
+    <>
+      <Viele teile={formen.zyl} form="zyl" rauheit={0.9} />
+      <Viele teile={formen.kugel} form="kugel" rauheit={0.9} />
+      <Viele teile={formen.kegel} form="kegel" rauheit={0.9} />
+      <Viele teile={formen.box} rauheit={0.9} />
+    </>
+  );
+}
+
 export function Buero3D({ stil, d, f }) {
   const { b, t, etagen } = d;
   const h = etagen * 3.6;
@@ -958,9 +1009,12 @@ function Umgebung({ standort, gs, f }) {
   useEffect(() => () => grasMap.dispose(), [grasMap]);
   // Gestrichelte Mittellinie als Textur (1 Strich je 9 m) statt hunderter Einzelteile
   const strich = useCanvasTextur(64, 4, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#ffffff'; g.fillRect(0, 0, w * (3.5 / 9), h); }, [WEIT / 9, 1]);
+  const arten = stil?.umlandBaeume ?? [stil?.baum ?? 'rund'];
+  const baumListe = useMemo(() => baeume.map((bm, i) => ({ x: bm.x, z: bm.z, groesse: bm.groesse, i, art: arten[i % arten.length] })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baeume, arten.join()]);
   if (!stil) return null;
   const n = (paar) => landFarbe(paar, f.dunkel);   // Farben: hell bzw. gedämpft (Dunkelmodus)
-  const arten = stil.umlandBaeume ?? [stil.baum];
   // Typisches Objekt: hohe Bauwerke (Wasserturm, Eiffelturm) etwas kleiner, damit sie das Werk nicht verdecken
   const gross = land === 'US' ? 1.5 : land === 'FR' ? 1.8 : 2.4;
   const objektX = -gs.fahnenSeite * Math.min(B * 0.2, 34);
@@ -997,11 +1051,8 @@ function Umgebung({ standort, gs, f }) {
           <Bruecke x={fluss.brueckeX} z={landstrasse} breite={16} f={f} />
         </>
       )}
-      {baeume.map((bm, i) => (
-        <group key={i} position={[bm.x, 0, bm.z]}>
-          <Baum3D art={arten[i % arten.length]} groesse={bm.groesse} i={i} f={f} />
-        </group>
-      ))}
+      {/* Bäume am Rand: alle als Instanzen (wenige Zeichenaufrufe) */}
+      <BaumGruppe baeume={baumListe} f={f} />
       <group position={[wahrzeichenX, 0, -T / 2 - 14]} scale={1.4}>
         <Wahrzeichen land={land} x={0} z={0} />
       </group>

@@ -33,7 +33,7 @@ import { stufe, offenText } from '../stufe';
 import { useT } from '@/components/SpracheKontext';
 import { MaschineMitAmpel, MASCHINEN_HOEHE } from './Maschine3D';
 import { useRaum, useSichtbar } from './farben';
-import Landesdeko, { LAND_STIL, mitLandStil, Baum3D, Buero3D } from './Landesdeko';
+import Landesdeko, { LAND_STIL, mitLandStil, Baum3D, Buero3D, BaumGruppe } from './Landesdeko';
 import Figur from './Figur';
 import { Auto, Lkw, ParkendeAutos, Gabelstapler, AUTO_FARBEN } from './Fahrzeuge';
 import { Viele, canvasTextur, grasTextur, useCanvasTextur } from './Bausteine';
@@ -177,19 +177,25 @@ const parkTextur = () => canvasTextur(30, 80, (g, w, h) => {
   g.fillStyle = '#ffffff'; g.fillRect(0, 0, 1.5, 50);
 });
 
-/** Straßenlaterne: Mast, Ausleger zur Straße hin, Leuchte (nachts an) */
-function Laterne({ x, z, richtung, f }) {
-  const [dx, dz] = richtung;
+/** Alle Laternen als Instanzen: Mast, Ausleger und Leuchte je ein Zeichenaufruf statt drei je Laterne */
+function LaternenGruppe({ laternen, f }) {
+  const teile = useMemo(() => {
+    const masten = [];
+    const arme = [];
+    const koepfe = [];
+    laternen.forEach(({ x, z, richtung: [dx, dz] }) => {
+      masten.push({ p: [x, 3, z], g: [0.22, 6, 0.22] });
+      arme.push({ p: [x + dx * 0.7, 5.95, z + dz * 0.7], g: [Math.abs(dx) * 1.4 + 0.12, 0.12, Math.abs(dz) * 1.4 + 0.12] });
+      koepfe.push({ p: [x + dx * 1.35, 5.82, z + dz * 1.35], g: [dx ? 0.7 : 0.35, 0.18, dx ? 0.35 : 0.7] });
+    });
+    return { masten, arme, koepfe };
+  }, [laternen]);
   return (
-    <group position={[x, 0, z]}>
-      <mesh position={[0, 3, 0]} castShadow>
-        <cylinderGeometry args={[0.09, 0.13, 6, 10]} />
-        <meshStandardMaterial color={f['maschine-dunkel']} roughness={0.6} />
-      </mesh>
-      <Quader p={[dx * 0.7, 5.95, dz * 0.7]} g={[Math.abs(dx) * 1.4 + 0.12, 0.12, Math.abs(dz) * 1.4 + 0.12]} farbe={f['maschine-dunkel']} schatten={false} />
-      <Quader p={[dx * 1.35, 5.82, dz * 1.35]} g={[0.7, 0.18, 0.35]} farbe={f.nacht ? f.licht : f.tank}
-              leuchten={f.nacht ? 2 : 0} lichtFarbe={f.licht} schatten={false} />
-    </group>
+    <>
+      <Viele teile={teile.masten} form="zyl" farbe={f['maschine-dunkel']} rauheit={0.6} />
+      <Viele teile={teile.arme} farbe={f['maschine-dunkel']} schatten={false} />
+      <Viele teile={teile.koepfe} farbe={f.nacht ? f.licht : f.tank} schatten={false} leuchten={f.nacht ? 2 : 0} lichtFarbe={f.licht} />
+    </>
   );
 }
 
@@ -858,6 +864,8 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
   const { B, T } = gs;
   const X = (x) => x - B / 2;
   const Z = (y) => y - T / 2;
+  const baumListe = useMemo(() => gs.baeume.map((bm, i) => ({ x: bm.x - B / 2, z: bm.y - T / 2, groesse: bm.groesse, i, art: stil?.baum ?? 'rund' })),
+    [gs, B, T, stil]);
   const [hover, setHover] = useState(null);
   const steuerung = useRef(null);       // OrbitControls (Drehen, Zoomen, Verschieben)
   // Handy/Tablet: Ein Finger scrollt die Seite weiter (sonst bliebe man auf der 3D-Fläche „hängen“),
@@ -990,6 +998,9 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     const dz = Math.max(Z(h.y) - l.z, 0, l.z - Z(h.y + h.t));
     return Math.hypot(dx, dz) < 35;
   };
+  const sichtbareLaternen = useMemo(() => laternen.filter((l) => !naheGeoeffneterHalle(l)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [laternen, gewaehlt, gs]);
   // Trapezblech-Textur je Halle (Wiederholung passend zur Länge)
   const wandTexturen = useMemo(() => {
     const basis = rippenTextur();
@@ -1132,7 +1143,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       <ParkendeAutos plaetze={autos} />
       <Quader p={[X(gs.tor.x + gs.tor.b / 2), 0.6, Z(T - 1)]} g={[gs.tor.b, 1.2, 0.3]} farbe={f.tor} />
 
-      {laternen.filter((l) => !naheGeoeffneterHalle(l)).map((l, i) => <Laterne key={`l${i}`} {...l} f={f} />)}
+      <LaternenGruppe laternen={sichtbareLaternen} f={f} />
       <Landesdeko standort={standort} gs={gs} f={f} X={X} Z={Z} gebaeudeId={gewaehlt?.id} />
       {/* Betonflächen rund um die Hallen (Vorplatz, Anlieferung) */}
       {gebaeude.map((g) => {
@@ -1190,11 +1201,8 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
           </group>
         );
       })}
-      {gs.baeume.map((bm, i) => (
-        <group key={`${bm.x}-${bm.y}`} position={[X(bm.x), 0, Z(bm.y)]}>
-          <Baum3D art={stil?.baum ?? 'rund'} groesse={bm.groesse} i={i} f={f} />
-        </group>
-      ))}
+      {/* Bäume auf dem Gelände: als Instanzen (ein Zeichenaufruf je Teileart statt je Baum) */}
+      <BaumGruppe baeume={baumListe} f={f} />
 
       {/* Hallen */}
       {gebaeude.map((g) => {
@@ -1277,9 +1285,25 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
 /** Innenleben der gewählten Halle (Koordinaten relativ zur Hallenmitte) */
 function HallenInneres({ halle, h, f, bewegt, aktiv, maschinen, maschineId, onMaschine, hover, setHover, klick, neutral, boden }) {
   const t = useT();
-  // Beim ersten Aufbau einmal kurz zeichnen (hinter den geschlossenen Wänden), damit Grafikprogramme und
-  // Texturen schon fertig sind, wenn die Halle geöffnet wird. Danach unsichtbar, solange die Halle zu ist.
-  const [aufwaermen, setAufwaermen] = useState(2);
+  // Beim ersten Aufbau die Grafikprogramme (Shader) im Hintergrund übersetzen lassen (compileAsync blockiert
+  // den Browser nicht), danach einmal kurz zeichnen (hinter den geschlossenen Wänden), damit auch Formen und
+  // Texturen auf der Grafikkarte liegen, wenn die Halle geöffnet wird. Danach unsichtbar, solange die Halle zu ist.
+  const innen = useRef(null);
+  const { gl, camera, scene, invalidate } = useThree();
+  const [aufwaermen, setAufwaermen] = useState(aktiv ? 0 : -1);   // -1 = Shader werden noch übersetzt
+  useEffect(() => {
+    if (aufwaermen !== -1 || !innen.current) return undefined;
+    let aktuell = true;
+    const gruppe = innen.current;
+    // compile() berücksichtigt nur sichtbare Teile – deshalb für den Aufruf kurz sichtbar schalten
+    gruppe.visible = true;
+    const fertig = () => { if (aktuell) { setAufwaermen(1); invalidate(); } };
+    const versprechen = gl.compileAsync ? gl.compileAsync(gruppe, camera, scene) : Promise.resolve();
+    gruppe.visible = false;
+    versprechen.then(fertig, fertig);
+    return () => { aktuell = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useFrame(() => { if (aufwaermen > 0) setAufwaermen((n) => n - 1); });
   const sichtbar = aktiv || aufwaermen > 0;
   const ox = -h.b / 2;
@@ -1311,7 +1335,7 @@ function HallenInneres({ halle, h, f, bewegt, aktiv, maschinen, maschineId, onMa
   }, [boden, h.b, h.t]);
   const mitKran = h.hoehe < 14 && !/lager|logistik|versand|labor|büro/i.test(halle.bezeichnung ?? '');
   return (
-    <group visible={sichtbar}>
+    <group ref={innen} visible={sichtbar}>
       <Flaeche x={0} z={0} b={h.b} t={h.t} farbe={f.hallenboden} y={0.03} map={bodenMap} />
       <HallenDetails halle={halle} h={h} maschinen={maschinen} gang={gang} f={f} />
       {/* Gehweg im Gang (grüne Linien) und Gabelstapler in der Mitte */}
@@ -1384,6 +1408,26 @@ function HallenInneres({ halle, h, f, bewegt, aktiv, maschinen, maschineId, onMa
       })}
     </group>
   );
+}
+
+/**
+ * Schatten nicht in jedem Bild neu berechnen: Die Schattenkarte zeichnet alle schattenwerfenden Teile ein
+ * zweites Mal. Die Sonne steht still, nur Figuren und Fahrzeuge bewegen sich – jedes dritte Bild reicht
+ * (sieht gleich aus, spart viel Rechenzeit).
+ */
+function SchattenTakt({ bewegt }) {
+  const { gl } = useThree();
+  const bild = useRef(0);
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
+    return () => { gl.shadowMap.autoUpdate = true; };
+  }, [gl]);
+  useFrame(() => {
+    bild.current += 1;
+    if (!bewegt || bild.current % 3 === 0) gl.shadowMap.needsUpdate = true;
+  });
+  return null;
 }
 
 /** Meldet, sobald nach dem Übersetzen zwei Bilder gezeichnet wurden (die Szene ist dann sichtbar fertig) */
@@ -1481,10 +1525,14 @@ export default function Werk3D(props) {
       {/* ruhen: während der Zoom-Fahrt aus dem Land steht die Kamera still über dem Werk – die Szene muss nicht neu
           gezeichnet werden; die Grafikkarte hat dann nur die Kamerafahrt der Karte zu tun (flüssiger) */}
       <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar || !fertig || pause || (ruhen && gezeichnet) ? 'never' : bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
-              camera={{ fov: 38, near: 0.5, far: 4000, position: [150, 200, 220] }} gl={{ antialias: true, alpha: true }}>
+              camera={{ fov: 38, near: 0.5, far: 4000, position: [150, 200, 220] }} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+              // Keine Shader-Fehlerprüfung: Sie wartet nach jedem neuen Grafikprogramm synchron auf die Grafikkarte
+              // und blockierte beim Aufbau über eine Sekunde (Profil). compileAsync übersetzt dann wirklich im Hintergrund.
+              onCreated={({ gl }) => { gl.debug.checkShaderErrors = false; }}>
         <Szene {...props} f={f} bewegt={bewegt} phase={zeit.phase} kamera={kamera} flach={flach} hintergrund={hintergrund}
                onKameraFortschritt={kameraFortschritt} onFlachFertig={flachFertig} />
         <Vorbereiten onFertig={() => setFertig(true)} />
+        <SchattenTakt bewegt={bewegt} />
         {fertig && !gezeichnet && <ErsteBilder onFertig={() => setGezeichnet(true)} />}
       </Canvas>
       <span className="raum-uhr" title={t('Ortszeit am Standort')}>

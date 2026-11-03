@@ -17,10 +17,10 @@ const farbeHilfe = new THREE.Color();
 /**
  * teile: [{ p: [x, y, z], g: [b, h, t], r?: [rx, ry, rz], farbe?: '#…' }]
  * form: 'box' (Standard), 'zyl' (stehender Zylinder), 'kugel', 'kegel' oder 'ring' (Rad); g = Größe [b, h, t] bzw. Durchmesser
- * deckkraft < 1: durchsichtig (Glas)
+ * deckkraft < 1: durchsichtig (Glas); leuchten > 0 mit lichtFarbe: selbstleuchtend (z. B. Laternen nachts)
  * geometrie: eigene Form in Originalgröße (z. B. Autokarosserie), g ist dann Skalierung (Standard 1)
  */
-export function Viele({ teile, farbe = '#ffffff', form = 'box', geometrie = null, schatten = true, rauheit = 0.75, metall = 0, deckkraft = 1 }) {
+export function Viele({ teile, farbe = '#ffffff', form = 'box', geometrie = null, schatten = true, rauheit = 0.75, metall = 0, deckkraft = 1, leuchten = 0, lichtFarbe = null }) {
   const ref = useRef(null);
   const mitFarben = teile.some((t) => t.farbe);
   useLayoutEffect(() => {
@@ -50,7 +50,8 @@ export function Viele({ teile, farbe = '#ffffff', form = 'box', geometrie = null
       {/* bei Einzelfarben je Teil: Grundfarbe weiß, sonst würde sie mit der Teilfarbe multipliziert.
           key: Three.js übernimmt "durchsichtig" nur bei neuem Material */}
       <meshStandardMaterial key={deckkraft < 1 ? 'glas' : 'voll'} color={mitFarben ? '#ffffff' : farbe} roughness={rauheit} metalness={metall}
-                            transparent={deckkraft < 1} opacity={deckkraft} depthWrite={deckkraft >= 1} />
+                            transparent={deckkraft < 1} opacity={deckkraft} depthWrite={deckkraft >= 1}
+                            emissive={lichtFarbe ?? '#000000'} emissiveIntensity={leuchten} />
     </instancedMesh>
   );
 }
