@@ -7,8 +7,9 @@
  *
  * Gestaltung angelehnt an eine ruhige, reduzierte Designsprache mit
  * "Glas"-Optik: ein ganz leicht farbiger, weicher Hintergrund, darüber
- * halbtransparente Karten mit Unschärfe (backdrop-filter) und einer feinen
- * Lichtkante oben. Eine einzige Akzentfarbe, dezente Status-Farben.
+ * halbtransparente Karten mit einer feinen Lichtkante oben (Unschärfe per
+ * backdrop-filter nur dort, wo Inhalt dahinter liegt: Menüs, Fenster, Handy-Leiste).
+ * Eine einzige Akzentfarbe, dezente Status-Farben.
  * Wer im Betriebssystem "Transparenz reduzieren" eingestellt hat, bekommt
  * automatisch feste Flächen.
  *
@@ -238,8 +239,8 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     gap: 6px;
     padding: 14px 12px 12px;
     background: linear-gradient(180deg, var(--glas-licht), transparent 70%), var(--karte);
-    backdrop-filter: var(--glas-unschaerfe);
-    -webkit-backdrop-filter: var(--glas-unschaerfe);
+    /* Unschärfe nur auf dem Handy, wo die Leiste über dem Inhalt liegt (siehe unten). Am PC liegt dahinter
+       nur der ruhige Hintergrund – dort sah sie gleich aus und verursachte in Chrome Zeichenfehler. */
     border-right: .5px solid var(--linie);
     box-shadow: inset -1px 0 0 var(--glas-rand);
     transition: width .3s var(--weich), transform .3s var(--weich);
@@ -504,6 +505,8 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .leiste-hintergrund { display: none; }
 
 @media (max-width: 767.98px) {
+    /* Die Leiste fährt über den Inhalt – hier ist die Glas-Unschärfe sichtbar */
+    .seitenleiste { backdrop-filter: var(--glas-unschaerfe); -webkit-backdrop-filter: var(--glas-unschaerfe); }
     .app-rahmen { margin-left: 0; }
     .mobil-kopf {
         position: sticky; top: 8px; z-index: 1020;
@@ -654,8 +657,10 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 
 .karte {
     background: linear-gradient(180deg, var(--glas-licht), transparent 60%), var(--karte);
-    backdrop-filter: var(--glas-unschaerfe);
-    -webkit-backdrop-filter: var(--glas-unschaerfe);
+    /* Bewusst OHNE backdrop-filter: Hinter den Karten liegt nur der ruhige Hintergrundverlauf, die Unschärfe
+       sah identisch aus (gemessen). Sie kostete aber beim Scrollen Leistung, und Chrome zeichnete sie mit
+       Grafikkarte teils nur stückweise neu (hellere Rechtecke in den Karten, z. B. beim Überfahren von Knöpfen).
+       Glas mit Unschärfe bleibt dort, wo Inhalt dahinter liegt: Seitenleiste, Menüs, Fenster. */
     border: 1px solid var(--glas-rand);
     border-radius: var(--radius-karte);
     box-shadow: var(--glas-kante), var(--schatten);
@@ -931,7 +936,6 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
     background: var(--fuellung);
     border: 1px solid var(--glas-rand);
     color: var(--text);
-    backdrop-filter: blur(10px);
 }
 .btn-sekundaer:hover { background: var(--fuellung-hover); color: var(--text); }
 .btn-klein { padding: 6px 14px; font-size: .875rem; }
@@ -2370,7 +2374,11 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .chat-leer { text-align: center; padding: 24px 8px; color: var(--text-leise); }
 .chat-leer > .bi { font-size: 2rem; display: block; margin-bottom: 8px; color: var(--akzent); }
 .chat-hinweis { color: var(--text-leise); font-size: .85rem; text-align: center; margin: 20px 0; }
-.chat-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+/* minmax(0, 1fr): sonst richtet sich die Spalte nach der längsten Nachricht und ragt aus dem Fenster */
+.chat-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.chat-name-zeile { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
+.chat-name-zeile strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-wann { flex: none; font-size: .75rem; color: var(--text-leise); white-space: nowrap; }
 .chat-liste button {
     width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
     padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text);

@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/components/SpracheKontext';
 import { RollenAbzeichen, PersonWaehlenKnopf } from '@/components/PersonWahl';
-import { datum, datumZeit, uhrzeit } from '@/lib/format';
+import { datum, uhrzeit } from '@/lib/format';
 import { nachrichtSenden, nachrichtenGelesen } from '@/app/aktionen';
 
 export const NACHRICHTEN_WECHSEL = 'nachrichtenwechsel';
@@ -29,6 +29,11 @@ function useAbfrage(aufgabe, aktiv) {
     document.addEventListener('visibilitychange', sichtbar);
     return () => { clearInterval(zeitgeber); document.removeEventListener('visibilitychange', sichtbar); };
   }, [aufgabe, aktiv]);
+}
+
+/** Kurz wie in Messengern: heute nur die Uhrzeit, sonst das Datum */
+function wann(zeitpunkt, sprache) {
+  return datum(zeitpunkt, sprache) === datum(new Date(), sprache) ? uhrzeit(zeitpunkt, sprache) : datum(zeitpunkt, sprache);
 }
 
 export default function Chat({ ich, personen, mit, onMit }) {
@@ -164,7 +169,7 @@ export default function Chat({ ich, personen, mit, onMit }) {
       <h2 className="abschnitt-titel">{t('Nachrichten')}</h2>
       <p className="klein">{t('Du schreibst als {name}.', { name: ich.name })}</p>
       <input type="search" className="form-control mb-2" value={suche} onChange={(e) => setSuche(e.target.value)}
-             placeholder={t('Neue Nachricht an … (Name suchen)')} aria-label={t('Person suchen')} />
+             placeholder={t('Neue Nachricht: Person suchen …')} aria-label={t('Person suchen')} />
       {treffer.length > 0 && (
         <ul className="chat-liste chat-treffer">
           {treffer.map((p) => (
@@ -190,9 +195,9 @@ export default function Chat({ ich, personen, mit, onMit }) {
               <button type="button" onClick={() => onMit(g.id)} className={g.ungelesen > 0 ? 'ungelesen' : ''}>
                 <span className="avatar" aria-hidden="true">{g.name.split(' ').map((x) => x[0]).slice(0, 2).join('')}</span>
                 <span className="chat-zeile">
-                  <span className="d-flex justify-content-between gap-2">
+                  <span className="chat-name-zeile">
                     <strong>{g.name}</strong>
-                    <span className="klein">{datumZeit(g.zeitpunkt, t.sprache)}</span>
+                    <span className="chat-wann">{wann(g.zeitpunkt, t.sprache)}</span>
                   </span>
                   <span className="chat-vorschau">{g.von_mir && `${t('Du')}: `}{g.text}</span>
                 </span>

@@ -411,7 +411,9 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.explorer-info button:has-text("ALB-H1-01")');
   await p.waitForSelector('#beschreibung', { timeout: 15000 }).catch(() => {});
   pruefe('Melden 3D: Maschine gewählt, Formular offen', (await p.$('#beschreibung')) !== null && (await p.textContent('.auswahl-chip')).includes('ALB-H1-01'));
-  await p.goto(BASE + '/karte?werk=alb'); await p.waitForSelector('.ebene-neu .raum.fertig', { timeout: 60000 }).catch(() => {});
+  // Werk öffnet erst in 2D, dann blendet 3D ein – warten, bis die Einblendung ganz fertig ist
+  await p.goto(BASE + '/karte?werk=alb');
+  await p.waitForFunction(() => document.querySelector('.ebene-neu .raum.fertig') && !document.querySelector('.ebene-alt'), null, { timeout: 60000 }).catch(() => {});
   await p.click('.raum-schalter button:has-text("2D")');
   // 3D → 2D: Kamera fährt erst nach oben, Gebäude werden flach, dann Überblendung (gut 2 s), dann ist die 3D-Szene weg
   await p.waitForTimeout(300);
