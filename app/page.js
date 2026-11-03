@@ -20,7 +20,6 @@ import { lieferungBuchen } from '@/app/aktionen';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import { T } from '@/lib/sprache';
 import { standorteMitZahlen } from '@/lib/karten/daten';
-import KleineKarte from '@/components/karten/KleineKarte';
 import FavoritKachel from '@/components/FavoritKachel';
 import { aktuellePerson } from '@/lib/person';
 import { ansichtAusCookie, ansichtBedingung, ansichtAktiv } from '@/lib/ansicht';
@@ -302,15 +301,6 @@ export default async function Uebersicht() {
           {/* Favorit: eine angepinnte Kartenansicht als kleines Fenster (Daten lädt die Kachel selbst) */}
           <FavoritKachel />
 
-          {/* Kleine Deutschlandkarte: Klick auf ein Werk öffnet die Störungskarte dort */}
-          <section className="karte" style={{ '--i': 7 }}>
-            <div className="karte-kopf">
-              <h2 className="abschnitt-titel">{t('Standorte')}</h2>
-              <Link href="/karte">{t('Zur Karte')}</Link>
-            </div>
-            {/* Ansicht aus dem Konto: nur das gewählte Land bzw. Werk */}
-            <KleineKarte standorte={standorte.filter((st) => (ansicht.standortId ? st.id === ansicht.standortId : !ansicht.land || st.land === ansicht.land))} />
-          </section>
         </div>
       </div>
 

@@ -246,13 +246,9 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.goto(`${BASE}/auftraege/${auftrag}`);
   await p.click('a:has-text("Auf der Karte zeigen")'); await p.waitForTimeout(1000);
   pruefe('Auftrag → Karte markiert die Maschine', p.url().includes('/karte?werk=dor&halle=h1&maschine=' + gewaehlteMaschine) && (await p.$('.plan-maschine.gewaehlt')) !== null, p.url());
-  // Übersicht: zuerst die Liste, darunter rechts die kleine Karte; Klick öffnet die Störungskarte im Werk
+  // Übersicht: keine kleine Weltkarte mehr, stattdessen die Kachel „Favorit“
   await p.goto(BASE + '/'); await p.waitForTimeout(800);
-  const yListe = (await (await p.$('main h2:has-text("Offene Störmeldungen")')).boundingBox()).y;
-  const yKarte = (await (await p.$('main .wkarte')).boundingBox()).y;
-  pruefe('Übersicht: Liste vor der kleinen Karte', yListe < yKarte, `${yListe} / ${yKarte}`);
-  await p.click('main .wkarte [data-ort="land-CN"]'); await p.waitForURL('**/karte?land=cn');
-  pruefe('Übersicht: Klick auf Land öffnet die Störungskarte dort', (await p.textContent('.buehne-titel')) === 'China');
+  pruefe('Übersicht: Favorit-Kachel statt kleiner Karte', (await p.$('main .wkarte')) === null && (await p.$('main .favorit-kachel')) !== null);
   await p.goto(BASE + '/'); await p.waitForTimeout(800);
   // Seitenleiste
   const offenDb = Number(sql("SELECT count(*) FROM wartungsauftrag WHERE status <> 'erledigt'"));

@@ -388,6 +388,12 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .favorit-symbol {
     width: 24px; height: 24px; border-radius: 7px;
     display: grid; place-items: center; font-size: .76rem;
+    color: var(--text-leise);
+    background: var(--karte-solid);
+    box-shadow: inset 0 0 0 1px var(--linie);
+}
+/* Nur der Favorit, den die Karte gerade zeigt, bekommt das dunkle Feld (wie der aktive Eintrag) */
+.favorit-link.aktiv .favorit-symbol {
     color: var(--logo-zeichen);
     background: linear-gradient(180deg, var(--logo-oben), var(--logo-unten));
     box-shadow: inset 0 0 0 1px var(--logo-rand);
@@ -2307,3 +2313,10 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     .historie-kopf { flex-wrap: wrap; gap: 8px; }
     .zustand-text { display: none; }
 }
+
+/* Kleines Kartenfenster (Favorit-Kachel): nur Kürzel und Zahl an den Hallen, kein Hinweistext, schmaler Kopf */
+.explorer-kompakt .raum-halle-name, .explorer-kompakt .gebaeude-name, .explorer-kompakt .gebaeude-info,
+.explorer-kompakt .buehne-hinweis, .explorer-kompakt .plan-beschriftung { display: none; }
+.explorer-kompakt .raum-halle { font-size: .7rem; padding: 2px 3px 2px 7px; gap: 4px; }
+.explorer-kompakt .raum-uhr { font-size: .66rem; padding: 2px 7px; left: 8px; bottom: 8px; }
+.explorer-kompakt .buehne-kopf { padding-top: 3px; padding-bottom: 3px; }
