@@ -34,8 +34,11 @@ import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeSchritte from './MeldeSchritte';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
+import { startAusAdresse } from '@/lib/karten/adresse';
 import { laenderAus, landKarte, weltVerhaeltnis } from '@/lib/karten/laender';
 import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
+import { ton, tonAn, tonSetzen } from '@/lib/ton';
+import { favoritenLesen, favoritHinzufuegen, favoritEntfernen, FAVORITEN_WECHSEL, FAVORIT_OEFFNEN, FAVORIT_SYMBOLE, MAX_FAVORITEN } from '@/lib/favoriten';
 
 // 3D-Ansicht für Werk und Halle: three.js wird nur im Browser und nur bei Bedarf geladen
 const Werk3D = dynamic(() => import('./raum/Werk3D'), { ssr: false, loading: () => <div className="raum-laden" /> });
@@ -46,6 +49,50 @@ const MaschineDetail3D = dynamic(() => import('./raum/MaschineDetail3D'), { ssr:
 function dreiDVorladen() {
   const laden = () => { import('./raum/Werk3D'); import('./raum/MaschineDetail3D'); };
   if ('requestIdleCallback' in window) window.requestIdleCallback(laden, { timeout: 3000 }); else setTimeout(laden, 1500);
+}
+
+/**
+ * Pin-Animation: Ein kleines Schild mit Symbol und Namen fliegt im Bogen vom Pin-Knopf zum neuen
+ * Eintrag in der Seitenleiste (auf dem Handy, wo die Leiste zu ist, zum Menü-Knopf oben).
+ * Der Eintrag selbst blendet kurz danach ein (Klasse favorit-neu in components/Favoriten.js).
+ */
+function favoritFliegt(knopf, favorit) {
+  if (!knopf || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  let versuche = 0;
+  const los = () => {
+    const eintrag = document.querySelector(`[data-favorit-id="${favorit.id}"] .favorit-symbol`);
+    if (!eintrag && versuche++ < 6) { requestAnimationFrame(los); return; }   // Leiste zeichnet den Eintrag noch
+    let ziel = eintrag?.getBoundingClientRect();
+    if (!ziel || ziel.width === 0 || ziel.right <= 0) ziel = document.querySelector('.mobil-kopf .rund-knopf')?.getBoundingClientRect();
+    if (!ziel || ziel.width === 0) return;
+    const start = knopf.getBoundingClientRect();
+    const schild = document.createElement('div');
+    schild.className = 'favorit-flug';
+    schild.setAttribute('aria-hidden', 'true');
+    const symbol = document.createElement('i');
+    symbol.className = `bi ${FAVORIT_SYMBOLE[favorit.art] ?? 'bi-pin-angle'}`;
+    const text = document.createElement('span');
+    text.textContent = favorit.name;
+    schild.append(symbol, text);
+    document.body.appendChild(schild);
+    const s = schild.getBoundingClientRect();
+    // Position so, dass die Mitte des Symbols (links im Schild) auf dem Punkt liegt
+    const lage = (x, y, k) => `translate(${x - (s.height / 2) * k}px, ${y - (s.height / 2) * k}px) scale(${k})`;
+    const sx = start.left + start.width / 2;
+    const sy = start.top + start.height / 2;
+    const zx = ziel.left + ziel.width / 2;
+    const zy = ziel.top + ziel.height / 2;
+    const flug = schild.animate([
+      { offset: 0, transform: lage(sx, sy, 0.6), opacity: 0 },
+      { offset: 0.15, transform: lage(sx, sy + 26, 1), opacity: 1 },
+      { offset: 0.55, transform: lage((sx + zx) / 2, Math.min(sy, zy) - 40, 0.95), opacity: 1 },   // Bogen nach oben
+      { offset: 0.9, transform: lage(zx, zy, 0.55), opacity: 1 },
+      { offset: 1, transform: lage(zx, zy, 0.4), opacity: 0 },
+    ], { duration: 1000, easing: 'cubic-bezier(.45, 0, .25, 1)', fill: 'both' });
+    flug.onfinish = () => schild.remove();
+    flug.oncancel = () => schild.remove();
+  };
+  requestAnimationFrame(los);
 }
 
 /** Kann der Browser WebGL (3D)? */
@@ -119,37 +166,106 @@ export default function KartenExplorer({
   useEffect(() => {
     const kann = webglVorhanden();
     setWebgl(kann);
-    let wahl = null;
-    try { wahl = localStorage.getItem('kartenansicht'); } catch { /* z. B. privater Modus */ }
+    // Vorrang hat die Adresse (?ansicht=3d, z. B. aus einem Favoriten), dann die gemerkte Wahl
+    let wahl = start.ansicht === '2d' || start.ansicht === '3d' ? start.ansicht : null;
+    try { wahl ??= localStorage.getItem('kartenansicht'); } catch { /* z. B. privater Modus */ }
     const drei = kann && (wahl ? wahl === '3d' : window.innerWidth >= 768);
     setDreiD(drei);
     if (drei) dreiDVorladen();
   }, []);
+  const ruhig = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  // Ton der Kamerafahrten an/aus (Lautsprecher-Knopf, gemerkt in lib/ton.js)
+  const [tonEin, setTonEin] = useState(true);
+  useEffect(() => {
+    const lesen = () => setTonEin(tonAn());
+    lesen();
+    window.addEventListener('kartentonwechsel', lesen);
+    return () => window.removeEventListener('kartentonwechsel', lesen);
+  }, []);
+  // Favoriten: Adressen der angepinnten Ansichten (für den Zustand des Pin-Knopfs)
+  const [favoriten, setFavoriten] = useState([]);
+  const [pinHinweis, setPinHinweis] = useState(null);
+  useEffect(() => {
+    const lesen = () => setFavoriten(favoritenLesen());
+    lesen();
+    window.addEventListener(FAVORITEN_WECHSEL, lesen);
+    return () => window.removeEventListener(FAVORITEN_WECHSEL, lesen);
+  }, []);
+  useEffect(() => {
+    if (!pinHinweis) return undefined;
+    const weg = setTimeout(() => setPinHinweis(null), 3000);
+    return () => clearTimeout(weg);
+  }, [pinHinweis]);
   function ansichtWaehlen(drei) {
-    const setzen = () => {
-      setDreiD(drei);
-      setUebergang(null);
-      try { localStorage.setItem('kartenansicht', drei ? '3d' : '2d'); } catch { /* ignorieren */ }
-    };
-    // 3D → 2D: erst fährt die Kamera senkrecht nach oben, dann wird zum Plan überblendet
-    if (!drei) ausRaum(setzen); else setzen();
+    try { localStorage.setItem('kartenansicht', drei ? '3d' : '2d'); } catch { /* ignorieren */ }
+    // 3D → 2D: Kamera fährt senkrecht nach oben, die Gebäude werden flach (wie gezeichnet),
+    // dann blendet die Zeichnung darüber ein
+    if (!drei && istRaum(ebene) && !ruhig()) {
+      // Weiter geht es, sobald die Szene flach ist (onFlach von Werk3D) – Sicherheitsnetz nach 6 s
+      setVerlassen('flach');
+      ton('sanft');
+      zuZeichnung.current = { ebene, notfall: setTimeout(() => zeichnungUeberblenden(), 6000) };
+      return;
+    }
+    abbrechenZuZeichnung();
+    setVerlassen(null);
+    setDreiD(drei);
+    setUebergang(null);
   }
+  function abbrechenZuZeichnung() {
+    if (!zuZeichnung.current) return;
+    clearTimeout(zuZeichnung.current.notfall);
+    zuZeichnung.current = null;
+  }
+  // 'flach': 3D → 2D läuft (Kamera hoch, Gebäude flach); 'hoch': Kamera steigt beim Herauszoomen ins Land
+  const [verlassen, setVerlassen] = useState(null);
+  // 3D → 2D, letzter Schritt: Szene ist flach von oben → Zeichnung blendet darüber ein (deckungsgleich)
+  const zuZeichnung = useRef(null);
+  function zeichnungUeberblenden() {
+    const laufend = zuZeichnung.current;
+    if (!laufend) return;
+    clearTimeout(laufend.notfall);
+    zuZeichnung.current = null;
+    // Die Zeichnung kommt ohne Einblend-Animation der Kacheln (sie liegt deckungsgleich unter der flachen Szene)
+    setOhneEinblenden(`${laufend.ebene.land ?? 'welt'}-${laufend.ebene.standortId ?? 'x'}-${laufend.ebene.gebaeudeId ?? 'x'}`);
+    setUebergang({ von: laufend.ebene, vonSchluessel: schluesselVon(laufend.ebene), vonRaum: true, richtung: 'blende', dauer: 700 });
+    setDreiD(false);
+    setVerlassen(null);
+  }
+  // Schlüssel der 2D-Ebene, die aus 3D heraus entstanden ist: Ihre Kacheln fliegen nicht noch einmal herein
+  // (bleibt so, solange die Ebene besteht – ein Entfernen der Klasse würde die Animation neu starten)
+  const [ohneEinblenden, setOhneEinblenden] = useState(null);
 
-  // Aus der 3D-Szene heraus (zu 2D oder zurück ins Land): Kamera fährt nach oben über das Werk, die Szene
-  // blendet aus und gibt den 2D-Plan darunter frei – erst dann folgt der eigentliche Wechsel (sanft statt Schnitt)
-  const [verlassen, setVerlassen] = useState(false);
-  function ausRaum(aktion) {
-    const ruhig = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (!istRaum(ebene) || ruhig) { aktion(); return; }
-    setVerlassen(true);
-    setTimeout(() => {
-      setOhneEinblenden(true);
-      aktion();
-      setVerlassen(false);
-      setTimeout(() => setOhneEinblenden(false), 1500);
-    }, 1150);
+  // 3D-Werk unsichtbar vorbereiten (beim Darüberfahren über einen Standort bzw. nach dem Klick): Erst wenn
+  // die Szene fertig ist, startet die Kamerafahrt – sie landet dann direkt auf dem 3D-Bild von oben
+  const [vorbereitung, setVorbereitung] = useState(null);   // Ebene des vorbereiteten Werks
+  const [wartet, setWartet] = useState(null);               // angeklicktes Werk, das noch vorbereitet wird
+  const bereit = useRef(new Set());                         // Schlüssel fertiger 3D-Szenen
+  const vorschauTimer = useRef(null);
+  function vorschau(st) {
+    if (!istRaum({ standortId: st.id }) || ruhig()) return;
+    clearTimeout(vorschauTimer.current);
+    vorschauTimer.current = setTimeout(() => {
+      setVorbereitung((alt) => (alt?.standortId === st.id ? alt : { land: st.land, standortId: st.id, gebaeudeId: null }));
+    }, 180);
   }
-  const [ohneEinblenden, setOhneEinblenden] = useState(false);
+  function szeneBereit(schluessel) {
+    bereit.current.add(schluessel);
+    if (wartet && schluesselVon(wartet) === schluessel) {
+      const ziel = wartet;
+      setWartet(null);
+      wechsle(ziel, 'rein');
+    }
+  }
+  // Sicherheitsnetz: nach 2,5 s ohne fertige Szene trotzdem losfliegen
+  useEffect(() => {
+    if (!wartet) return undefined;
+    const punkt = buehneRef.current?.querySelector(`[data-ort="st-${wartet.standortId}"]`);
+    punkt?.classList.add('wird-vorbereitet');
+    const notfall = setTimeout(() => { const ziel = wartet; setWartet(null); wechsle(ziel, 'rein'); }, 2500);
+    return () => { clearTimeout(notfall); punkt?.classList.remove('wird-vorbereitet'); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wartet]);
 
   const standortVon = (e) => standorte.find((st) => st.id === e.standortId) ?? null;
   const gebaeudeVon = (e) => gebaeude.find((g) => g.id === e.gebaeudeId) ?? null;
@@ -178,23 +294,71 @@ export default function KartenExplorer({
   function wechsle(neueEbene, richtung) {
     // 3D: Zwischen Werk und Halle fliegt die Kamera – die Ebene selbst bleibt, keine Zoom-Animation
     if (raumMoeglich && dreiD && ebene.standortId && neueEbene.standortId === ebene.standortId) {
+      abbrechenZuZeichnung();
+      setVerlassen(null);
+      ton('sanft');
       setEbene(neueEbene);
       setMaschineId(null);
       return;
     }
-    setUebergang({ von: ebene, richtung, dauer: dauerFuer(richtung === 'rein' ? neueEbene : ebene) });
+    abbrechenZuZeichnung();   // laufendes 3D → 2D abbrechen
+    if (schluesselVon(neueEbene) === ohneEinblenden) setOhneEinblenden(null);   // neu hinein: wieder mit Einblenden
+    const vonRaum = istRaum(ebene);
+    // Aus 3D heraus ins Land: Kamera steigt in die Vogelperspektive, gleichzeitig zoomt die Karte heraus
+    if (vonRaum && richtung === 'raus' && !ruhig()) setVerlassen('hoch');
+    ton(richtung);
+    setUebergang({ von: ebene, vonSchluessel: schluesselVon(ebene), vonRaum, richtung, dauer: dauerFuer(richtung === 'rein' ? neueEbene : ebene) * (vonRaum ? 1.2 : 1) });
     setEbene(neueEbene);
     setMaschineId(null);
+    setVorbereitung(null);
   }
 
   const zuLand = (l) => wechsle({ land: l.kuerzel, standortId: null, gebaeudeId: null }, 'rein');
-  const zuWerk = (st) => wechsle({ land: st.land, standortId: st.id, gebaeudeId: null }, 'rein');
+  const zuWerk = (st) => {
+    const ziel = { land: st.land, standortId: st.id, gebaeudeId: null };
+    // 3D: erst vorbereiten (falls noch nicht fertig), dann zoomen
+    if (istRaum(ziel) && !ruhig() && !bereit.current.has(schluesselVon(ziel))) {
+      setVorbereitung(ziel);
+      setWartet(ziel);
+      return;
+    }
+    wechsle(ziel, 'rein');
+  };
   const zuGebaeude = (g) => wechsle({ land: ebene.land, standortId: g.standort_id, gebaeudeId: g.id }, 'rein');
-  const zuWelt = () => ausRaum(() => wechsle({ land: null, standortId: null, gebaeudeId: null }, 'raus'));
-  const zuLandRaus = () => ausRaum(() => wechsle({ land: ebene.land, standortId: null, gebaeudeId: null }, 'raus'));
+  const zuWelt = () => wechsle({ land: null, standortId: null, gebaeudeId: null }, 'raus');
+  const zuLandRaus = () => wechsle({ land: ebene.land, standortId: null, gebaeudeId: null }, 'raus');
   const zuStandort = () => wechsle({ land: ebene.land, standortId: ebene.standortId, gebaeudeId: null }, 'raus');
   // Eine Ebene höher (Zurück-Knopf)
   const zurueck = { gebaeude: zuStandort, werk: zuLandRaus, land: zuWelt }[stufeName];
+
+  // Pin-Knopf: genau diese Ansicht (Ebene + 2D/3D) als Favorit in die Seitenleiste – nochmal klicken entfernt sie
+  const ansichtJetzt = raumMoeglich && dreiD ? '3d' : '2d';
+  const favoritAdresse = (() => {
+    const p = new URLSearchParams();
+    if (land && !standort) p.set('land', land.kuerzel.toLowerCase());
+    if (standort) p.set('werk', standort.kuerzel.toLowerCase());
+    if (aktuellesGebaeude) p.set('halle', aktuellesGebaeude.kuerzel.toLowerCase());
+    p.set('ansicht', ansichtJetzt);
+    return `/karte?${p}`;
+  })();
+  const angepinnt = favoriten.find((f) => f.adresse === favoritAdresse) ?? null;
+  const pinRef = useRef(null);
+  function pinnen() {
+    if (angepinnt) {
+      favoritEntfernen(angepinnt.id);
+      setPinHinweis(t('Aus den Favoriten entfernt'));
+      return;
+    }
+    const art = { welt: 'welt', land: 'land', werk: 'werk', gebaeude: 'halle' }[stufeName];
+    const name = aktuellesGebaeude ? `${standort.name} · ${aktuellesGebaeude.bezeichnung}` : standort?.name ?? (land ? t(land.name) : t('Weltweit'));
+    const ergebnis = favoritHinzufuegen({ name, art, ansicht: ansichtJetzt, adresse: favoritAdresse });
+    if (!ergebnis.ok) {
+      setPinHinweis(t('Höchstens {n} Favoriten – bitte zuerst einen in der Seitenleiste entfernen.', { n: MAX_FAVORITEN }));
+      return;
+    }
+    setPinHinweis(null);
+    favoritFliegt(pinRef.current, ergebnis.favorit);
+  }
 
   function maschineGeklickt(m) {
     if (modus === 'auswahl') onMaschine?.(m);
@@ -211,6 +375,13 @@ export default function KartenExplorer({
     const alt = altRef.current;
     const buehne = buehneRef.current;
     if (!uebergang || !neu || !alt || !buehne) return undefined;
+    // 3D → 2D: nur überblenden (die Szene ist schon flach von oben und deckt sich mit der Zeichnung)
+    // Favorit öffnen (Sprung): ebenso nur überblenden
+    if (uebergang.richtung === 'blende' || uebergang.richtung === 'sprung') {
+      const ein = neu.animate([{ opacity: 0 }, { opacity: 1 }], { duration: uebergang.dauer, easing: 'ease-in-out', fill: 'both' });
+      const aus = alt.animate([{ opacity: 1 }, { opacity: 0 }], { duration: uebergang.dauer, easing: 'ease-in-out', fill: 'both' });
+      return () => { ein.cancel(); aus.cancel(); };
+    }
     const rein = uebergang.richtung === 'rein';
     const [eltern, kind] = rein ? [alt, neu] : [neu, alt];
     const kindEbene = rein ? ebene : uebergang.von;
@@ -223,7 +394,7 @@ export default function KartenExplorer({
     // Fokus: Umriss des Landes, Punkt des Werks bzw. Fläche der Halle
     const fokus = eltern.querySelector(`[data-flaeche="${kennung}"]`)
       ?? eltern.querySelector(`[data-ort="${kennung}"] .punkt-blase`) ?? eltern.querySelector(`[data-ort="${kennung}"]`);
-    const ziel = kind.querySelector('.dkarte-land, .lageplan, .grundriss, .raum, .raum-laden') ?? kind.firstElementChild;
+    const ziel = kind.querySelector('.raum-platzhalter, .dkarte-land, .lageplan, .grundriss, .raum, .raum-laden') ?? kind.firstElementChild;
     const animationen = [];
     const dauer = uebergang.dauer;
     const blende = (el, ein) => el.animate(
@@ -247,7 +418,7 @@ export default function KartenExplorer({
   // Nach der Animation die alte Ebene entfernen
   useEffect(() => {
     if (!uebergang) return undefined;
-    const timer = setTimeout(() => setUebergang(null), uebergang.dauer);
+    const timer = setTimeout(() => { setUebergang(null); setVerlassen(null); }, uebergang.dauer);
     return () => clearTimeout(timer);
   }, [uebergang]);
 
@@ -265,6 +436,30 @@ export default function KartenExplorer({
     const ziel = `${window.location.pathname}${p.toString() ? `?${p}` : ''}`;
     window.history.replaceState(window.history.state, '', ziel);
   }, [adresseMitfuehren, land, standort, aktuellesGebaeude, maschineId]);
+
+  // Favorit aus der Seitenleiste, während die Karte offen ist: kurz überblenden und genau dort weitermachen
+  const favoritRef = useRef(null);
+  favoritRef.current = (adresse) => {
+    const ziel = startAusAdresse(Object.fromEntries(new URL(adresse, window.location.origin).searchParams), daten);
+    const zielLand = standorte.find((st) => st.id === ziel.standortId)?.land ?? ziel.land ?? null;
+    const zielEbene = { land: zielLand, standortId: ziel.standortId ?? null, gebaeudeId: ziel.gebaeudeId ?? null };
+    const drei = ziel.ansicht ? webgl && ziel.ansicht === '3d' : dreiD;
+    if (drei) dreiDVorladen();
+    ton('sanft');
+    setVerlassen(null);
+    setVorbereitung(null);
+    setWartet(null);
+    setUebergang({ von: ebene, vonSchluessel: schluesselVon(ebene), vonRaum: istRaum(ebene), richtung: 'sprung', dauer: 500 });
+    setDreiD(drei);
+    setEbene(zielEbene);
+    setMaschineId(null);
+  };
+  useEffect(() => {
+    if (!adresseMitfuehren) return undefined;
+    const oeffnen = (e) => favoritRef.current?.(e.detail);
+    window.addEventListener(FAVORIT_OEFFNEN, oeffnen);
+    return () => window.removeEventListener(FAVORIT_OEFFNEN, oeffnen);
+  }, [adresseMitfuehren]);
 
   /* ---------- Darstellung einer Ebene ---------- */
 
@@ -290,7 +485,7 @@ export default function KartenExplorer({
     } else if (karte) {
       art = 'land';
       inhalt = <LandKarte karte={karte} standorte={standorte.filter((x) => x.land === e.land)} neutral={melden}
-                          onWaehle={aktiv ? zuWerk : undefined} />;
+                          onWaehle={aktiv ? zuWerk : undefined} onVorschau={aktiv ? vorschau : undefined} />;
     } else {
       inhalt = <WeltKarte laender={laender} neutral={melden} onWaehle={aktiv ? zuLand : undefined} />;
     }
@@ -349,7 +544,7 @@ export default function KartenExplorer({
 
       {/* Weltebene: Bühne so hoch wie die (breite) Weltkarte, damit oben und unten nichts leer bleibt.
           Während eines Zooms behält die Bühne die volle Höhe – die Weltkarte ist oben verankert und bewegt sich nicht. */}
-      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' && !uebergang ? ' buehne-welt' : ''}${ohneEinblenden ? ' ohne-einblenden' : ''}`} ref={buehneRef}
+      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' && !uebergang ? ' buehne-welt' : ''}`} ref={buehneRef}
            style={{ '--welt-verhaeltnis': weltVerhaeltnis() }}>
         {/* Kopf über der Karte: Zurück und Titel */}
         <div className="buehne-kopf">
@@ -368,32 +563,66 @@ export default function KartenExplorer({
         {/* Alte Ebene (nur während des Zooms) und neue Ebene – mit Schlüssel, damit React eine
             bestehende Ebene (z. B. die 3D-Szene) beim Rollentausch weiterverwendet statt neu aufzubauen */}
         {[
-          ...(uebergang && schluesselVon(uebergang.von) !== schluessel ? [{ e: uebergang.von, aktiv: false }] : []),
-          { e: ebene, aktiv: true },
-        ].map(({ e, aktiv }) => (
-          <div key={schluesselVon(e)} ref={aktiv ? neuRef : altRef} aria-hidden={aktiv ? undefined : true}
-               // Beim Herauszoomen sind die Beschriftungen der neuen (zunächst stark vergrößerten) Ebene kurz verborgen
-               className={`explorer-ebene ${aktiv ? 'ebene-neu' : 'ebene-alt'}${istRaum(e) ? ' ebene-raum' : ''}`
-                 + `${aktiv && uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`}>
-            {istRaum(e) ? (
-              <>
-                {/* Darunter der 2D-Plan: Auf ihn zoomt die Kamerafahrt, aus ihm „wächst“ die 3D-Szene (erst von oben,
-                    dann kippt die Kamera) und beim Verlassen kommt er wieder zum Vorschein */}
-                <div className="raum-unterlage" aria-hidden="true">{ebeneZeichnen(e, false)}</div>
-                <Werk3D standort={standortVon(e)} {...werkDaten(e.standortId)} gebaeudeId={e.gebaeudeId} verlassen={aktiv && verlassen}
-                        maschineId={aktiv ? maschineId : null} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
-              </>
-            ) : ebeneZeichnen(e, aktiv)}
-          </div>
-        ))}
+          ...(uebergang && uebergang.vonSchluessel !== schluessel
+            ? [{ e: uebergang.von, schl: uebergang.vonSchluessel, raum3d: uebergang.vonRaum, rolle: 'alt' }] : []),
+          // unsichtbar vorbereitetes 3D-Werk (wird beim Wechsel zur neuen Ebene – gleicher Schlüssel, kein Neuaufbau)
+          ...(vorbereitung && schluesselVon(vorbereitung) !== schluessel && schluesselVon(vorbereitung) !== uebergang?.vonSchluessel
+            ? [{ e: vorbereitung, schl: schluesselVon(vorbereitung), raum3d: true, rolle: 'vorschau' }] : []),
+          { e: ebene, schl: schluessel, raum3d: raum, rolle: 'neu' },
+        ].map(({ e, schl, raum3d, rolle }) => {
+          const aktiv = rolle === 'neu';
+          return (
+            <div key={schl} ref={aktiv ? neuRef : rolle === 'alt' ? altRef : undefined} aria-hidden={aktiv ? undefined : true}
+                 // Beim Herauszoomen sind die Beschriftungen der neuen (zunächst stark vergrößerten) Ebene kurz verborgen
+                 className={`explorer-ebene ebene-${rolle}${raum3d ? ' ebene-raum' : ''}`
+                   + `${aktiv && uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`
+                   + `${rolle === 'alt' && uebergang?.richtung === 'raus' ? ' ebene-weich' : ''}`
+                   + `${schl === ohneEinblenden ? ' ohne-einblenden' : ''}`
+                   // Hinein ins 3D-Werk: weiche Ränder, solange die Szene noch klein ist (kein hartes Rechteck)
+                   + `${aktiv && raum3d && uebergang?.richtung === 'rein' ? ' ebene-weich-ein' : ''}`}
+                 style={aktiv && uebergang ? { '--uebergang-dauer': `${uebergang.dauer}ms` } : undefined}>
+              {raum3d ? (
+                <>
+                  {/* Platzhalter in Größe und Lage des 2D-Plans (ohne Inhalt): Darauf zielt die Kamerafahrt */}
+                  <div className="raum-unterlage" aria-hidden="true">
+                    <div className="ebene-inhalt" style={{ '--verhaeltnis': seitenverhaeltnis(e, standortVon(e), gebaeudeVon(e), null, laender) }}>
+                      <div className="raum-platzhalter" style={{ aspectRatio: seitenverhaeltnis(e, standortVon(e), gebaeudeVon(e), null, laender) }} />
+                    </div>
+                  </div>
+                  <Werk3D standort={standortVon(e)} {...werkDaten(e.standortId)} gebaeudeId={e.gebaeudeId}
+                          verlassen={rolle === 'alt' ? { blende: 'flach', sprung: null }[uebergang?.richtung] ?? 'hoch' : aktiv ? verlassen : null}
+                          vorschau={rolle === 'vorschau'} onFlach={aktiv ? zeichnungUeberblenden : undefined} starten={aktiv && !uebergang} onBereit={() => szeneBereit(schl)}
+                          maschineId={aktiv ? maschineId : null} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
+                </>
+              ) : ebeneZeichnen(e, aktiv)}
+            </div>
+          );
+        })}
 
-        {/* Umschalter 2D / 3D (nur für Werk und Halle) */}
-        {raumMoeglich && (stufeName === 'werk' || stufeName === 'gebaeude') && (
-          <div className="sprach-schalter raum-schalter" role="group" aria-label={t('Darstellung der Karte')}>
-            <button type="button" aria-pressed={!dreiD} onClick={() => ansichtWaehlen(false)}>2D</button>
-            <button type="button" aria-pressed={dreiD} onClick={() => ansichtWaehlen(true)}>3D</button>
-          </div>
-        )}
+        {/* Oben rechts: Ton an/aus, Ansicht anpinnen (nicht beim Melden) und Umschalter 2D / 3D (nur Werk und Halle) */}
+        <div className="karten-werkzeuge">
+          <button type="button" className="rund-knopf karten-knopf" aria-pressed={tonEin}
+                  onClick={() => { tonSetzen(!tonEin); if (!tonEin) setTimeout(() => ton('sanft'), 0); }}
+                  aria-label={tonEin ? t('Ton der Kamerafahrten ausschalten') : t('Ton der Kamerafahrten einschalten')}
+                  title={tonEin ? t('Ton aus') : t('Ton an')}>
+            <i className={`bi ${tonEin ? 'bi-volume-up' : 'bi-volume-mute'}`} aria-hidden="true" />
+          </button>
+          {!melden && (
+            <button type="button" ref={pinRef} className={`rund-knopf karten-knopf karten-pin${angepinnt ? ' angepinnt' : ''}`}
+                    aria-pressed={Boolean(angepinnt)} onClick={pinnen}
+                    aria-label={angepinnt ? t('Aus den Favoriten entfernen') : t('Diese Ansicht anpinnen')}
+                    title={angepinnt ? t('Aus den Favoriten entfernen') : t('Diese Ansicht anpinnen')}>
+              <i className={`bi ${angepinnt ? 'bi-pin-angle-fill' : 'bi-pin-angle'}`} aria-hidden="true" />
+            </button>
+          )}
+          {raumMoeglich && (stufeName === 'werk' || stufeName === 'gebaeude') && (
+            <div className="sprach-schalter raum-schalter" role="group" aria-label={t('Darstellung der Karte')}>
+              <button type="button" aria-pressed={!dreiD} onClick={() => ansichtWaehlen(false)}>2D</button>
+              <button type="button" aria-pressed={dreiD} onClick={() => ansichtWaehlen(true)}>3D</button>
+            </div>
+          )}
+        </div>
+        {pinHinweis && <div className="karten-hinweis" role="status">{pinHinweis}</div>}
       </div>
       {!melden && <Legende />}
     </div>

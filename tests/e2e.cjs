@@ -408,11 +408,58 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.explorer-info button:has-text("ALB-H1-01")');
   await p.waitForSelector('#beschreibung', { timeout: 15000 }).catch(() => {});
   pruefe('Melden 3D: Maschine gewählt, Formular offen', (await p.$('#beschreibung')) !== null && (await p.textContent('.auswahl-chip')).includes('ALB-H1-01'));
-  await p.goto(BASE + '/karte?werk=alb'); await p.waitForTimeout(1500);
+  await p.goto(BASE + '/karte?werk=alb'); await p.waitForSelector('.raum.fertig', { timeout: 60000 }).catch(() => {});
   await p.click('.raum-schalter button:has-text("2D")');
-  // 3D → 2D: Kamera fährt erst nach oben und blendet aus (gut 1 s), dann ist die 3D-Szene weg
+  // 3D → 2D: Kamera fährt erst nach oben, Gebäude werden flach, dann Überblendung (gut 2 s), dann ist die 3D-Szene weg
+  await p.waitForTimeout(300);
+  pruefe('3D → 2D: Szene bleibt erst stehen (Kamera hoch, Gebäude flach)', (await p.$('.raum.verlassen')) !== null && (await p.$('.ebene-neu .lageplan')) === null);
   await p.waitForFunction(() => !document.querySelector('.raum'), null, { timeout: 30000 }).catch(() => {});
   pruefe('2D: Lageplan wieder da, Wahl gemerkt', (await p.$('.ebene-neu .lageplan')) !== null && (await p.evaluate(() => localStorage.getItem('kartenansicht'))) === '2d');
+
+  // Ton-Knopf: schaltet das „Wusch“ ab, Wahl gemerkt
+  await p.click('.karten-werkzeuge button[aria-label*="Ton"]');
+  pruefe('Ton: Lautsprecher-Knopf schaltet ab und merkt es', (await p.evaluate(() => localStorage.getItem('kartenton'))) === 'aus'
+    && (await p.getAttribute('.karten-werkzeuge button[aria-label*="Ton"]', 'aria-pressed')) === 'false');
+  await p.click('.karten-werkzeuge button[aria-label*="Ton"]');
+
+  // Favoriten: Werk Albstadt in 2D anpinnen → Eintrag in der Seitenleiste unter „Störungskarte“
+  await p.evaluate(() => localStorage.removeItem('kartenfavoriten'));
+  await p.click('.karten-pin'); await p.waitForTimeout(1500);
+  const favs = () => p.evaluate(() => JSON.parse(localStorage.getItem('kartenfavoriten') ?? '[]'));
+  pruefe('Favoriten: Pin legt Favorit mit Ebene und 2D/3D an', (await favs()).length === 1 && (await favs())[0].adresse === '/karte?werk=alb&ansicht=2d'
+    && (await p.$$eval('.favorit', (z) => z.length)) === 1 && (await p.textContent('.favorit')).includes('Stammwerk Albstadt')
+    && (await p.getAttribute('.karten-pin', 'aria-pressed')) === 'true', JSON.stringify(await favs()));
+  // Halle in 3D anpinnen (Adresse mit halle und ansicht=3d)
+  await p.click('.raum-schalter button:has-text("3D")'); await p.waitForSelector('.raum.fertig', { timeout: 60000 }).catch(() => {});
+  await p.click('.raum-halle:has-text("H2")'); await p.waitForTimeout(2000);
+  await p.click('.karten-pin'); await p.waitForTimeout(1500);
+  pruefe('Favoriten: Halle in 3D angepinnt', (await favs()).some((f) => f.adresse === '/karte?werk=alb&halle=h2&ansicht=3d' && f.art === 'halle'), JSON.stringify(await favs()));
+  // Favorit öffnen, während die Karte offen ist (ohne Neuladen): Werk in 2D
+  await p.click('.explorer-pfad button:has-text("Weltweit")'); await p.waitForTimeout(2500);
+  await p.click('.favorit-link:has-text("Stammwerk Albstadt") >> nth=0');
+  await p.waitForSelector('.ebene-neu .lageplan', { timeout: 15000 }).catch(() => {});
+  pruefe('Favoriten: Klick öffnet die Karte in genau dieser Ansicht (Werk, 2D)', (await p.$('.ebene-neu .lageplan')) !== null
+    && (await p.textContent('.buehne-titel')) === 'Stammwerk Albstadt' && (await p.$('.raum')) === null);
+  // Umbenennen und Entfernen
+  await p.hover('.favorit >> nth=0'); await p.click('.favorit >> nth=0 >> button[title="Umbenennen"]');
+  await p.fill('.favorit-bearbeiten input', 'Mein Stammwerk'); await p.keyboard.press('Enter'); await p.waitForTimeout(200);
+  pruefe('Favoriten: umbenennen', (await p.textContent('.favorit >> nth=0')).includes('Mein Stammwerk') && (await favs())[0].name === 'Mein Stammwerk');
+  // Von einer anderen Seite: Halle 3D öffnet direkt in 3D
+  await p.goto(BASE + '/auftraege'); await p.waitForTimeout(800);
+  await p.click('.favorit-link:has-text("Halle 2")');
+  await p.waitForURL(/ansicht=3d/, { timeout: 15000 }).catch(() => {});
+  await p.waitForSelector('.raum canvas', { timeout: 60000 }).catch(() => {});
+  pruefe('Favoriten: von anderer Seite direkt in die Halle (3D)', (await p.$('.raum canvas')) !== null && /Halle 2/.test(await p.textContent('.buehne-titel')), p.url());
+  // Höchstens 10
+  await p.evaluate(() => {
+    localStorage.setItem('kartenfavoriten', JSON.stringify(Array.from({ length: 10 }, (_, i) => ({ id: 'x' + i, name: 'Test ' + i, art: 'land', ansicht: '2d', adresse: '/karte?land=de&ansicht=2d&n=' + i }))));
+    window.dispatchEvent(new Event('favoritenwechsel'));
+  });
+  await p.click('.karten-pin'); await p.waitForTimeout(400);
+  pruefe('Favoriten: höchstens 10, Hinweis statt elftem', (await favs()).length === 10 && (await p.textContent('.karten-hinweis')).includes('Höchstens 10'));
+  await p.hover('.favorit >> nth=0'); await p.click('.favorit >> nth=0 >> button[title="Entfernen"]'); await p.waitForTimeout(200);
+  pruefe('Favoriten: entfernen', (await favs()).length === 9 && (await p.$$eval('.favorit', (z) => z.length)) === 9);
+  await p.evaluate(() => { localStorage.removeItem('kartenfavoriten'); localStorage.setItem('kartenansicht', '2d'); });
   }
   await b3.close();
 

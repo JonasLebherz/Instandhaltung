@@ -24,7 +24,7 @@ function beschriftungOben(punkt, allePunkte, karte) {
     && p.y > punkt.y && p.y - punkt.y < karte.hoehe * 0.094);
 }
 
-export default function LandKarte({ karte, standorte, auswahlId = null, onWaehle, neutral = false }) {
+export default function LandKarte({ karte, standorte, auswahlId = null, onWaehle, onVorschau, neutral = false }) {
   const t = useT();
   const { breite, hoehe } = karte;
   const punkte = standorte.map((st) => ({ st, ...karte.punkt(st.breitengrad, st.laengengrad) }));
@@ -63,7 +63,7 @@ export default function LandKarte({ karte, standorte, auswahlId = null, onWaehle
         const oben = beschriftungOben(punkt, punkte, karte);
         const farbe = neutral ? 'neutral' : stufe(st.offen, st.hoechste_prioritaet);
         return (
-          <button key={st.id} type="button" onClick={(e) => onWaehle?.(st, e)}
+          <button key={st.id} type="button" onClick={(e) => onWaehle?.(st, e)} onPointerEnter={() => onVorschau?.(st)} onFocus={() => onVorschau?.(st)}
                   // Tooltips am linken/rechten Kartenrand nach innen ausrichten, damit nichts übersteht
                   className={`karten-punkt stufe-${farbe}${oben ? ' name-oben' : ''}${x > breite * 0.68 ? ' info-links' : ''}`
                     + `${x < breite * 0.32 ? ' info-rechts' : ''}${auswahlId === st.id ? ' gewaehlt' : ''}`}

@@ -11,38 +11,18 @@
  *   /karte?werk=ham               Lageplan des Werks Hamburg
  *   /karte?werk=ham&halle=h2      Grundriss von Halle 2
  *   /karte?maschine=12            Grundriss mit ausgewählter Maschine
+ *   …&ansicht=3d                  Werk bzw. Halle in 3D (bzw. 2d) – so öffnen die Favoriten der Seitenleiste
  */
 import { benutzerPflicht } from '@/lib/auth';
 import { ansichtAusCookie } from '@/lib/ansicht';
 import { alleKartenDaten, nachAnsicht } from '@/lib/karten/daten';
 import KartenExplorer from '@/components/karten/KartenExplorer';
+import { startAusAdresse } from '@/lib/karten/adresse';
 import Kennzahl from '@/components/Kennzahl';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 
 export const dynamic = 'force-dynamic';
 export const generateMetadata = () => seitentitel('Störungskarte');
-
-/**
- * Startebene aus der Adresse ermitteln. Unbekannte Werte werden ignoriert.
- * Eine Maschine legt Werk und Gebäude automatisch mit fest.
- */
-function startAusAdresse(parameter, daten) {
-  const werk = String(parameter?.werk ?? '').toUpperCase();
-  const halle = String(parameter?.halle ?? '').toUpperCase();
-  const maschine = daten.maschinen.find((m) => String(m.id) === String(parameter?.maschine ?? ''));
-  if (maschine) {
-    const g = daten.gebaeude.find((x) => x.id === maschine.gebaeude_id);
-    return { standortId: g.standort_id, gebaeudeId: g.id, maschineId: maschine.id };
-  }
-  const standort = daten.standorte.find((st) => st.kuerzel === werk);
-  if (!standort) {
-    // Nur ein Land angegeben (Kürzel klein in der Adresse, groß in der Datenbank)
-    const land = String(parameter?.land ?? '').toUpperCase();
-    return daten.standorte.some((st) => st.land === land) ? { land } : {};
-  }
-  const gebaeude = daten.gebaeude.find((g) => g.standort_id === standort.id && g.kuerzel === halle);
-  return { standortId: standort.id, gebaeudeId: gebaeude?.id ?? null };
-}
 
 export default async function KartenSeite({ searchParams }) {
   await benutzerPflicht();
@@ -66,8 +46,11 @@ export default async function KartenSeite({ searchParams }) {
       </div>
 
       <KartenExplorer daten={daten} adresseMitfuehren
-                      // Ohne Angabe in der Adresse beginnt die Karte bei der Ansicht aus dem Konto
-                      start={Object.keys(parameter ?? {}).length > 0 ? startAusAdresse(parameter, daten) : { land: ansicht.land, standortId: ansicht.standortId }} />
+                      // Ohne Angabe in der Adresse beginnt die Karte bei der Ansicht aus dem Konto.
+                      // ?ansicht=2d|3d (z. B. aus einem Favoriten) geht der gemerkten 2D/3D-Wahl vor.
+                      start={Object.keys(parameter ?? {}).length > 0
+                        ? startAusAdresse(parameter, daten)
+                        : { land: ansicht.land, standortId: ansicht.standortId }} />
 
       <div className="row g-4 mt-0">
         <div className="col-6 col-lg-3">

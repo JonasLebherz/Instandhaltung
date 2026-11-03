@@ -9,6 +9,8 @@
  * Skript in app/layout.js setzt es schon vor dem ersten Anzeigen, damit nichts
  * springt. Ohne gespeicherte Wahl ist die Leiste auf großen Bildschirmen offen.
  *
+ * Unter „Störungskarte“ stehen die Favoriten (angepinnte Kartenansichten, components/Favoriten.js).
+ *
  * Unten: Sprache (Deutsch/Englisch), Darstellung (Hell/Dunkel/Automatisch)
  * und das Konto. Das Konto zeigt die echte Anmeldung (E-Mail) und die
  * gewählte fiktive Person mit Rolle und Werk (siehe lib/person.js). Über
@@ -25,6 +27,7 @@ import { useSprache, useSpracheWechseln, useT } from './SpracheKontext';
 import Logo from './Logo';
 import PersonWahl, { RollenAbzeichen, PERSON_WAEHLEN } from './PersonWahl';
 import AnsichtWahl from './AnsichtWahl';
+import Favoriten from './Favoriten';
 
 /** Seiten, nach Bereichen gruppiert. "symbolAktiv" ist die gefüllte Variante für die aktuelle Seite. */
 // Texte mit T() markiert – übersetzt werden sie beim Anzeigen mit t()
@@ -33,7 +36,8 @@ const BEREICHE = [
     titel: T('Überblick'),
     seiten: [
       { pfad: '/', text: T('Übersicht'), symbol: 'bi-grid-1x2', symbolAktiv: 'bi-grid-1x2-fill' },
-      { pfad: '/karte', text: T('Störungskarte'), symbol: 'bi-map', symbolAktiv: 'bi-map-fill' },
+      // favoriten: darunter die angepinnten Kartenansichten (components/Favoriten.js)
+      { pfad: '/karte', text: T('Störungskarte'), symbol: 'bi-map', symbolAktiv: 'bi-map-fill', favoriten: true },
     ],
   },
   {
@@ -205,7 +209,7 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                 {bereich.seiten.map((seite) => {
                   const aktiv = istAktiv(seite);
                   const zahl = seite.zaehler && offeneAuftraege > 0 ? offeneAuftraege : null;
-                  return (
+                  return [
                     <li key={seite.pfad}>
                       <Link href={seite.pfad} className={`leiste-link${aktiv ? ' aktiv' : ''}`}
                             onClick={() => setMobilOffen(false)}
@@ -222,8 +226,9 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                           {zahl && <span className="leiste-zahl" aria-hidden="true">{zahl}</span>}
                         </span>
                       </Link>
-                    </li>
-                  );
+                    </li>,
+                    seite.favoriten && <Favoriten key="favoriten" onOeffnen={() => setMobilOffen(false)} />,
+                  ];
                 })}
               </ul>
             </div>

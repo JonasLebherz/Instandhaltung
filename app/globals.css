@@ -268,7 +268,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 
 /* Kein overflow hier: Sonst würden die Sprechblasen der eingeklappten Leiste abgeschnitten */
 .leiste-nav { flex: 1; }
-.leiste-bereich ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.leiste-bereich ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .leiste-titel {
     font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
     color: var(--text-leise);
@@ -355,6 +355,67 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     background: var(--karte-solid);
 }
 
+/* ---------- Favoriten (angepinnte Kartenansichten) unter „Störungskarte“ ---------- */
+.favoriten { margin: 2px 0 4px; }
+.favoriten-titel {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 12px 2px 52px;
+    font-size: .68rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-leise);
+    white-space: nowrap;
+}
+.favoriten-anzahl { font-weight: 500; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.favoriten-leer { margin: 2px 12px 4px 52px; font-size: .75rem; line-height: 1.3; color: var(--text-leise); }
+.favoriten ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
+/* Aufgeklappt: viele Favoriten scrollen in sich, damit die Leiste unten nicht übersteht */
+:root[data-leiste="auf"] .favoriten ul { max-height: min(380px, 36vh); overflow-y: auto; }
+.favorit { position: relative; }
+.favorit-link { min-height: 36px; padding-left: 26px; padding-right: 58px; font-size: .88rem; }
+.favorit-link .leiste-symbol { flex-basis: 26px; height: 26px; }
+.favorit-symbol {
+    width: 24px; height: 24px; border-radius: 7px;
+    display: grid; place-items: center; font-size: .78rem;
+    color: var(--logo-zeichen);
+    background: linear-gradient(180deg, var(--logo-oben), var(--logo-unten));
+    box-shadow: inset 0 0 0 1px var(--logo-rand);
+}
+.favorit-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.favorit-ansicht {
+    flex: none; font-size: .64rem; font-weight: 700; padding: 1px 6px; border-radius: 6px;
+    background: var(--fuellung); color: var(--text-leise);
+}
+.favorit-aktionen {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    display: flex; gap: 2px; opacity: 0; transition: opacity .15s ease;
+}
+.favorit:hover .favorit-aktionen, .favorit:focus-within .favorit-aktionen { opacity: 1; }
+@media (hover: none) { .favorit-aktionen { opacity: 1; } }
+.favorit-aktionen button {
+    width: 26px; height: 26px; border: 0; border-radius: 8px; display: grid; place-items: center;
+    background: transparent; color: var(--text-leise); font-size: .78rem;
+}
+.favorit-aktionen button:hover { background: var(--fuellung); color: var(--text); }
+.favorit-bearbeiten { padding: 3px 4px 3px 26px; }
+.favorit-bearbeiten input {
+    width: 100%; height: 32px; padding: 0 10px; border-radius: 10px; font-size: .88rem;
+    border: 1px solid var(--akzent); background: var(--karte-solid); color: var(--text); outline: none;
+}
+/* Gerade angepinnt: Eintrag erscheint, wenn das fliegende Schild ankommt */
+.favorit-neu { animation: favorit-landen .55s .85s var(--weich) backwards; }
+.favorit-neu .favorit-link { animation: favorit-leuchten 1.4s .9s ease-out backwards; }
+@keyframes favorit-landen { from { opacity: 0; transform: translateX(-10px) scale(.9); } }
+@keyframes favorit-leuchten { from { background: var(--glas-linse); box-shadow: 0 0 0 2px var(--akzent); } }
+/* Fliegendes Schild vom Pin-Knopf zur Seitenleiste */
+.favorit-flug {
+    position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none; transform-origin: 0 0;
+    display: inline-flex; align-items: center; gap: 8px; padding: 0 12px 0 0; height: 34px; border-radius: 999px;
+    background: var(--karte-solid); color: var(--text); font-size: .85rem; font-weight: 600; white-space: nowrap;
+    border: 1px solid var(--glas-rand); box-shadow: var(--schatten-hover);
+}
+.favorit-flug i {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--akzent); color: var(--akzent-text);
+}
+
 /* ---------- Eingeklappt (nur ab Tablet-Breite) ---------- */
 @media (min-width: 768px) {
     :root:not([data-leiste="auf"]) .leiste-titel {
@@ -391,6 +452,23 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     :root:not([data-leiste="auf"]) .leiste-marke .leiste-text { display: none; }
     :root:not([data-leiste="auf"]) .leiste-kopf { justify-content: center; }
     :root:not([data-leiste="auf"]) .konto-name small { display: none; }
+    /* Favoriten eingeklappt: nur das Symbol, Name als Sprechblase; Umbenennen/Entfernen als kleine Leiste darunter */
+    :root:not([data-leiste="auf"]) .favoriten-titel { font-size: 0; padding: 0; height: 0; }
+    :root:not([data-leiste="auf"]) .favoriten-leer { display: none; }
+    :root:not([data-leiste="auf"]) .favorit-link { padding: 0 10px; justify-content: flex-start; }
+    :root:not([data-leiste="auf"]) .favorit-link .leiste-symbol { flex-basis: 30px; }
+    :root:not([data-leiste="auf"]) .favorit-aktionen {
+        right: auto; left: calc(100% + 22px); top: calc(50% + 20px); transform: none;
+        padding: 3px; border-radius: 10px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
+        visibility: hidden; z-index: 3;
+    }
+    /* unsichtbare Brücke über die Lücke, damit die Leiste beim Hinüberfahren nicht verschwindet */
+    :root:not([data-leiste="auf"]) .favorit-aktionen::before { content: ''; position: absolute; right: 100%; top: -24px; bottom: 0; width: 26px; }
+    :root:not([data-leiste="auf"]) .favorit:hover .favorit-aktionen,
+    :root:not([data-leiste="auf"]) .favorit:focus-within .favorit-aktionen { visibility: visible; }
+    :root:not([data-leiste="auf"]) .favorit-bearbeiten {
+        position: absolute; left: calc(100% + 22px); top: 50%; transform: translateY(-50%); width: 220px; padding: 0; z-index: 4;
+    }
 }
 
 /* Die schmale Leiste oben gibt es nur auf dem Smartphone */
@@ -1995,14 +2073,29 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* 3D blendet erst ein, wenn die Grafik vorbereitet ist (kein Ruckeln beim Öffnen) */
 .raum > div:first-child { opacity: 0; transition: opacity .35s ease; }
 .raum.fertig > div:first-child { opacity: 1; }
-/* Beim Verlassen: erst fährt die Kamera nach oben (≈ 0,8 s), dann blendet die Szene zum Plan darunter aus */
-.raum.fertig.verlassen > div:first-child, .raum.verlassen .raum-uhr { opacity: 0; transition: opacity .3s ease .8s; }
+/* Beim Verlassen der 3D-Szene: Beschriftungen und Uhr ausblenden (die Szene selbst blendet die Karte aus) */
+.raum.verlassen .raum-uhr, .raum.verlassen .raum-halle, .raum.verlassen .raum-marke { opacity: 0; transition: opacity .3s ease; }
 .raum-uhr { transition: opacity .3s ease; }
-/* 2D-Plan unter der 3D-Szene – gleiche Lage wie die 2D-Ebene, nicht anklickbar */
-.raum-unterlage { position: absolute; inset: 0; display: flex; padding: var(--kopf-h) 22px 22px; pointer-events: none; }
+/* Platzhalter in Größe und Lage des 2D-Plans (leer, unsichtbar): Ziel der Kamerafahrt */
+.raum-unterlage { position: absolute; inset: 0; display: flex; padding: var(--kopf-h) 22px 22px; pointer-events: none; visibility: hidden; }
+/* Unsichtbar vorbereitete 3D-Szene (beim Darüberfahren bzw. nach dem Klick, bis sie fertig ist) */
+.ebene-vorschau { opacity: 0; pointer-events: none; z-index: 0; }
+/* Angeklickter Standort pulsiert, solange sein 3D-Werk vorbereitet wird */
+.wird-vorbereitet .punkt-blase { animation: vorbereiten-puls .7s ease-in-out infinite alternate; }
+@keyframes vorbereiten-puls { to { transform: scale(1.25); box-shadow: 0 0 0 8px color-mix(in srgb, var(--akzent) 18%, transparent); } }
+/* Herauszoomen: die kleiner werdende Ebene mit weichem, rundem Rand statt hartem Rechteck */
+.ebene-weich { -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent 100%); mask-image: radial-gradient(closest-side, #000 62%, transparent 100%); }
+/* Hinein ins 3D-Werk: dieselbe weiche Maske, sie öffnet sich mit dem Zoom ganz (500 % → Ränder außerhalb des Bilds) */
+.ebene-weich-ein {
+    -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent 100%); mask-image: radial-gradient(closest-side, #000 62%, transparent 100%);
+    -webkit-mask-position: center; mask-position: center; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-size: 500% 500%; mask-size: 500% 500%;
+    animation: weich-ein var(--uebergang-dauer, 1s) cubic-bezier(.55, 0, .9, .4) backwards;
+}
+@keyframes weich-ein { from { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; } }
 /* Plan unter der 3D-Szene und der Plan direkt nach dem Verlassen von 3D: ohne Einblend-Animation,
    sonst flögen die Kacheln beim Überblenden noch einmal herein */
-.raum-unterlage *, .explorer-buehne.ohne-einblenden .explorer-ebene * { animation: none !important; }
+.raum-unterlage *, .explorer-ebene.ohne-einblenden * { animation: none !important; }
 /* Ortszeit des Werks unten links in der 3D-Ansicht */
 .raum-uhr {
     position: absolute; left: 14px; bottom: 14px; z-index: 5; display: inline-flex; align-items: center; gap: 6px;
@@ -2013,8 +2106,38 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .raum-marke-name { padding: 0 6px; }
 .raum-marke:not(.gewaehlt) .raum-marke-name { padding: 3px 10px; border-radius: 999px; background: var(--karte-erhoeht); border: 1px solid var(--glas-rand); font-weight: 600; }
 .raum-laden { background: radial-gradient(60% 50% at 50% 55%, var(--fuellung), transparent); animation: einblenden .4s ease; }
-.raum-schalter { position: absolute; top: 14px; right: 14px; z-index: 6; box-shadow: var(--glas-kante), 0 4px 16px rgba(31, 38, 64, .08); background: var(--karte-erhoeht); }
+/* Oben rechts in der Bühne: Ton, Pin (Favorit) und Umschalter 2D/3D */
+.karten-werkzeuge { position: absolute; top: 14px; right: 14px; z-index: 6; display: flex; align-items: center; gap: 8px; }
+.raum-schalter { box-shadow: var(--glas-kante), 0 4px 16px rgba(31, 38, 64, .08); background: var(--karte-erhoeht); }
 .raum-schalter button { min-width: 44px; }
+.karten-knopf {
+    width: 38px; height: 38px; font-size: 1rem;
+    background: var(--karte-erhoeht);
+    backdrop-filter: var(--glas-unschaerfe);
+    -webkit-backdrop-filter: var(--glas-unschaerfe);
+    border: 1px solid var(--glas-rand);
+    box-shadow: var(--glas-kante), 0 4px 16px rgba(31, 38, 64, .08);
+}
+.karten-knopf:hover { background: var(--karte-solid); }
+.karten-knopf[aria-pressed="false"] { color: var(--text-leise); }
+.karten-pin[aria-pressed="false"] { color: var(--text); }
+.karten-pin.angepinnt, .karten-pin.angepinnt:hover { background: var(--akzent); color: var(--akzent-text); border-color: transparent; }
+.karten-pin.angepinnt i { animation: pin-setzen .35s var(--weich); }
+@keyframes pin-setzen { from { transform: translateY(-6px) rotate(-20deg); } to { transform: none; } }
+.karten-hinweis {
+    position: absolute; top: 62px; right: 14px; z-index: 6; max-width: min(320px, calc(100% - 28px));
+    padding: 7px 12px; border-radius: 12px; font-size: .82rem;
+    background: var(--karte-solid); color: var(--text); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
+    animation: hinweis-ein .2s var(--weich) backwards;
+}
+@keyframes hinweis-ein { from { opacity: 0; transform: translateY(-4px); } }
+/* Titel links lässt rechts Platz für die Knöpfe; auf schmalen Bildschirmen rutschen die Knöpfe darunter */
+.buehne-kopf { max-width: calc(100% - 230px); }
+@media (max-width: 575.98px) {
+    .buehne-kopf { max-width: calc(100% - 24px); }
+    .karten-werkzeuge { top: 68px; }
+    .karten-hinweis { top: 116px; }
+}
 /* Beschriftung einer Halle über dem Dach */
 .raum-halle {
     display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
