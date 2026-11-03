@@ -89,7 +89,7 @@ export default function MaschinenListe({ maschinen }) {
                   </td>
                   <td className="d-none d-md-table-cell">{m.standort} · {m.gebaeude_kuerzel}</td>
                   <td className="d-none d-lg-table-cell">{m.baujahr}</td>
-                  <td><span className={`ampel-punkt ampel-${z}`} aria-hidden="true" /> {t(AMPEL_TEXT[z])}{m.offen > 0 && ` (${m.offen})`}</td>
+                  <td className="text-nowrap"><span className={`ampel-punkt ampel-${z}`} title={t(AMPEL_TEXT[z])} /> <span className="zustand-text">{t(AMPEL_TEXT[z])}</span>{m.offen > 0 && ` (${m.offen})`}</td>
                   <td className="zahl">{m.stoerungen_12m}</td>
                 </tr>
               );

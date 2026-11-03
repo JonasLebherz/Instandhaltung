@@ -125,6 +125,12 @@ function kamerafahrt(A, B, rein, schritte = 32) {
   const s = Math.min(A.w / B.w, A.h / B.h);      // so klein beginnt die Kindebene (passt genau in A)
   const kind = [];
   const eltern = [];
+  // Hineinzoomen mit weichem, rundem Rand: Die Kindebene liegt in einer Hülle mit fester Maske. Die Hülle wächst
+  // gegen Ende um den Faktor m (Maske öffnet sich), die Ebene darin schrumpft genau um 1/m – zusammen ergibt das
+  // dieselbe Fahrt. Nur Verschieben und Skalieren: Das erledigt die Grafikkarte, ohne die Ebene neu zu zeichnen
+  // (eine animierte mask-size würde jedes Bild neu zeichnen und ruckeln).
+  const huelle = [];
+  const gegen = [];
   for (let i = 0; i <= schritte; i += 1) {
     const zeit = i / schritte;
     const p = rein ? zeit : 1 - zeit;
@@ -135,8 +141,11 @@ function kamerafahrt(A, B, rein, schritte = 32) {
     const cy = A.y + (B.y - A.y) * schwenk;
     kind.push({ offset: zeit, transform: `translate(${cx - k * B.x}px, ${cy - k * B.y}px) scale(${k})` });
     eltern.push({ offset: zeit, transform: `translate(${cx - (k / s) * A.x}px, ${cy - (k / s) * A.y}px) scale(${k / s})` });
+    const m = 1 + 4 * stufe01(zeit, 0.55, 1) ** 2;   // Maske öffnet sich erst, wenn die Ebene groß genug ist
+    huelle.push({ offset: zeit, transform: `translate(${cx - k * m * B.x}px, ${cy - k * m * B.y}px) scale(${k * m})` });
+    gegen.push({ offset: zeit, transform: `translate(${B.x * (1 - 1 / m)}px, ${B.y * (1 - 1 / m)}px) scale(${1 / m})` });
   }
-  return { kind, eltern };
+  return { kind, eltern, huelle, gegen };
 }
 
 /** Seitenverhältnis (Breite / Höhe) des Inhalts einer Ebene – damit er in die Bühne passt */
@@ -159,7 +168,13 @@ export default function KartenExplorer({
   const neuRef = useRef(null);
   const altRef = useRef(null);
 
-  const laender = laenderAus(standorte);
+  // Länder und Länderkarten nur einmal berechnen (nicht bei jedem Neuzeichnen während einer Kamerafahrt)
+  const laender = useMemo(() => laenderAus(standorte), [standorte]);
+  const landKarten = useMemo(() => new Map(), [standorte]);
+  const landKarteVon = (kuerzel) => {
+    if (!landKarten.has(kuerzel)) landKarten.set(kuerzel, landKarte(kuerzel, standorte));
+    return landKarten.get(kuerzel);
+  };
   // Start: ein Werk legt das Land mit fest
   const startLand = standorte.find((st) => st.id === start.standortId)?.land ?? start.land ?? null;
   const [ebene, setEbene] = useState({ land: startLand, standortId: start.standortId ?? null, gebaeudeId: start.gebaeudeId ?? null });
@@ -445,15 +460,29 @@ export default function KartenExplorer({
     );
     const A = fokus ? rechteck(fokus) : null;
     const B = ziel ? rechteck(ziel) : null;
+    const huelle = rein ? kind.parentElement : null;
     if (A && B && A.w > 0 && B.w > 0 && A.h > 0 && B.h > 0) {
       const fahrt = kamerafahrt(A, B, rein);
-      animationen.push(kind.animate(fahrt.kind, { duration: dauer, fill: 'both' }));
+      if (huelle) {
+        // Hineinzoomen: Hülle mit fester, runder Maske um die Mitte des Inhalts (siehe kamerafahrt)
+        const maske = `radial-gradient(closest-side at ${B.x}px ${B.y}px, #000 62%, transparent 100%)`;
+        huelle.style.maskImage = maske;
+        huelle.style.webkitMaskImage = maske;
+        huelle.style.transformOrigin = '0 0';
+        animationen.push(huelle.animate(fahrt.huelle, { duration: dauer, fill: 'both' }));
+        animationen.push(kind.animate(fahrt.gegen, { duration: dauer, fill: 'both' }));
+      } else {
+        animationen.push(kind.animate(fahrt.kind, { duration: dauer, fill: 'both' }));
+      }
       animationen.push(eltern.animate(fahrt.eltern, { duration: dauer, fill: 'both' }));
     }
     animationen.push(blende(neu, true), blende(alt, false));
     neu.style.transformOrigin = '0 0';
     alt.style.transformOrigin = '0 0';
-    return () => animationen.forEach((a) => a.cancel());
+    return () => {
+      animationen.forEach((a) => a.cancel());
+      if (huelle) { huelle.style.maskImage = ''; huelle.style.webkitMaskImage = ''; }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uebergang]);
 
@@ -508,7 +537,7 @@ export default function KartenExplorer({
   function ebeneZeichnen(e, aktiv) {
     const st = standortVon(e);
     const g = gebaeudeVon(e);
-    const karte = e.land ? landKarte(e.land, standorte) : null;
+    const karte = e.land ? landKarteVon(e.land) : null;
     const verhaeltnis = seitenverhaeltnis(e, st, g, karte, laender);
     let inhalt;
     let art = 'welt';
@@ -595,7 +624,7 @@ export default function KartenExplorer({
 
       {/* Weltebene: Bühne so hoch wie die (breite) Weltkarte, damit oben und unten nichts leer bleibt.
           Während eines Zooms behält die Bühne die volle Höhe – die Weltkarte ist oben verankert und bewegt sich nicht. */}
-      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' && !uebergang ? ' buehne-welt' : ''}`} ref={buehneRef}
+      <div className={`explorer-buehne buehne-${groesse}${stufeName === 'welt' && !uebergang ? ' buehne-welt' : ''}${uebergang || verlassen || aufbau ? ' im-flug' : ''}${raum ? ' buehne-raum' : ''}`} ref={buehneRef}
            style={{ '--welt-verhaeltnis': weltVerhaeltnis() }}>
         {/* Kopf über der Karte: Zurück und Titel */}
         <div className="buehne-kopf">
@@ -623,15 +652,15 @@ export default function KartenExplorer({
         ].map(({ e, schl, raum3d, rolle }) => {
           const aktiv = rolle === 'neu';
           return (
-            <div key={schl} ref={aktiv ? neuRef : rolle === 'alt' ? altRef : undefined} aria-hidden={aktiv ? undefined : true}
+            // Hülle: trägt beim Hineinzoomen die weiche Maske (siehe kamerafahrt); sonst unsichtbar ohne Wirkung
+            <div key={schl} className={`ebene-huelle huelle-${rolle}`}>
+            <div ref={aktiv ? neuRef : rolle === 'alt' ? altRef : undefined} aria-hidden={aktiv ? undefined : true}
                  // Beim Herauszoomen sind die Beschriftungen der neuen (zunächst stark vergrößerten) Ebene kurz verborgen
                  className={`explorer-ebene ebene-${rolle}${raum3d ? ' ebene-raum' : ''}`
                    + `${aktiv && uebergang?.richtung === 'raus' ? ' ohne-marken' : ''}`
                    + `${rolle === 'alt' && uebergang?.richtung === 'raus' ? ' ebene-weich' : ''}`
-                   + `${schl === ohneEinblenden ? ' ohne-einblenden' : ''}`
-                   // Hineinzoomen (alle Ebenen): weiche, runde Ränder, solange die neue Ebene noch klein ist – kein Rechteck
-                   + `${aktiv && uebergang?.richtung === 'rein' ? ' ebene-weich-ein' : ''}`}
-                 style={aktiv && uebergang ? { '--uebergang-dauer': `${uebergang.dauer}ms` } : undefined}>
+                   + `${schl === ohneEinblenden ? ' ohne-einblenden' : ''}`}
+>
               {raum3d ? (
                 <>
                   {/* Platzhalter in Größe und Lage des 2D-Plans (ohne Inhalt): Darauf zielt die Kamerafahrt */}
@@ -642,10 +671,12 @@ export default function KartenExplorer({
                   </div>
                   <Werk3D standort={standortVon(e)} {...werkDaten(e.standortId)} gebaeudeId={e.gebaeudeId}
                           verlassen={rolle === 'alt' ? { blende: 'flach', sprung: null }[uebergang?.richtung] ?? 'hoch' : aktiv ? verlassen : null}
-                          vorschau={rolle === 'vorschau'} aufbauen={rolle === 'vorschau' && aufbau !== null} onFlach={aktiv ? zeichnungUeberblenden : undefined} starten={aktiv && !uebergang} onBereit={() => szeneBereit(schl)}
+                          vorschau={rolle === 'vorschau'} aufbauen={rolle === 'vorschau' && aufbau !== null}
+                          ruhen={aktiv && uebergang?.richtung === 'rein'} onFlach={aktiv ? zeichnungUeberblenden : undefined} starten={aktiv && !uebergang} onBereit={() => szeneBereit(schl)}
                           maschineId={aktiv ? maschineId : null} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt} neutral={melden} />
                 </>
               ) : ebeneZeichnen(e, aktiv)}
+            </div>
             </div>
           );
         })}

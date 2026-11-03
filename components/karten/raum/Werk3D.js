@@ -860,6 +860,12 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
   const Z = (y) => y - T / 2;
   const [hover, setHover] = useState(null);
   const steuerung = useRef(null);       // OrbitControls (Drehen, Zoomen, Verschieben)
+  // Handy/Tablet: Ein Finger scrollt die Seite weiter (sonst bliebe man auf der 3D-Fläche „hängen“),
+  // zwei Finger zoomen die Kamera. OrbitControls setzt sonst touch-action: none (läuft vorher, Kind-Effekt).
+  const { gl } = useThree();
+  useEffect(() => {
+    if (window.matchMedia?.('(pointer: coarse)').matches) gl.domElement.style.touchAction = 'pan-y';
+  }, [gl]);
   // Beschriftungen (HTML) erst nach dem ersten Bild einblenden – vorher ging die erste verloren
   const [bereit, setBereit] = useState(false);
   useFrame(() => { if (!bereit) setBereit(true); });
@@ -906,14 +912,16 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
       const abstand = Math.max(B, T) * 3;
       return { schluessel: 'hoch', target: [0, 0, 0], position: [0, abstand, abstand * 0.25], dauer: 1.1 };
     }
+    // Schmale Bühne (Handy hochkant): Kamera weiter weg, damit links und rechts nichts abgeschnitten wird
+    const schmal = Math.min(2.2, Math.max(1, 1.45 / (size.width / Math.max(1, size.height))));
     if (gewaehlt) {
       const h = gs.hallen[gewaehlt.id];
       const mitte = [X(h.x + h.b / 2), 0, Z(h.y + h.t / 2)];
-      const abstand = Math.max(h.b * 1.35, h.t * 1.8) + 8;
+      const abstand = (Math.max(h.b * 1.35, h.t * 1.8) + 8) * schmal ** 0.6;   // Halle: Maschinen sollen groß bleiben
       return { schluessel: `g${gewaehlt.id}`, target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand), dauer: 1.2 };
     }
     // Werk füllt das Bild, die Landschaft drumherum läuft bis zum Horizont
-    const abstand = Math.max(B * 1.2, T * 1.7) + 10;
+    const abstand = (Math.max(B * 1.2, T * 1.7) + 10) * schmal;
     const mitte = [0, 0, 4];
     return { schluessel: 'werk', target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand), dauer: 1.6 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1378,6 +1386,18 @@ function HallenInneres({ halle, h, f, bewegt, aktiv, maschinen, maschineId, onMa
   );
 }
 
+/** Meldet, sobald nach dem Übersetzen zwei Bilder gezeichnet wurden (die Szene ist dann sichtbar fertig) */
+function ErsteBilder({ onFertig }) {
+  const zaehler = useRef(0);
+  const { invalidate } = useThree();
+  useFrame(() => {
+    zaehler.current += 1;
+    if (zaehler.current === 2) onFertig(); else if (zaehler.current < 2) invalidate();
+  });
+  useEffect(() => { invalidate(); }, [invalidate]);
+  return null;
+}
+
 /** Grafikprogramme (Shader) vorab übersetzen, ohne den Browser zu blockieren – erst danach wird gezeichnet */
 function Vorbereiten({ onFertig }) {
   const { gl, scene, camera } = useThree();
@@ -1399,7 +1419,9 @@ export default function Werk3D(props) {
   // Kamera: beginnt senkrecht von oben (dort landet die Kamerafahrt aus dem Land) und kippt, sobald die Ebene
   // aktiv ist, in die Schrägansicht. Verlassen: 'flach' = nach oben, dann sinken die Gebäude ab (→ 2D);
   // 'hoch' = Kamera steigt in die Vogelperspektive, während die Karte ins Land herauszoomt.
-  const { verlassen, starten, onBereit, vorschau, onFlach, aufbauen } = props;
+  const { verlassen, starten, onBereit, vorschau, onFlach, aufbauen, ruhen } = props;
+  // Erst „bereit“ melden, wenn wirklich Bilder gezeichnet sind – sonst wäre die Fläche während der Kamerafahrt leer
+  const [gezeichnet, setGezeichnet] = useState(false);
   // Unsichtbar vorbereitete Szene (vorschau): nach den ersten Bildern anhalten, bis sie gebraucht wird –
   // so zeichnet im Hintergrund nichts, während man noch über die Landkarte fährt
   const [pause, setPause] = useState(false);
@@ -1413,7 +1435,7 @@ export default function Werk3D(props) {
   // während die Kamera in die Schrägansicht kippt
   const [flach, setFlach] = useState(Boolean(aufbauen));
   const [hintergrund, setHintergrund] = useState(false);   // Halleninneres vorbereiten erst, wenn Ruhe ist
-  useEffect(() => { if (fertig) onBereit?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [fertig]);
+  useEffect(() => { if (gezeichnet) onBereit?.(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [gezeichnet]);
   useEffect(() => {
     if (verlassen === 'hoch') { setKamera('hoch'); return undefined; }
     if (verlassen === 'flach') {
@@ -1452,11 +1474,14 @@ export default function Werk3D(props) {
          // Zahl der Maschinen mit LED-Anzeige > 0 in der geöffneten Halle (für Tests und Screenreader-Hinweis)
          data-stoerungsanzeigen={props.gebaeudeId && !props.neutral ? props.maschinen.filter((m) => m.gebaeude_id === props.gebaeudeId && m.offen > 0).length : undefined}>
       {/* offsetSize: Größe ohne CSS-Transform messen (die Ebene wird beim Zoomen skaliert) */}
-      <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar || !fertig || pause ? 'never' : bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
+      {/* ruhen: während der Zoom-Fahrt aus dem Land steht die Kamera still über dem Werk – die Szene muss nicht neu
+          gezeichnet werden; die Grafikkarte hat dann nur die Kamerafahrt der Karte zu tun (flüssiger) */}
+      <Canvas shadows dpr={[1, 1.5]} frameloop={!sichtbar || !fertig || pause || (ruhen && gezeichnet) ? 'never' : bewegt ? 'always' : 'demand'} resize={{ offsetSize: true }}
               camera={{ fov: 38, near: 0.5, far: 4000, position: [150, 200, 220] }} gl={{ antialias: true, alpha: true }}>
         <Szene {...props} f={f} bewegt={bewegt} phase={zeit.phase} kamera={kamera} flach={flach} hintergrund={hintergrund}
                onKameraFortschritt={kameraFortschritt} onFlachFertig={flachFertig} />
         <Vorbereiten onFertig={() => setFertig(true)} />
+        {fertig && !gezeichnet && <ErsteBilder onFertig={() => setGezeichnet(true)} />}
       </Canvas>
       <span className="raum-uhr" title={t('Ortszeit am Standort')}>
         <i className={`bi ${zeit.phase === 'nacht' ? 'bi-moon-stars' : zeit.phase === 'daemmerung' ? 'bi-sunset' : 'bi-sun'}`} aria-hidden="true" />

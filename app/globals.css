@@ -2103,19 +2103,18 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .raum-unterlage { position: absolute; inset: 0; display: flex; padding: var(--kopf-h) 22px 22px; pointer-events: none; visibility: hidden; }
 /* Unsichtbar vorbereitete 3D-Szene (beim Darüberfahren bzw. nach dem Klick, bis sie fertig ist) */
 .ebene-vorschau { opacity: 0; pointer-events: none; z-index: 0; }
+/* Hülle um jede Ebene (trägt beim Hineinzoomen die weiche Maske, siehe kamerafahrt in KartenExplorer.js).
+   Sie selbst fängt keine Klicks ab; die Reihenfolge der Ebenen steht an der Hülle. */
+.ebene-huelle { position: absolute; inset: 0; pointer-events: none; }
+.ebene-huelle > .explorer-ebene:not(.ebene-alt):not(.ebene-vorschau) { pointer-events: auto; }
+.huelle-vorschau { z-index: 0; }
+.huelle-alt { z-index: 1; }
+.huelle-neu { z-index: 2; }
 /* Angeklickter Standort pulsiert, solange sein 3D-Werk vorbereitet wird */
 .wird-vorbereitet .punkt-blase { animation: vorbereiten-puls .7s ease-in-out infinite alternate; }
 @keyframes vorbereiten-puls { to { transform: scale(1.25); box-shadow: 0 0 0 8px color-mix(in srgb, var(--akzent) 18%, transparent); } }
 /* Herauszoomen: die kleiner werdende Ebene mit weichem, rundem Rand statt hartem Rechteck */
 .ebene-weich { -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent 100%); mask-image: radial-gradient(closest-side, #000 62%, transparent 100%); }
-/* Hinein ins 3D-Werk: dieselbe weiche Maske, sie öffnet sich mit dem Zoom ganz (500 % → Ränder außerhalb des Bilds) */
-.ebene-weich-ein {
-    -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent 100%); mask-image: radial-gradient(closest-side, #000 62%, transparent 100%);
-    -webkit-mask-position: center; mask-position: center; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-    -webkit-mask-size: 500% 500%; mask-size: 500% 500%;
-    animation: weich-ein var(--uebergang-dauer, 1s) cubic-bezier(.55, 0, .9, .4) backwards;
-}
-@keyframes weich-ein { from { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; } }
 /* Plan unter der 3D-Szene und der Plan direkt nach dem Verlassen von 3D: ohne Einblend-Animation,
    sonst flögen die Kacheln beim Überblenden noch einmal herein */
 .raum-unterlage *, .explorer-ebene.ohne-einblenden * { animation: none !important; }
@@ -2278,4 +2277,33 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     .historie-eintrag a { grid-template-columns: minmax(0, 1fr) auto; }
     .historie-datum { grid-column: 1 / -1; }
     .historie-pills { grid-column: 1; justify-content: flex-start; }
+}
+
+/* Stillstand: das rote Licht blinkt auch in 2D (Ampel-Zeile, Liste der Maschinen) – wie die Ampel in 3D */
+.ampel-rot .ampel-symbol i:nth-child(1), .ampel-punkt.ampel-rot { animation: stillstand-blinken 1s steps(1, end) infinite; }
+@keyframes stillstand-blinken { 60% { opacity: .2; box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .ampel-rot .ampel-symbol i:nth-child(1), .ampel-punkt.ampel-rot { animation: none; } }
+
+/* ---------- Leistung: keine Hintergrund-Unschärfe über bewegten Inhalten ----------
+   backdrop-filter muss bei jeder Bewegung darunter neu berechnet werden. Während einer Kamerafahrt (im-flug)
+   und über der ständig gezeichneten 3D-Szene (buehne-raum) deshalb feste Flächen statt Glas. */
+.explorer-buehne.im-flug *, .explorer-buehne.buehne-raum * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.explorer-buehne.buehne-raum .buehne-kopf, .explorer-buehne.buehne-raum .karten-knopf,
+.explorer-buehne.buehne-raum .raum-schalter, .explorer-buehne.buehne-raum .raum-halle { background: color-mix(in srgb, var(--karte-solid) 92%, transparent); }
+
+/* ---------- Handy (schmale Bühne) ---------- */
+@media (max-width: 575.98px) {
+    /* Lageplan: Hallen-Kacheln nur mit Kürzel und Kurzname, Text abgeschnitten statt überlappend */
+    .explorer-ebene .gebaeude-info { display: none; }
+    .explorer-ebene .gebaeude-kuerzel { font-size: .9rem; }
+    .explorer-ebene .gebaeude-name { font-size: .64rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .explorer-ebene .plan-beschriftung { font-size: .55rem; }
+    /* 3D: kleinere Beschriftungen und Uhr */
+    .raum-halle { font-size: .68rem; padding: 2px 4px 2px 8px; gap: 4px; }
+    .raum-halle .zaehl-marke { transform: scale(.85); }
+    .raum-uhr { left: 8px; bottom: 8px; font-size: .68rem; padding: 3px 8px; }
+    .buehne-hinweis { display: none; }
+    /* Maschinen: Filter der Historie umbrechen, Zustand nur als Punkt */
+    .historie-kopf { flex-wrap: wrap; gap: 8px; }
+    .zustand-text { display: none; }
 }

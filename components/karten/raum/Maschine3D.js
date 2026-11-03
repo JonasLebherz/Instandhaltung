@@ -149,9 +149,12 @@ function ledTextur(zahl, farbe) {
 const blickHilfe = new THREE.Vector3();
 function LedAnzeige({ y, zahl, farbe, f }) {
   const ref = useRef(null);
+  const letzte = useRef({ x: NaN, z: NaN });
   useFrame(({ camera }) => {
     const g = ref.current;
-    if (!g) return;
+    // Nur neu ausrichten, wenn sich die Kamera bewegt hat (spart Rechenzeit bei vielen Maschinen)
+    if (!g || (letzte.current.x === camera.position.x && letzte.current.z === camera.position.z)) return;
+    letzte.current = { x: camera.position.x, z: camera.position.z };
     g.getWorldPosition(blickHilfe);
     g.lookAt(camera.position.x, blickHilfe.y, camera.position.z);
   });
@@ -173,15 +176,25 @@ function LedAnzeige({ y, zahl, farbe, f }) {
  * Die passende Leuchte strahlt, die anderen sind dunkel. zustand = null: alle aus (beim Melden).
  * anzeige: Zahl offener Störungen für die LED-Anzeige obendrauf (null = keine Anzeige, z. B. beim Melden)
  */
-export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null }) {
+export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null, blinken = false }) {
   const leuchten = [['rot', 0.38], ['orange', 0.2], ['gruen', 0.02]];
+  // Stillstand: das rote Licht blinkt (an 0,6 s, aus 0,4 s) – so fällt es sofort auf
+  const rotRef = useRef(null);
+  const scheinRef = useRef(null);
+  useFrame(({ clock }) => {
+    if (!blinken || !rotRef.current) return;
+    const an = clock.elapsedTime % 1 < 0.6;
+    rotRef.current.material.emissiveIntensity = an ? 3.2 : 0.15;
+    rotRef.current.material.opacity = an ? 1 : 0.45;
+    if (scheinRef.current) scheinRef.current.material.opacity = an ? 0.42 : 0;
+  });
   return (
     <group position={p} scale={groesse}>
       <Rolle p={[0, (hoehe - 0.55) / 2, 0]} r={0.035} l={hoehe - 0.55} farbe={f['maschine-dunkel']} />
       {leuchten.map(([name, y]) => {
         const an = zustand === name;
         return (
-          <mesh key={name} position={[0, hoehe - 0.55 + y + 0.09, 0]}>
+          <mesh key={name} ref={name === 'rot' ? rotRef : undefined} position={[0, hoehe - 0.55 + y + 0.09, 0]}>
             <cylinderGeometry args={[0.1, 0.1, 0.17, 18]} />
             <meshStandardMaterial color={f[`ampel-${name}`]} emissive={f[`ampel-${name}`]}
                                   emissiveIntensity={an ? 2.6 : 0} transparent opacity={an ? 1 : 0.3} roughness={0.3} />
@@ -190,7 +203,7 @@ export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null 
       })}
       {/* Leuchtschein um die aktive Leuchte – so erkennt man den Zustand auch von weitem */}
       {zustand && (
-        <mesh position={[0, hoehe - 0.55 + { rot: 0.38, orange: 0.2, gruen: 0.02 }[zustand] + 0.09, 0]}>
+        <mesh ref={scheinRef} position={[0, hoehe - 0.55 + { rot: 0.38, orange: 0.2, gruen: 0.02 }[zustand] + 0.09, 0]}>
           <sphereGeometry args={[0.3, 16, 12]} />
           <meshBasicMaterial color={f[`ampel-${zustand}`]} transparent opacity={0.3} depthWrite={false} />
         </mesh>
@@ -786,7 +799,7 @@ export function MaschineMitAmpel({ m, L, W, f, bewegt, detail = null, ampelGroes
       <MaschinenForm typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} />
       <Namensschild m={m} L={L} W={W} f={f} />
       {detail && <Details m={m} zustand={zustand} typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} voll={detail === 'voll'} />}
-      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} hoehe={ampelHoehe} anzeige={anzeige} />
+      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} hoehe={ampelHoehe} anzeige={anzeige} blinken={bewegt && zustand === 'rot'} />
     </>
   );
 }

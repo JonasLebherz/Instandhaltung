@@ -60,7 +60,7 @@ export default function MaschinenHistorie({ historie }) {
       </div>
 
       <section className="karte mb-4" style={{ '--i': 8 }}>
-        <div className="karte-kopf">
+        <div className="karte-kopf historie-kopf">
           <h2 className="abschnitt-titel">{t('Maschinenhistorie')}</h2>
           <div className="sprach-schalter" role="group" aria-label={t('Filter')}>
             {FILTER.map(([wert, text]) => (
