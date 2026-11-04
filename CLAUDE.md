@@ -20,6 +20,12 @@ Laut Aufgabenstellung gibt es keine Technik-Vorgabe. Der Wechsel wurde mit den B
 
 ## Team & andere KI-Assistenten
 
+- **Projekt-Skills** unter `.claude/skills/` (Herkunft je Ordner in `HERKUNFT.md`):
+  - `apple-design` – Design-Prüfung nach Apples Richtlinien (siehe „Design“).
+  - `graphify` – Wissensgraph des Projekts (`/graphify`): kurzer Starter, der beim Aufruf das Paket `graphifyy` installiert und dessen Anleitung befolgt; Ausgabe in `graphify-out/` (nicht im Repository).
+  - `ponytail` – „so wenig Code wie möglich“, **nur auf ausdrücklichen Wunsch** (`/ponytail`). Die Regeln hier gehen vor, v. a. ausführliche deutsche Kommentare.
+  - Nicht installiert: OmniRoute (KI-Gateway, das Anfragen über fremde Anbieter mit eigenen Zugangsdaten leitet) – ein Serverprogramm für den eigenen Rechner, kein Teil dieser App.
+
 - Im Team arbeitet mindestens eine Person mit OpenAI Codex. Codex liest `AGENTS.md`, nicht diese Datei.
 - `AGENTS.md` verweist auf `CLAUDE.md` und fasst die wichtigsten Regeln zusammen. Bei neuen Konventionen **beide Dateien** aktualisieren.
 - Die Team-Anleitungen unter `docs/` (Codex-PDF) beschreiben noch den XAMPP-Ablauf und müssen auf Vercel/Supabase aktualisiert werden.

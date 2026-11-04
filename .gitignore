@@ -12,3 +12,6 @@ out/
 *.log
 .vercel
 tests/screenshots/
+
+# Wissensgraph von /graphify (wird bei Bedarf neu erzeugt)
+graphify-out/
