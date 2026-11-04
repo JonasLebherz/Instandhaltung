@@ -62,7 +62,7 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte, person 
       {hatFehler && (
         <div className="hinweis hinweis-fehler" role="alert">
           <i className="bi bi-x-circle-fill" aria-hidden="true" />
-          <span className="hinweis-text">{fehler.allgemein ?? t('Bitte prüfen Sie die markierten Felder.')}</span>
+          <span className="hinweis-text">{fehler.allgemein ?? t('Bitte prüfe die markierten Felder.')}</span>
         </div>
       )}
       {gesperrt && (

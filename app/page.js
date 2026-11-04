@@ -233,7 +233,7 @@ export default async function Uebersicht() {
               <h2 className="abschnitt-titel mb-1">{t('Dir zugewiesene Aufgaben')}</h2>
               <p className="klein mb-0">{t('Wähle eine Person aus dem Unternehmen – dann siehst du hier ihre Aufgaben und arbeitest in ihrer Rolle.')}</p>
             </div>
-            <PersonWaehlenKnopf>{t('Person wählen …')}</PersonWaehlenKnopf>
+            <PersonWaehlenKnopf className="btn btn-sekundaer">{t('Person wählen …')}</PersonWaehlenKnopf>
           </div>
         )}
       </section>
@@ -255,7 +255,7 @@ export default async function Uebersicht() {
                   <thead>
                     <tr>
                       <th>{t('Maschine')}</th>
-                      <th>{t('Priorität')}</th>
+                      <th className="d-none d-sm-table-cell">{t('Priorität')}</th>
                       <th>{t('Status')}</th>
                       <th className="d-none d-md-table-cell">{t('Gemeldet')}</th>
                     </tr>
@@ -266,8 +266,10 @@ export default async function Uebersicht() {
                         <td>
                           <Link className="zeilen-link" prefetch={false} href={`/auftraege/${m.auftrag_id}`}>{m.maschine}</Link>
                           <div className="klein text-truncate beschreibung-kurz">{m.stadt} · {m.gebaeude} – {m.beschreibung}</div>
+                          {/* Handy: Priorität unter der Maschine statt in eigener Spalte (sonst wird die Tabelle zu breit) */}
+                          <div className="d-sm-none mt-1"><PrioritaetPill prioritaet={m.prioritaet} /></div>
                         </td>
-                        <td><PrioritaetPill prioritaet={m.prioritaet} /></td>
+                        <td className="d-none d-sm-table-cell"><PrioritaetPill prioritaet={m.prioritaet} /></td>
                         <td>
                           <StatusPill status={m.status} />
                           {m.techniker && <div className="klein mt-1">{m.techniker}</div>}

@@ -31,7 +31,7 @@
     --karte-solid: #ffffff;          /* feste Fläche, z. B. für Diagramm-Punkte */
     --text: #1d1d1f;
     --logo-oben: #2c2c30; --logo-unten: #0c0c0e; --logo-rand: rgba(255, 255, 255, .06); --logo-zeichen: #f5f5f7;
-    --text-leise: #6e6e73;
+    --text-leise: #5f5f64;          /* 5,5:1 auf Karten – auch in der kühlen Ecke des Hintergrunds ≥ 4,5:1 */
     --linie: rgba(60, 60, 67, .12);
     --feld-rand: rgba(60, 60, 67, .18);
     --feld-bg: rgba(255, 255, 255, .72);
@@ -39,9 +39,12 @@
     --fuellung: rgba(118, 118, 128, .10);   /* Balken-Hintergrund, Sekundär-Buttons */
     --fuellung-hover: rgba(118, 118, 128, .17);
 
-    /* Glas (angelehnt an Apples „Liquid Glass“): stark durchscheinende Flächen mit Unschärfe,
-       Lichtkante oben (--glas-licht als Verlauf), feiner Haarlinie außen und weichem Schatten */
-    --karte: rgba(255, 255, 255, .42);
+    /* Zwei Ebenen wie bei Apple (Design-Prüfung, docs/design-review.md):
+       --glas = Bedien-Ebene (Seitenleiste, Menüs): stark durchscheinend, Lichtkante oben.
+       --karte = Inhalts-Ebene: ruhiger, fast deckend („Material“), damit Text überall gut lesbar bleibt.
+       Beide mit Lichtkante (--glas-licht als Verlauf), feiner Haarlinie außen und weichem Schatten. */
+    --glas: rgba(255, 255, 255, .42);
+    --karte: rgba(255, 255, 255, .74);
     --glas-licht: rgba(255, 255, 255, .26);      /* heller oben, läuft nach unten aus */
     --karte-erhoeht: rgba(255, 255, 255, .72);   /* Menüs, Navigation */
     --glas-rand: rgba(255, 255, 255, .55);
@@ -52,19 +55,20 @@
     /* Hintergrund „Morgendunst“: warmes Licht oben links, kühles Stahlblau unten rechts –
        ruhig wie ein unscharfes Foto, bewusst ohne bunte Farbwolken. Darauf wird das Glas sichtbar. */
     --umgebung-licht: rgba(255, 246, 232, .95);
-    --umgebung-kuehl: rgba(150, 170, 195, .75);
+    --umgebung-kuehl: rgba(150, 170, 195, .5);
     --umgebung-dunst: rgba(185, 205, 215, .6);
     --umgebung-verlauf: linear-gradient(155deg, #e9e6e0 0%, #d9dfe6 55%, #c9d2dc 100%);
 
-    --akzent: #1f7a80;               /* Petrol: ruhig, technisch, klar getrennt von Rot/Orange/Grün */
-    --akzent-hover: #186166;
-    --akzent-zart: rgba(31, 122, 128, .12);
-    --akzent-ring: rgba(31, 122, 128, .26);
+    --akzent: #1b7076;               /* Petrol: ruhig, technisch, klar getrennt von Rot/Orange/Grün (5:1 auf Karten) */
+    --akzent-hover: #155c61;
+    --akzent-flaeche: #1b7076;       /* gefüllte Knöpfe/Markierungen mit weißer Schrift (5,8:1) */
+    --akzent-zart: rgba(27, 112, 118, .12);
+    --akzent-ring: rgba(27, 112, 118, .26);
     --akzent-text: #ffffff;          /* Schrift auf Akzentflächen */
 
     /* Status-Farben: jeweils Hintergrund (zart) + Schrift (kräftig) */
-    --gruen-bg: #e3f5e8;   --gruen: #1a7f37;
-    --orange-bg: #fff1e0;  --orange: #b25000;
+    --gruen-bg: #e3f5e8;   --gruen: #17722f;
+    --orange-bg: #fff1e0;  --orange: #a64a00;
     --rot-bg: #fde8e7;     --rot: #c4281c;
     --blau-bg: #e8f1fc;    --blau: #0060c0;
     --lila-bg: #f1ebfb;    --lila: #6e3fc4;
@@ -109,6 +113,7 @@
     --fuellung: rgba(255, 255, 255, .08);
     --fuellung-hover: rgba(255, 255, 255, .13);
 
+    --glas: rgba(255, 255, 255, .05);
     --karte: rgba(255, 255, 255, .05);
     --glas-licht: rgba(255, 255, 255, .04);
     --karte-erhoeht: rgba(40, 42, 48, .78);
@@ -124,6 +129,7 @@
 
     --akzent: #2a9aa1;               /* Petrol, im Dunkeln etwas heller für guten Kontrast */
     --akzent-hover: #36adb4;
+    --akzent-flaeche: #1c7f85;       /* gefüllte Knöpfe: weiße Schrift 4,8:1 (auf #2a9aa1 wären es nur 3,4:1) */
     --akzent-zart: rgba(42, 154, 161, .18);
     --akzent-ring: rgba(42, 154, 161, .34);
     --akzent-text: #ffffff;
@@ -156,9 +162,9 @@
 
 /* Wer "Transparenz reduzieren" eingestellt hat, bekommt feste Flächen */
 @media (prefers-reduced-transparency: reduce) {
-    :root { --karte: #ffffff; --karte-erhoeht: #ffffff; --glas-unschaerfe: none; --glas-licht: transparent;
+    :root { --karte: #ffffff; --glas: #ffffff; --karte-erhoeht: #ffffff; --glas-unschaerfe: none; --glas-licht: transparent;
             --umgebung-licht: transparent; --umgebung-kuehl: transparent; --umgebung-dunst: transparent; --umgebung-verlauf: #eef0f4; }
-    :root[data-theme="dark"] { --karte: #1c1c1e; --karte-erhoeht: #2c2c2e; --umgebung-verlauf: #050507; }
+    :root[data-theme="dark"] { --karte: #1c1c1e; --glas: #1c1c1e; --karte-erhoeht: #2c2c2e; --umgebung-verlauf: #050507; }
 }
 
 /* =====================================================================
@@ -241,7 +247,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     flex-direction: column;
     gap: 6px;
     padding: 14px 12px 12px;
-    background: linear-gradient(180deg, var(--glas-licht), transparent 70%), var(--karte);
+    background: linear-gradient(180deg, var(--glas-licht), transparent 70%), var(--glas);
     /* Unschärfe nur auf dem Handy, wo die Leiste über dem Inhalt liegt (siehe unten). Am PC liegt dahinter
        nur der ruhige Hintergrund – dort sah sie gleich aus und verursachte in Chrome Zeichenfehler. */
     border-right: .5px solid var(--linie);
@@ -304,7 +310,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 .leiste-bereich ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .leiste-titel {
-    font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    font-size: .75rem; font-weight: 650; letter-spacing: 0;
     color: var(--text-leise);
     padding: 16px 12px 6px;
     white-space: nowrap;
@@ -364,7 +370,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     position: absolute; top: -5px; right: -9px;
     min-width: 18px; height: 18px; padding: 0 5px;
     place-items: center;
-    font-size: .64rem;
+    font-size: .6875rem;
     box-shadow: 0 0 0 2px var(--karte-solid);
 }
 .leiste-wert { font-size: .8rem; color: var(--text-leise); font-weight: 400; }
@@ -399,7 +405,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .favoriten-titel {
     display: flex; align-items: center; justify-content: space-between;
     padding: 4px 8px 4px 10px;
-    font-size: .68rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--text-leise);
+    font-size: .75rem; font-weight: 650; color: var(--text-leise);
     white-space: nowrap;
 }
 .favoriten-titel i { color: var(--akzent); margin-right: 3px; }
@@ -423,14 +429,14 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     box-shadow: inset 0 0 0 1.5px var(--akzent-ring);
 }
 .favorit-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-.favorit-name small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: .64rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--text-leise); }
+.favorit-name small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: .6875rem; font-weight: 600; color: var(--text-leise); }
 .favorit-ansicht {
-    flex: none; font-size: .62rem; font-weight: 700; padding: 1px 6px; border-radius: 6px;
+    flex: none; font-size: .6875rem; font-weight: 700; padding: 1px 6px; border-radius: 6px;
     background: var(--karte-solid); color: var(--text-leise); box-shadow: inset 0 0 0 1px var(--linie);
 }
 /* Aktiver Favorit: die Karte zeigt gerade genau diese Ansicht */
 .favorit-link.aktiv { background: var(--karte-solid); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
-.favorit-link.aktiv .favorit-ansicht { background: var(--akzent); color: var(--akzent-text); box-shadow: none; }
+.favorit-link.aktiv .favorit-ansicht { background: var(--akzent-flaeche); color: var(--akzent-text); box-shadow: none; }
 /* „…“-Knopf je Eintrag – öffnet das Menü (Umbenennen, 2D/3D, Entfernen) */
 .favorit-mehr {
     position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
@@ -466,7 +472,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 .favorit-flug i {
     width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-    background: var(--akzent); color: var(--akzent-text);
+    background: var(--akzent-flaeche); color: var(--akzent-text);
 }
 
 /* ---------- Eingeklappt (nur ab Tablet-Breite) ---------- */
@@ -516,7 +522,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     /* „…“ als kleines rundes Abzeichen oben rechts am Symbol (wie die Zahl bei „Aufträge“), mittig zum Symbol ausgerichtet */
     :root:not([data-leiste="auf"]) .favorit-mehr {
         left: calc(50% + 5px); right: auto; top: 1px; transform: none;
-        width: 17px; height: 17px; border-radius: 50%; font-size: .62rem;
+        width: 17px; height: 17px; border-radius: 50%; font-size: .6875rem;
         background: var(--karte-solid); color: var(--text); box-shadow: 0 0 0 1px var(--linie), 0 1px 3px rgba(0, 0, 0, .12);
     }
     :root:not([data-leiste="auf"]) .favorit-bearbeiten {
@@ -654,7 +660,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 
 .seitenkopf { margin-bottom: 32px; }
 .seitenkopf .eyebrow {
-    color: var(--akzent);
+    color: var(--text-leise);
     font-weight: 600;
     font-size: .9rem;
     margin-bottom: 6px;
@@ -714,34 +720,27 @@ a.karte:hover {
 /* ---------- Große Kennzahlen ---------- */
 
 .kennzahl { height: calc(100% - 24px); position: relative; overflow: hidden; }
+/* Ruhig wie eine Zusammenfassung bei Apple: kleines Symbol vor der Bezeichnung (gleiche Farbe wie der Text),
+   darunter die Zahl. Farbe nur, wenn sie etwas bedeutet (Warnung, unter Mindestbestand …). */
 .kennzahl-kopf {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 10px;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 7px;
+    margin-bottom: 8px;
 }
 .kennzahl-label {
     color: var(--text-leise);
-    font-size: .95rem;
-    font-weight: 500;
+    font-size: .9rem;
+    font-weight: 600;
     min-width: 0; overflow-wrap: anywhere; hyphens: auto;   /* lange Titel brechen um statt das Symbol hinauszuschieben */
 }
-.kennzahl-symbol {
-    width: 36px; height: 36px;
-    flex: 0 0 36px;
-    border-radius: 11px;
-    display: grid; place-items: center;
-    font-size: 1.05rem;
-    background: var(--akzent-zart);
-    color: var(--akzent);
-    transition: transform .4s var(--weich);
-}
-a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
+.kennzahl-symbol { flex: none; font-size: .9rem; color: var(--text-leise); }
 .kennzahl-wert {
-    font-size: 3rem;
-    font-weight: 700;
-    letter-spacing: -.035em;
+    font-size: 2.6rem;
+    font-weight: 650;
+    letter-spacing: -.03em;
     line-height: 1.05;
     font-variant-numeric: tabular-nums;
 }
@@ -757,10 +756,9 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
     font-size: .9rem;
     margin-top: 8px;
 }
-.kennzahl-warnung .kennzahl-wert { color: var(--orange); }
-.kennzahl-warnung .kennzahl-symbol { background: var(--orange-bg); color: var(--orange); }
-.kennzahl-rot .kennzahl-symbol { background: var(--rot-bg); color: var(--rot); }
-.kennzahl-gruen .kennzahl-symbol { background: var(--gruen-bg); color: var(--gruen); }
+.kennzahl-warnung .kennzahl-wert, .kennzahl-warnung .kennzahl-symbol { color: var(--orange); }
+.kennzahl-rot .kennzahl-symbol { color: var(--rot); }
+.kennzahl-gruen .kennzahl-symbol { color: var(--gruen); }
 
 /* ---------- Status-Pills ---------- */
 
@@ -836,12 +834,13 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
     font-size: .95rem;
     color: var(--text);
 }
+/* Unter langen Listen: wie viele gezeigt werden und „Weitere anzeigen“ */
+.liste-weiter { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 8px 0; border-top: 1px solid var(--linie); }
 .tabelle th {
     color: var(--text-leise);
-    font-weight: 500;
-    font-size: .78rem;
-    text-transform: uppercase;
-    letter-spacing: .05em;
+    font-weight: 600;
+    font-size: .8rem;
+    letter-spacing: 0;
     padding: 8px;
     border-bottom: 1px solid var(--linie);
     white-space: nowrap;
@@ -948,18 +947,18 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
                 color var(--uebergang), transform var(--uebergang), box-shadow var(--uebergang);
 }
 .btn:active { transform: scale(.97); }
+/* Hauptknopf: flache Akzentfläche (wie Apples „prominent“-Stil), feine Lichtkante, kein farbiger Schein.
+   Höchstens ein bis zwei davon je Seite – alles andere ist .btn-sekundaer. */
 .btn-primary {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--akzent) 82%, #fff) 0%, var(--akzent) 55%);
+    background: var(--akzent-flaeche);
     border-color: transparent;
     color: var(--akzent-text);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 2px 8px var(--akzent-ring);
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 1px 2px rgba(0, 0, 0, .12);
 }
-.btn-primary:hover, .btn-primary:focus {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--akzent-hover) 78%, #fff) 0%, var(--akzent-hover) 55%);
-    border-color: transparent;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 8px 22px var(--akzent-ring);
-}
-.btn-primary:disabled { background: var(--akzent); border-color: var(--akzent); opacity: .7; }
+.btn-primary:hover, .btn-primary:focus { background: color-mix(in srgb, var(--akzent-flaeche) 86%, #000); border-color: transparent; color: var(--akzent-text); }
+.btn-primary:active { background: color-mix(in srgb, var(--akzent-flaeche) 76%, #000); }
+.btn-primary:disabled { background: var(--akzent-flaeche); border-color: var(--akzent-flaeche); opacity: .6; }
 .btn-sekundaer {
     background: var(--fuellung);
     border: 1px solid var(--glas-rand);
@@ -1084,7 +1083,7 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
     .app-main { padding-top: 24px; }
     .seitenkopf h1 { font-size: 1.95rem; }
     .karte { padding: 20px; }
-    .kennzahl-wert { font-size: 2.4rem; }
+    .kennzahl-wert { font-size: 2.2rem; }
     .details { grid-template-columns: 1fr; gap: 2px; }
     .details dd { margin-bottom: 10px; }
     .ablauf li { font-size: 0; }          /* nur Balken, Text wird zu eng */
@@ -1102,14 +1101,15 @@ a.karte:hover .kennzahl-symbol { transform: scale(1.1) rotate(-6deg); }
  * ================================================================== */
 
 /* Jede Seite gleitet beim Öffnen sanft herein (app/template.js) */
-.seiten-einstieg { animation: einblenden .5s var(--weich) both; }
+.seiten-einstieg { animation: einblenden .2s ease-out both; }
 
 /* Karten erscheinen nacheinander: --i ist die Position (0, 1, 2, …) */
 /* 'backwards': Startzustand gilt nur bis zum Ende – danach greifen wieder Hover-Effekte */
-.karte { animation: hochgleiten .6s var(--weich) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+/* Nur ein kurzes, leises Einblenden – höchstens 6 Stufen, damit nichts lange auf sich warten lässt */
+.karte { animation: hochgleiten .32s var(--weich) backwards; animation-delay: calc(min(var(--i, 0), 6) * 30ms); }
 
 @keyframes einblenden    { from { opacity: 0; } to { opacity: 1; } }
-@keyframes hochgleiten   { from { opacity: 0; transform: translateY(14px) scale(.99); } to { opacity: 1; transform: none; } }
+@keyframes hochgleiten   { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes hereingleiten { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
 @keyframes ausblenden    { to { opacity: 0; transform: translateY(-8px); height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; } }
 @keyframes herabgleiten  { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
@@ -1205,7 +1205,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .welt-firma:hover { fill: color-mix(in srgb, var(--stufe) 45%, var(--land)); }
 .welt-fuehrung line { stroke: var(--text-leise); stroke-width: .8; stroke-dasharray: 2 2; opacity: .7; }
 .welt-fuehrung circle { fill: var(--text); opacity: .65; }
-.hauptsitz-stern { font-size: .62rem; color: var(--orange); }
+.hauptsitz-stern { font-size: .6875rem; color: var(--orange); }
 .hauptsitz-abzeichen {
     display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 7px; border-radius: 999px;
     font-size: .7rem; font-weight: 600; color: var(--orange); background: var(--orange-bg); vertical-align: 1px;
@@ -1264,7 +1264,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     white-space: nowrap;
 }
 .karten-punkt:hover .punkt-blase, .karten-punkt:focus-visible .punkt-blase, .karten-punkt.gewaehlt .punkt-blase { transform: scale(1.15); }
-.karten-punkt.gewaehlt .punkt-name { background: var(--akzent); color: var(--akzent-text); }
+.karten-punkt.gewaehlt .punkt-name { background: var(--akzent-flaeche); color: var(--akzent-text); }
 /* Name über dem Punkt (wenn darunter ein anderes Werk liegt) */
 .karten-punkt.name-oben { flex-direction: column-reverse; --anker: translate(-50%, calc(-100% + 17px)); }
 .karten-punkt.name-oben .punkt-info { bottom: auto; top: calc(100% + 8px); }
@@ -1434,7 +1434,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     border-radius: 5px;
     pointer-events: none;
 }
-.plan-maschine.gewaehlt .maschine-modell { color: var(--akzent-text); background: var(--akzent); }
+.plan-maschine.gewaehlt .maschine-modell { color: var(--akzent-text); background: var(--akzent-flaeche); }
 
 /* ---------- Seitenleiste & Brotkrumen ---------- */
 
@@ -1710,9 +1710,10 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .sprach-schalter button {
     border: 0; background: transparent; color: var(--text-leise);
     font-size: .75rem; font-weight: 700; letter-spacing: .04em;
-    padding: 4px 10px; border-radius: 999px;
+    padding: 4px 10px; border-radius: 999px; min-height: 28px;
     transition: background-color var(--uebergang), color var(--uebergang);
 }
+@media (pointer: coarse) { .sprach-schalter button { min-height: 34px; padding-inline: 12px; } }
 .sprach-schalter button[aria-pressed="true"] { background: var(--karte-solid); color: var(--text); box-shadow: 0 1px 4px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04); }
 :root[data-theme="dark"] .sprach-schalter button[aria-pressed="true"] { background: rgba(255, 255, 255, .2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15); }
 
@@ -2235,7 +2236,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     display: inline-flex; align-items: center; gap: 6px; padding: 2px; border: 0; border-radius: 999px;
     background: transparent; color: var(--text); font-size: .78rem; font-weight: 600; white-space: nowrap;
 }
-.raum-marke.gewaehlt { padding: 2px 10px 2px 2px; background: var(--akzent); color: var(--akzent-text); box-shadow: 0 4px 14px var(--akzent-ring); }
+.raum-marke.gewaehlt { padding: 2px 10px 2px 2px; background: var(--akzent-flaeche); color: var(--akzent-text); box-shadow: 0 4px 14px var(--akzent-ring); }
 .raum-marke .zaehl-marke { box-shadow: 0 0 0 3px var(--karte-erhoeht); }
 .stufe-rot.raum-marke .zaehl-marke { animation: maschine-puls 2s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .stufe-rot.raum-marke .zaehl-marke { animation: none; } }
@@ -2351,8 +2352,8 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     /* Lageplan: Hallen-Kacheln nur mit Kürzel und Kurzname, Text abgeschnitten statt überlappend */
     .explorer-ebene .gebaeude-info { display: none; }
     .explorer-ebene .gebaeude-kuerzel { font-size: .9rem; }
-    .explorer-ebene .gebaeude-name { font-size: .64rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .explorer-ebene .plan-beschriftung { font-size: .55rem; }
+    .explorer-ebene .gebaeude-name { font-size: .6875rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .explorer-ebene .plan-beschriftung { display: none; }   /* zu klein zum Lesen */
     /* 3D: kleinere Beschriftungen und Uhr */
     .raum-halle { font-size: .68rem; padding: 2px 4px 2px 8px; gap: 4px; }
     .raum-halle .zaehl-marke { transform: scale(.85); }
@@ -2390,7 +2391,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .mitarbeiter-tabelle tr.im-chat td { background: var(--akzent-zart); }
 .ich-marke {
     margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: .66rem; font-weight: 700;
-    background: var(--akzent); color: var(--akzent-text); vertical-align: 1px;
+    background: var(--akzent-flaeche); color: var(--akzent-text); vertical-align: 1px;
 }
 .mitarbeiter-offen { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .mitarbeiter-offen .mini-balken { min-width: 48px; width: 48px; flex: none; }
@@ -2436,7 +2437,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     display: flex; flex-direction: column; gap: 2px;
     animation: hochgleiten .25s var(--weich) backwards;
 }
-.chat-blase.meine { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: var(--akzent); border-color: transparent; color: var(--akzent-text); }
+.chat-blase.meine { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: var(--akzent-flaeche); border-color: transparent; color: var(--akzent-text); }
 .chat-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.4; }
 .chat-zeit { align-self: flex-end; font-size: .66rem; opacity: .7; display: inline-flex; gap: 4px; align-items: center; }
 .chat-eingabe { display: flex; gap: 8px; align-items: flex-end; padding-top: 12px; border-top: 1px solid var(--linie); }
@@ -2465,7 +2466,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 }
 .kalender-tag:hover { border-color: color-mix(in srgb, var(--akzent) 45%, var(--linie)); }
 .kalender-tag.anderer-monat { opacity: .45; }
-.kalender-tag.heute .kalender-zahl { background: var(--akzent); color: var(--akzent-text); }
+.kalender-tag.heute .kalender-zahl { background: var(--akzent-flaeche); color: var(--akzent-text); }
 .kalender-tag.gewaehlt { border-color: var(--akzent); box-shadow: 0 0 0 3px var(--akzent-ring); }
 .kalender-zahl { align-self: flex-start; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; font-size: .82rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .kalender-marken { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -2525,7 +2526,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .qr-schritte { display: flex; justify-content: space-between; gap: 4px; white-space: nowrap; padding: 8px 14px; border-top: 1px dashed #c9ccd2; font-size: .7rem; color: #3c4048; }
 .qr-schritte b {
     display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 3px; border-radius: 50%;
-    background: #16181c; color: #fff; font-size: .62rem;
+    background: #16181c; color: #fff; font-size: .6875rem;
 }
 @media print {
     @page { margin: 12mm; }
@@ -2625,18 +2626,18 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .regal3d-fach.zustand-rot .r3-schild { border-left-color: var(--rot); }
 .regal3d-fach.zustand-rot .r3-zahl { color: var(--rot); font-weight: 700; }
 /* Abzeichen „Fehlt“ / „2 fehlen“ hinten im Schild (oben im Fach stünde es vor den fehlenden Teilen) */
-.r3-fehlt { padding: 2px 6px; margin-right: -3px; border-radius: 999px; background: var(--rot); color: var(--qr-hell); font-size: .62rem; font-weight: 700; }
+.r3-fehlt { padding: 2px 6px; margin-right: -3px; border-radius: 999px; background: var(--rot); color: var(--qr-hell); font-size: .6875rem; font-weight: 700; }
 /* wenig Platz: nur Lagerplatz und Bestand, ohne Abzeichen und Lkw (die Farbe zeigt den Zustand) */
 .regal3d { container-type: inline-size; }
 @container (max-width: 520px) {
-    .r3-schild { font-size: .62rem; gap: 4px; padding: 0 4px; border-left-width: 3px; }
+    .r3-schild { font-size: .6875rem; gap: 4px; padding: 0 4px; border-left-width: 3px; }
     .regal3d-fach:not(:hover):not(.gewaehlt) .r3-fehlt, .regal3d-fach:not(:hover):not(.gewaehlt) .r3-schild .bi { display: none; }
 }
 .regal3d-fach:hover, .regal3d-fach:focus-visible { z-index: 3; }
 .regal3d-fach.gewaehlt { z-index: 2; }
 .lager-legende .geist-muster { width: 14px; height: 14px; border-radius: 4px; border: 1.5px dashed var(--rot); background: color-mix(in srgb, var(--rot) 22%, transparent); }
 .lager-regal + .lager-regal { margin-top: 18px; }
-.lager-regal-titel { font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-leise); margin-bottom: 8px; }
+.lager-regal-titel { font-size: .8rem; font-weight: 650; color: var(--text-leise); margin-bottom: 8px; }
 /* Fächer: gleich breite Kacheln, auf schmalen Bildschirmen weniger je Zeile */
 .lager-regal { container-type: inline-size; }
 .lager-faecher { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -2785,13 +2786,13 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .achse-tag { grid-row: 1; display: flex; flex-direction: column; align-items: center; font-size: .66rem; color: var(--text-leise); line-height: 1.15; padding: 2px 0; position: relative; }
 .achse-tag b { font-size: .74rem; color: var(--text); font-variant-numeric: tabular-nums; }
 .achse-tag.wochenende { background: color-mix(in srgb, var(--text-leise) 8%, transparent); }
-.achse-tag.heute { background: var(--akzent); border-radius: 8px; }
+.achse-tag.heute { background: var(--akzent-flaeche); border-radius: 8px; }
 .achse-tag.heute b, .achse-tag.heute small { color: var(--akzent-text); }
-.achse-monat { position: absolute; top: -13px; left: 2px; font-weight: 700; text-transform: uppercase; font-size: .58rem; }
+.achse-monat { position: absolute; top: -13px; left: 2px; font-weight: 700; text-transform: uppercase; font-size: .6875rem; }
 .achse-heute { background: color-mix(in srgb, var(--akzent) 14%, transparent); border-left: 2px solid var(--akzent); }
 .achse-balken {
     position: relative; z-index: 1; min-width: 0; margin: 0 1px; padding: 0 5px; border: 0; border-radius: 6px;
-    font-size: .64rem; font-weight: 600; color: #fff; text-align: left; overflow: visible; white-space: nowrap;
+    font-size: .6875rem; font-weight: 600; color: #fff; text-align: left; overflow: visible; white-space: nowrap;
     background: var(--orange); transition: transform var(--uebergang), box-shadow var(--uebergang);
 }
 /* Aufgabe als Text rechts neben dem Balken (ein Tag ist zu schmal für Text) */

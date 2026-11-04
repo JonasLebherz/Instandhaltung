@@ -8,6 +8,10 @@
  *   ?maschine=   ID einer Maschine
  *   ?prioritaet= niedrig / mittel / hoch
  *   ?suche=      Text, der in der Beschreibung vorkommt
+ *   ?anzahl=     wie viele Zeilen gezeigt werden (Standard 50, „Weitere anzeigen“ erhöht um 50)
+ *
+ * Es werden nicht alle (über 1.000) Meldungen auf einmal geladen: Die Seite bliebe sonst lang und langsam.
+ * COUNT(*) OVER () liefert trotzdem die Gesamtzahl für die Überschrift.
  */
 import Link from 'next/link';
 import Auswahl from '@/components/Auswahl';
@@ -15,13 +19,15 @@ import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
 import { ansichtAusCookie, ansichtBedingung } from '@/lib/ansicht';
 import { STATUS_WERTE, PRIORITAET_WERTE } from '@/lib/konstanten';
-import { datumZeit } from '@/lib/format';
+import { datumZeit, zahl } from '@/lib/format';
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import { gross } from '@/lib/sprache';
 
 export const dynamic = 'force-dynamic';
 export const generateMetadata = () => seitentitel('Aufträge');
+
+const SCHRITT = 50;   // so viele Zeilen je „Weitere anzeigen“
 
 export default async function AuftraegeSeite({ searchParams }) {
   await benutzerPflicht();
@@ -40,6 +46,8 @@ export default async function AuftraegeSeite({ searchParams }) {
   if (!/^\d+$/.test(filter.standort)) filter.standort = '';
   if (!/^\d+$/.test(filter.maschine)) filter.maschine = '';
   if (!PRIORITAET_WERTE.includes(filter.prioritaet)) filter.prioritaet = '';
+  // Anzahl der Zeilen: ganze Vielfache von 50, höchstens 2.000
+  const anzahl = Math.min(2000, Math.max(SCHRITT, Math.ceil((Number(parameter?.anzahl) || SCHRITT) / SCHRITT) * SCHRITT));
 
   /* ---------- Abfrage aus Bausteinen zusammensetzen ----------
    * Jeder Filter fügt eine Bedingung hinzu. Die Werte werden – wie immer –
@@ -67,7 +75,8 @@ export default async function AuftraegeSeite({ searchParams }) {
     sql`
       SELECT w.id AS auftrag_id, w.status,
              s.id AS meldung_id, s.zeitpunkt, s.beschreibung, s.ursache_kategorie, s.prioritaet,
-             m.bezeichnung AS maschine, m.anlagennummer, st.stadt, g.kuerzel AS gebaeude, t.name AS techniker
+             m.bezeichnung AS maschine, m.anlagennummer, st.stadt, g.kuerzel AS gebaeude, t.name AS techniker,
+             COUNT(*) OVER ()::int AS gesamt
       FROM stoermeldung s
       JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
       JOIN maschine m        ON m.id = s.maschine_id
@@ -75,8 +84,13 @@ export default async function AuftraegeSeite({ searchParams }) {
       JOIN standort st       ON st.id = g.standort_id
       LEFT JOIN techniker t  ON t.id = w.techniker_id
       WHERE ${bedingungStatus} AND ${bedingungStandort} AND ${bedingungMaschine} AND ${bedingungPrio} AND ${bedingungSuche}
-      ORDER BY s.zeitpunkt DESC`,
+      ORDER BY s.zeitpunkt DESC
+      LIMIT ${anzahl}`,
   ]);
+  const gesamt = auftraege[0]?.gesamt ?? 0;
+  // Adresse für „Weitere anzeigen“: dieselben Filter, 50 Zeilen mehr
+  const weiter = new URLSearchParams(Object.entries(filter).filter(([, wert]) => wert !== ''));
+  weiter.set('anzahl', String(anzahl + SCHRITT));
 
   const filterAktiv = Object.values(filter).some((wert) => wert !== '');
 
@@ -89,7 +103,7 @@ export default async function AuftraegeSeite({ searchParams }) {
       <div className="seitenkopf d-flex justify-content-between align-items-end flex-wrap gap-3">
         <div>
           <h1>{t('Aufträge')}</h1>
-          <p>{auftraege.length === 1 ? t('1 Meldung') : t('{n} Meldungen', { n: auftraege.length })}{filterAktiv ? ` ${t('(gefiltert)')}` : ''}</p>
+          <p>{gesamt === 1 ? t('1 Meldung') : t('{n} Meldungen', { n: zahl(gesamt, 0, t.sprache) })}{filterAktiv ? ` ${t('(gefiltert)')}` : ''}</p>
         </div>
         <Link href="/melden" className="btn btn-primary"><i className="bi bi-plus-lg" aria-hidden="true" /> {t('Neue Störung melden')}</Link>
       </div>
@@ -135,7 +149,7 @@ export default async function AuftraegeSeite({ searchParams }) {
       {/* Ergebnisliste */}
       <section className="karte" style={{ '--i': 1 }}>
         {auftraege.length === 0 ? (
-          <p className="leer"><i className="bi bi-search text-leise" />{t('Keine Meldungen gefunden. Passen Sie ggf. die Filter an.')}</p>
+          <p className="leer"><i className="bi bi-search text-leise" />{t('Keine Meldungen gefunden. Passe die Filter an oder setze sie zurück.')}</p>
         ) : (
           <div className="tabelle-rahmen">
             <table className="tabelle">
@@ -174,6 +188,14 @@ export default async function AuftraegeSeite({ searchParams }) {
                 ))}
               </tbody>
             </table>
+            {gesamt > auftraege.length && (
+              <div className="liste-weiter">
+                <span className="klein">{t('{n} von {m} angezeigt', { n: zahl(auftraege.length, 0, t.sprache), m: zahl(gesamt, 0, t.sprache) })}</span>
+                <Link href={`/auftraege?${weiter}`} scroll={false} className="btn btn-sekundaer btn-klein">
+                  {t('Weitere {n} anzeigen', { n: Math.min(SCHRITT, gesamt - auftraege.length) })}
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </section>

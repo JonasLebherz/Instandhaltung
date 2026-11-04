@@ -214,7 +214,14 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   // 14. Filter & Suche
   await p.goto(BASE + '/auftraege?suche=Lager');
   const n = await p.$$eval('tbody tr', (z) => z.length);
-  pruefe('Suche findet Treffer', n > 0 && n === Number(sql("SELECT count(*) FROM stoermeldung WHERE beschreibung ILIKE '%Lager%'")), n);
+  const lagerTreffer = Number(sql("SELECT count(*) FROM stoermeldung WHERE beschreibung ILIKE '%Lager%'"));
+  pruefe('Suche findet Treffer (höchstens 50 Zeilen, Gesamtzahl im Kopf)', n > 0 && n === Math.min(50, lagerTreffer)
+    && (await p.textContent('h1 + p')).includes(String(lagerTreffer)), n);
+  // Lange Liste in Stufen: „Weitere anzeigen“ behält den Filter und zeigt 50 mehr
+  if (lagerTreffer > 50) {
+    await Promise.all([p.waitForURL(/anzahl=100/), p.click('.liste-weiter a')]); await p.waitForTimeout(500);
+    pruefe('Aufträge: „Weitere anzeigen“ lädt 50 Zeilen mehr, Suche bleibt', (await p.$$eval('tbody tr', (z) => z.length)) === Math.min(100, lagerTreffer) && p.url().includes('suche=Lager'));
+  }
   await p.goto(BASE + '/auftraege?suche=100%25');
   pruefe('Suche mit % ohne Fehler', (await p.content()).includes('Keine Meldungen gefunden'));
   // 14b. Störungskarte: Werte stimmen, Klickpfad funktioniert
