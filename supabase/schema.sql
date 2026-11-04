@@ -21,7 +21,7 @@
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS v_stoerung_details, v_stoerungen_monat, v_ausfallzeit_maschine, v_mttr_maschine,
                     v_kennzahlen_standort;
-DROP TABLE IF EXISTS stoermeldung_foto, wartung_durchfuehrung, wartungsplan, nachricht, auftrag_verlauf, bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
+DROP TABLE IF EXISTS lagerbestand, stoermeldung_foto, wartung_durchfuehrung, wartungsplan, nachricht, auftrag_verlauf, bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
                      stoermeldung, person, techniker, maschine, gebaeude, standort, land CASCADE;
 DROP TYPE IF EXISTS auftragsstatus, prioritaet, schicht, bestellstatus, ursache, maschinentyp, rolle;
 
@@ -138,14 +138,23 @@ CREATE TABLE person (
 COMMENT ON TABLE person IS 'Personen des Unternehmens mit Rolle und Werk';
 CREATE INDEX idx_techniker_standort ON techniker (standort_id);
 
--- Ersatzteillager
+-- Ersatzteile (Katalog). Wie viele davon in welchem Werk liegen, steht in "lagerbestand".
 CREATE TABLE ersatzteil (
     id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    bezeichnung     VARCHAR(100) NOT NULL UNIQUE,
-    bestand         INTEGER NOT NULL DEFAULT 0 CHECK (bestand >= 0),   -- Bestand kann nie negativ werden
-    mindestbestand  INTEGER NOT NULL DEFAULT 0 CHECK (mindestbestand >= 0)
+    bezeichnung     VARCHAR(100) NOT NULL UNIQUE
 );
-COMMENT ON TABLE ersatzteil IS 'Ersatzteile mit aktuellem Lagerbestand';
+COMMENT ON TABLE ersatzteil IS 'Ersatzteile (Katalog); Bestände je Werk in lagerbestand';
+
+-- Lager je Werk: Bestand, Mindestbestand und Lagerplatz jedes Teils
+CREATE TABLE lagerbestand (
+    standort_id     INTEGER NOT NULL REFERENCES standort (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    ersatzteil_id   INTEGER NOT NULL REFERENCES ersatzteil (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    bestand         INTEGER NOT NULL DEFAULT 0 CHECK (bestand >= 0),   -- Bestand kann nie negativ werden
+    mindestbestand  INTEGER NOT NULL DEFAULT 0 CHECK (mindestbestand >= 0),
+    lagerplatz      VARCHAR(10) NULL,          -- z. B. 'A-03' = Regal A, Fach 3
+    PRIMARY KEY (standort_id, ersatzteil_id)
+);
+COMMENT ON TABLE lagerbestand IS 'Bestand der Ersatzteile im Lager jedes Werks';
 
 
 -- =====================================================================
@@ -283,6 +292,8 @@ CREATE INDEX idx_stoermeldung_foto_meldung ON stoermeldung_foto (stoermeldung_id
 CREATE TABLE bestellung (
     id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     ersatzteil_id  INTEGER NOT NULL REFERENCES ersatzteil (id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    -- Für welches Werk bestellt wurde (die Lieferung geht in dessen Lager)
+    standort_id    INTEGER NOT NULL REFERENCES standort (id) ON UPDATE CASCADE ON DELETE RESTRICT,
     menge          INTEGER NOT NULL CHECK (menge > 0),
     bestelldatum   DATE    NOT NULL,
     lieferdatum    DATE    NULL,           -- tatsächliches Lieferdatum, NULL = noch offen
@@ -292,6 +303,7 @@ CREATE TABLE bestellung (
 COMMENT ON TABLE bestellung IS 'Nachbestellungen von Ersatzteilen';
 -- Index für "Gibt es schon eine offene Bestellung für dieses Teil?"
 CREATE INDEX idx_bestellung_teil_status ON bestellung (ersatzteil_id, status);
+CREATE INDEX idx_bestellung_werk_teil_status ON bestellung (standort_id, ersatzteil_id, status);
 
 
 -- =====================================================================
@@ -313,6 +325,7 @@ ALTER TABLE stoermeldung       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wartungsauftrag    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auftrag_ersatzteil ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bestellung         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lagerbestand       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE person             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auftrag_verlauf    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nachricht          ENABLE ROW LEVEL SECURITY;

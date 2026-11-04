@@ -26,6 +26,7 @@ export default function Favoriten({ onOeffnen, person }) {
   const [liste, setListe] = useState([]);
   const [eigenes, setEigenes] = useState(null);           // „Mein Werk“ der gewählten Person
   const [bearbeiten, setBearbeiten] = useState(null);     // ID des Favoriten, der gerade umbenannt wird
+  const [bearbeitenOben, setBearbeitenOben] = useState(0); // Höhe im Fenster (eingeklappte Leiste: Feld liegt fest daneben)
   const [menue, setMenue] = useState(null);               // { id, links, oben } des offenen Menüs
   const [neu, setNeu] = useState(null);                   // ID des zuletzt angepinnten Favoriten
   const [kartenAdresse, setKartenAdresse] = useState(null);
@@ -131,7 +132,7 @@ export default function Favoriten({ onOeffnen, person }) {
               <li key={f.id} data-favorit-id={f.id}
                   className={`favorit${f.id === neu ? ' favorit-neu' : ''}${f.person ? ' favorit-eigenes' : ''}${menue?.id === f.id ? ' menue-offen' : ''}`}>
                 {bearbeiten === f.id ? (
-                  <form className="favorit-bearbeiten" onSubmit={(e) => { e.preventDefault(); favoritUmbenennen(f.id, e.currentTarget.elements.name.value); setBearbeiten(null); }}>
+                  <form className="favorit-bearbeiten" style={{ '--oben': `${bearbeitenOben}px` }} onSubmit={(e) => { e.preventDefault(); favoritUmbenennen(f.id, e.currentTarget.elements.name.value); setBearbeiten(null); }}>
                     <span className="leiste-symbol">
                       <span className="favorit-symbol"><i className={`bi ${FAVORIT_SYMBOLE[f.art] ?? 'bi-pin-angle'}`} aria-hidden="true" /></span>
                     </span>
@@ -167,7 +168,7 @@ export default function Favoriten({ onOeffnen, person }) {
                       <div className="aufklapp-menue favorit-menue" role="menu" style={{ left: menue.links, top: Math.max(8, menue.oben) }}>
                         <div className="menue-titel">{titel}</div>
                         {!f.person && (
-                          <button type="button" role="menuitem" onClick={() => { setMenue(null); setBearbeiten(f.id); }}>
+                          <button type="button" role="menuitem" onClick={() => { setBearbeitenOben(menue.oben + 25); setMenue(null); setBearbeiten(f.id); }}>
                             <i className="bi bi-pencil" /> {t('Umbenennen')}
                           </button>
                         )}

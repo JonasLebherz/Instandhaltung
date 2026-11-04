@@ -21,6 +21,7 @@
 import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { abmelden } from '@/app/login/aktionen';
 import { SPRACHEN, T } from '@/lib/sprache';
 import { useSprache, useSpracheWechseln, useT } from './SpracheKontext';
@@ -123,6 +124,17 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
   const [ungelesen, setUngelesen] = useState(0);                   // Zahl neben "Mitarbeiter" (Chat)
   const [personWahl, setPersonWahl] = useState(false);            // Fenster "Person wechseln"
   const leisteRef = useRef(null);
+  // Sprechblase der eingeklappten Leiste (Name des Eintrags beim Darüberfahren). Sie liegt fest im Fenster
+  // (Portal) statt im Eintrag: Der mittlere Teil der Leiste scrollt (overflow), dort würde sie abgeschnitten.
+  const [tipp, setTipp] = useState(null);
+  function tippZeigen(e) {
+    const link = e.target.closest?.('.leiste-link');
+    const eingeklappt = document.documentElement.dataset.leiste !== 'auf' && window.matchMedia('(min-width: 768px)').matches;
+    if (!link || !eingeklappt || link.getAttribute('aria-expanded') === 'true') { setTipp(null); return; }
+    const r = link.getBoundingClientRect();
+    const text = link.getAttribute('aria-label') || link.textContent;
+    setTipp({ text, oben: r.top + r.height / 2, links: r.right + 14 });
+  }
   // Ton der Kamerafahrten in der Karte (lib/ton.js) – an/aus im Konto-Menü
   const [tonEin, setTonEin] = useState(true);
   useEffect(() => {
@@ -249,7 +261,8 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
           <i className="bi bi-chevron-left" />
         </button>
 
-        <nav className="leiste-nav">
+        <nav className="leiste-nav" onPointerOver={tippZeigen} onPointerLeave={() => setTipp(null)} onFocus={tippZeigen} onBlur={() => setTipp(null)}
+             onScroll={() => setTipp(null)}>
           {BEREICHE.map((bereich) => (
             <div key={bereich.titel} className="leiste-bereich">
               <div className="leiste-titel"><span>{t(bereich.titel)}</span></div>
@@ -399,6 +412,7 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
           </div>
         </div>
       </aside>
+      {tipp && createPortal(<div className="leiste-tipp" style={{ top: tipp.oben, left: tipp.links }} aria-hidden="true">{tipp.text}</div>, document.body)}
 
       {personWahl && <PersonWahl aktuelleId={person?.id ?? null} onSchliessen={() => setPersonWahl(false)} />}
     </>

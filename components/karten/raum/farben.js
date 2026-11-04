@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 const NAMEN = ['umgebung', 'gelaende', 'strasse', 'markierung', 'wand', 'fenster', 'tor', 'dach-0', 'dach-1', 'dach-2', 'dach-3',
   'hallenboden', 'linie', 'maschine', 'maschine-dunkel', 'signal', 'glas', 'baum', 'stamm', 'buero', 'tank',
   'person-0', 'person-1', 'person-2', 'haut', 'ampel-rot', 'ampel-orange', 'ampel-gruen', 'licht', 'beton',
-  'himmel-tag', 'himmel-daemmerung', 'himmel-nacht', 'regal-stuetze', 'regal-traeger', 'karton', 'palette'];
+  'himmel-tag', 'himmel-daemmerung', 'himmel-nacht'];
 
 export function farbenLesen() {
   const stil = getComputedStyle(document.documentElement);

@@ -81,7 +81,6 @@
 
     /* 3D-Ansicht und Werks-Deko (components/karten/raum/) – feste Farben, weil WebGL keine Transparenz-Mischung wie CSS kann */
     --raum-akzent: #5b6b7f;
-    --raum-regal-stuetze: #2f5d8a; --raum-regal-traeger: #e0782a; --raum-karton: #c9a26b; --raum-palette: #b88d5a;
     --raum-umgebung: #e6e9ee; --raum-gelaende: #d3dfca; --raum-beton: #e4e5e3; --raum-strasse: #c9ced6; --raum-markierung: #ffffff;
     --raum-wand: #f6f7f9; --raum-fenster: #9db4cf; --raum-tor: #8e96a3;
     --raum-dach-0: #8f9bab; --raum-dach-1: #b39c86; --raum-dach-2: #8ea597; --raum-dach-3: #a3a4c2;
@@ -140,7 +139,6 @@
 
     --raum-akzent: #9fb3cc;
     /* Dunkelmodus: dieselbe Welt wie am Tag, nur etwas gedämpft (Nacht kommt von der Ortszeit, nicht vom Modus) */
-    --raum-regal-stuetze: #264b6f; --raum-regal-traeger: #b46022; --raum-karton: #a18256; --raum-palette: #937148;
     --raum-umgebung: #20242a; --raum-gelaende: #a9b2a2; --raum-beton: #b6b7b6; --raum-strasse: #a1a5ab; --raum-markierung: #d9dde3;
     --raum-wand: #c5c6c7; --raum-fenster: #7e90a6; --raum-tor: #727882;
     --raum-dach-0: #727c89; --raum-dach-1: #8f7d6b; --raum-dach-2: #728479; --raum-dach-3: #82839b;
@@ -279,7 +277,28 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .leiste-umschalter i { transition: transform .3s var(--weich); }
 
 /* Kein overflow hier: Sonst würden die Sprechblasen der eingeklappten Leiste abgeschnitten */
-.leiste-nav { flex: 1; }
+.leiste-nav {
+    /* Der mittlere Teil scrollt, wenn das Fenster zu niedrig ist (Laptop, Browser-Zoom) – so bleiben
+       Sprache, Darstellung und Konto unten immer sichtbar */
+    flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text-leise) 35%, transparent) transparent;
+    margin: 0 -6px; padding: 0 6px;
+}
+.leiste-fuss { flex: none; }
+/* Sprechblase der eingeklappten Leiste (siehe tippZeigen in Seitenleiste.js) */
+.leiste-tipp {
+    position: fixed; z-index: 1100; transform: translateY(-50%); pointer-events: none; white-space: nowrap;
+    padding: 6px 12px; border-radius: 10px; font-size: .85rem; font-weight: 500;
+    background: var(--karte-solid); color: var(--text); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
+    animation: tipp-ein .15s var(--weich) backwards;
+}
+@keyframes tipp-ein { from { opacity: 0; transform: translate(-6px, -50%); } }
+/* Niedrige Fenster: Einträge etwas enger */
+@media (max-height: 780px) and (min-width: 768px) {
+    .leiste-link { min-height: 38px; }
+    .leiste-titel { padding: 10px 12px 4px; }
+    .leiste-kopf { min-height: 38px; }
+}
 .leiste-bereich ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .leiste-titel {
     font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
@@ -458,6 +477,8 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     :root:not([data-leiste="auf"]) .leiste-zahl, :root:not([data-leiste="auf"]) .leiste-wert,
     :root:not([data-leiste="auf"]) .leiste-konto .leiste-text i { display: none; }
     /* Der Text wird zur Sprechblase rechts neben dem Symbol – sichtbar beim Darüberfahren */
+    /* In der scrollenden Mitte zeigt die Sprechblase .leiste-tipp (fest im Fenster) den Namen */
+    :root:not([data-leiste="auf"]) .leiste-nav .leiste-link .leiste-text { display: none; }
     :root:not([data-leiste="auf"]) .leiste-link .leiste-text {
         position: absolute;
         left: calc(100% + 22px);
@@ -496,7 +517,8 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
         background: var(--karte-solid); color: var(--text); box-shadow: 0 0 0 1px var(--linie), 0 1px 3px rgba(0, 0, 0, .12);
     }
     :root:not([data-leiste="auf"]) .favorit-bearbeiten {
-        position: absolute; left: calc(100% + 16px); top: 50%; transform: translateY(-50%); width: 240px; z-index: 4;
+        /* fest im Fenster neben der Leiste – die scrollende Mitte würde ein absolut gesetztes Feld abschneiden */
+        position: fixed; left: calc(var(--leiste-b) + 16px); top: var(--oben, 50%); transform: translateY(-50%); width: 240px; z-index: 1100;
         padding: 4px; border-radius: 12px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
     }
     :root:not([data-leiste="auf"]) .favorit-bearbeiten .leiste-symbol { display: none; }
@@ -700,6 +722,7 @@ a.karte:hover {
     color: var(--text-leise);
     font-size: .95rem;
     font-weight: 500;
+    min-width: 0; overflow-wrap: anywhere; hyphens: auto;   /* lange Titel brechen um statt das Symbol hinauszuschieben */
 }
 .kennzahl-symbol {
     width: 36px; height: 36px;
@@ -2450,7 +2473,8 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .wartung-eintrag.art-erledigt { border-left-color: var(--gruen); }
 .wartung-eintrag.art-geplant { border-left-color: var(--linie); }
 .wartung-symbol { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--karte-solid); color: var(--akzent); }
-.wartung-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.wartung-eintrag { min-width: 0; }
+.wartung-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; overflow-wrap: anywhere; }
 .wartung-text strong { font-weight: 600; font-size: .9rem; }
 .wartung-status { font-size: .74rem; font-weight: 600; margin-top: 2px; }
 .wartung-status.ueberfaellig { color: var(--rot); }
@@ -2461,7 +2485,8 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .wartung-erledigen:hover { background: var(--gruen-bg); }
 .wartung-maschine { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wartung-dialog { width: min(640px, calc(100vw - 32px)); }
-@media (min-width: 1200px) { .wartung-liste { position: sticky; top: 20px; max-height: calc(100dvh - 40px); overflow-y: auto; } }
+@media (min-width: 1200px) { .wartung-liste:not(.liste-breit) { position: sticky; top: 20px; max-height: calc(100dvh - 40px); overflow-y: auto; } }
+.liste-breit .wartung-eintraege { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 @media (max-width: 575.98px) {
     .kalender { gap: 3px; }
     .kalender-tag { min-height: 54px; padding: 4px; border-radius: 9px; }
@@ -2474,27 +2499,44 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
  * ================================================================== */
 :root { --qr-dunkel: #111; --qr-hell: #fff; }   /* bewusst fest: Scanner brauchen dunkel auf hell */
 .qr-code { display: block; width: 100%; height: auto; border-radius: 6px; }
-.qr-etiketten { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.qr-etiketten { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; }
+/* Etikett: immer hell (wird gedruckt), klare Hierarchie – Kopfband, QR groß, Anlagennummer groß */
 .qr-etikett {
-    display: flex; gap: 14px; align-items: center; padding: 14px; border-radius: 14px;
-    background: var(--qr-hell); color: var(--qr-dunkel); border: 1px solid var(--linie); break-inside: avoid;
+    display: flex; flex-direction: column; overflow: hidden; break-inside: avoid;
+    border-radius: 14px; background: var(--qr-hell); color: var(--qr-dunkel);
+    border: 1px solid #d9dce1; box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
 }
-.qr-etikett .qr-code { width: 120px; flex: none; }
-.qr-karte .qr-gross { width: min(190px, 100%); margin: 0 auto; border: 1px solid var(--linie); }
-.wartung-entfernen { flex: none; align-self: center; width: 36px; height: 36px; color: var(--text-leise); background: var(--karte-solid); }
-.wartung-entfernen:hover { color: var(--rot); }
-.qr-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: .85rem; }
-.qr-text strong { font-size: 1.1rem; letter-spacing: .02em; }
-.qr-ort { color: #555; font-size: .75rem; }
-.qr-hinweis { margin-top: 6px; font-size: .72rem; font-weight: 600; }
+.qr-band {
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+    background: #16181c; color: #fff; font-size: .78rem; letter-spacing: .02em;
+}
+.qr-band .logo { --logo-oben: #2b2f36; --logo-unten: #16181c; }
+.qr-band strong { margin-left: auto; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: #ffd43b; }
+.qr-inhalt { display: flex; gap: 16px; align-items: center; padding: 14px 16px 10px; }
+.qr-etikett .qr-code { width: 118px; flex: none; border-radius: 0; }
+.qr-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.qr-nummer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.35rem; font-weight: 800; letter-spacing: .02em; line-height: 1.1; }
+.qr-name { font-size: .92rem; font-weight: 600; line-height: 1.25; }
+.qr-typ { font-size: .78rem; color: #3c4048; }
+.qr-ort { font-size: .74rem; color: #6b7078; }
+.qr-schritte { display: flex; justify-content: space-between; gap: 4px; white-space: nowrap; padding: 8px 14px; border-top: 1px dashed #c9ccd2; font-size: .7rem; color: #3c4048; }
+.qr-schritte b {
+    display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 3px; border-radius: 50%;
+    background: #16181c; color: #fff; font-size: .62rem;
+}
 @media print {
     @page { margin: 12mm; }
     .seitenleiste, .mobil-kopf, .nicht-drucken, .app-footer { display: none !important; }
     .app-rahmen { padding: 0 !important; margin: 0 !important; }
     body::before { display: none !important; }
     body { background: #fff !important; }
-    .qr-etiketten { grid-template-columns: repeat(2, 1fr); gap: 8mm; }
-    .qr-etikett { border: 1px dashed #999; border-radius: 0; animation: none !important; }
+    .qr-etiketten { grid-template-columns: repeat(2, 90mm); gap: 6mm; justify-content: center; }
+    .qr-etikett { width: 90mm; height: 55mm; box-shadow: none; border: 0.3mm dashed #888; border-radius: 3mm; animation: none !important;
+                  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .qr-inhalt { padding: 2.5mm 3mm 1.5mm; gap: 3mm; flex: 1; }
+    .qr-etikett .qr-code { width: 30mm; }
+    .qr-band { padding: 1.6mm 3mm; }
+    .qr-schritte { padding: 1.4mm 3mm; }
     .karte { box-shadow: none !important; background: #fff !important; animation: none !important; }
 }
 
@@ -2540,19 +2582,43 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .chat-auftrag:hover { text-decoration: underline; }
 
 /* =====================================================================
- * Lager (app/lager/) – 3D-Regal, Details, Liste
+ * Lager (app/lager/) – Lager je Werk: Werkwahl, Regal als Fächer, Details
  * ================================================================== */
-.lager-3d { position: relative; height: clamp(320px, 52vh, 560px); border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, var(--raum-umgebung), var(--raum-hallenboden)); }
-.lager-3d canvas { touch-action: pan-y; }
-.lager-legende { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.lager-kopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.lager-werkwahl { min-width: 240px; }
+.lager-legende { display: flex; gap: 14px; flex-wrap: wrap; }
 .lager-legende span { display: inline-flex; align-items: center; gap: 6px; }
-.lager-marke {
-    position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; transform: translate(-200%, -200%);
-    display: flex; flex-direction: column; align-items: center; gap: 1px; white-space: nowrap;
-    padding: 5px 10px; border-radius: 10px; font-size: .75rem; line-height: 1.25;
-    background: var(--karte-solid); color: var(--text); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
+.lager-suche { max-width: 260px; }
+.lager-regal + .lager-regal { margin-top: 18px; }
+.lager-regal-titel { font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-leise); margin-bottom: 8px; }
+/* Fächer: gleich breite Kacheln, auf schmalen Bildschirmen weniger je Zeile */
+.lager-regal { container-type: inline-size; }
+.lager-faecher { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+/* Breit genug: alle 5 Fächer eines Regals in einer Reihe (wie im echten Regal) */
+@container (min-width: 600px) { .lager-faecher { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; } }
+.lager-fach {
+    --zustand-farbe: var(--gruen);
+    display: flex; flex-direction: column; gap: 4px; min-width: 0; text-align: left;
+    padding: 10px 12px; border-radius: 14px; border: 1px solid var(--linie); border-bottom: 3px solid var(--zustand-farbe);
+    background: var(--karte-solid); color: var(--text);
+    transition: transform var(--uebergang), box-shadow var(--uebergang), border-color var(--uebergang);
 }
-.lager-marke span { font-variant-numeric: tabular-nums; color: var(--text-leise); }
+.lager-fach:hover { transform: translateY(-2px); box-shadow: var(--schatten-hover); }
+.lager-fach.zustand-orange { --zustand-farbe: var(--orange); }
+.lager-fach.zustand-rot { --zustand-farbe: var(--rot); background: color-mix(in srgb, var(--rot) 6%, var(--karte-solid)); }
+.lager-fach.gewaehlt { border-color: var(--akzent); box-shadow: 0 0 0 3px var(--akzent-ring); }
+.lager-fach-kopf { display: flex; align-items: center; gap: 8px; }
+.lager-fach-symbol { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--akzent-zart); color: var(--akzent); font-size: .95rem; flex: none; }
+.lager-platz { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--fuellung); color: var(--text-leise); }
+.lager-bestellt { margin-left: auto; color: var(--orange); }
+.lager-fach-name { font-weight: 600; font-size: .84rem; line-height: 1.25; overflow-wrap: break-word; hyphens: auto; min-height: 2.5em; }
+.lager-fach-art { font-size: .7rem; color: var(--text-leise); }
+.lager-fach-bestand { font-size: .78rem; color: var(--text-leise); font-variant-numeric: tabular-nums; }
+.lager-fach-bestand strong { font-size: 1.15rem; color: var(--text); }
+.lager-fach.zustand-rot .lager-fach-bestand strong { color: var(--rot); }
+.lager-fach-balken { position: relative; height: 6px; border-radius: 3px; background: var(--fuellung); }
+.lager-fach-balken span { display: block; height: 100%; border-radius: 3px; background: var(--zustand-farbe); }
+.lager-fach-balken i { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; border-radius: 1px; background: var(--text-leise); opacity: .6; }
 .lager-zustand { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; }
 .lager-zustand.zustand-rot { background: var(--rot-bg); color: var(--rot); }
 .lager-zustand.zustand-orange { background: var(--orange-bg); color: var(--orange); }
@@ -2560,18 +2626,29 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .lager-bestand { display: flex; align-items: baseline; gap: 8px; }
 .lager-bestand strong { font-size: 2.2rem; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .lager-bestand span { color: var(--text-leise); font-size: .85rem; }
-.lager-balken { position: relative; height: 8px; border-radius: 4px; background: var(--fuellung); margin-top: 6px; }
-.lager-balken span { display: block; height: 100%; border-radius: 4px; transition: width .4s var(--weich); }
-.lager-balken span.zustand-rot { background: var(--rot); }
-.lager-balken span.zustand-orange { background: var(--orange); }
-.lager-balken span.zustand-gruen { background: var(--gruen); }
-.lager-balken i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text-leise); border-radius: 1px; }
 .lager-bestellung { padding: 12px; border-radius: 12px; background: var(--fuellung); font-size: .88rem; }
 .lager-nachbestellen { margin-top: 8px; }
-.lager-suche { max-width: 240px; }
-.lager-tabelle tbody tr { cursor: pointer; }
-.lager-tabelle tbody tr.gewaehlt td { background: var(--akzent-zart); }
+.lager-zwischentitel { font-size: .9rem; font-weight: 600; margin: 20px 0 8px; }
+.lager-anderswo { list-style: none; margin: 0; padding: 0; }
+.lager-anderswo li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--linie); font-size: .88rem; }
+.lager-anderswo strong { font-variant-numeric: tabular-nums; }
 @media (min-width: 1200px) { .lager-detail { position: sticky; top: 20px; } }
+/* Alle Werke: Kachel je Werk */
+.lager-werke { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.lager-werk {
+    display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; text-decoration: none;
+    background: var(--karte-solid); color: var(--text); border: 1px solid var(--linie); border-left: 3px solid var(--gruen);
+    transition: transform var(--uebergang), box-shadow var(--uebergang);
+}
+.lager-werk.mit-mangel { border-left-color: var(--rot); }
+.lager-werk:hover { transform: translateY(-2px); box-shadow: var(--schatten-hover); text-decoration: none; color: var(--text); }
+.lager-werk-name { font-weight: 600; display: flex; flex-direction: column; }
+.lager-werk-name small { font-weight: 500; font-size: .72rem; color: var(--text-leise); text-transform: uppercase; letter-spacing: .04em; }
+.lager-werk-zahlen { display: flex; gap: 12px; flex-wrap: wrap; font-size: .72rem; color: var(--text-leise); }
+.lager-werk-zahlen span { display: flex; flex-direction: column; }
+.lager-werk-zahlen strong { font-size: 1.2rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.lager-werk-zahlen .zustand-rot strong { color: var(--rot); }
+.lager-werk-zahlen .zustand-orange strong { color: var(--orange); }
 
 /* =====================================================================
  * Hallen-Monitor (app/monitor/) – Vollbild ohne Seitenleiste
@@ -2631,3 +2708,50 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* Export-Knopf oben rechts in einer Statistik-Karte (Karte braucht position: relative) */
 .stat-ebene .karte { position: relative; }
 .karte-export { position: absolute; top: 22px; right: 22px; z-index: 2; }
+/* Hallen-Monitor in 3D: Halle groß, rechts die gestörten Maschinen */
+.monitor-schalter { position: static; }
+.monitor-3d { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; min-height: 0; }
+.monitor-3d-buehne { min-width: 0; }
+/* Höhe der Bühne kommt aus groesse="monitor" (--buehne-h) */
+.explorer-kompakt .explorer-buehne.buehne-monitor, .explorer-buehne.buehne-monitor { --buehne-h: max(420px, calc(100dvh - 190px)); }
+.monitor-3d-laden { height: max(420px, calc(100dvh - 190px)); border-radius: 20px; background: var(--fuellung); animation: pulsieren 1.4s ease-in-out infinite; }
+.monitor-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: calc(100dvh - 190px); }
+.monitor-zeile { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--karte-solid); border: 1px solid var(--linie); }
+.monitor-zeile.ampel-rot { border-left: 5px solid var(--rot); }
+.monitor-zeile.ampel-orange { border-left: 5px solid var(--orange); }
+.monitor-zeile.ampel-gruen { border-left: 5px solid var(--gruen); }
+.monitor-zeile-text { display: flex; flex-direction: column; min-width: 0; font-size: .95rem; }
+.monitor-zeile-text small { color: var(--text-leise); font-size: .8rem; }
+.monitor-alles-gut { padding: 16px; border-radius: 14px; background: var(--gruen-bg); color: var(--gruen); font-weight: 600; }
+@media (max-width: 991.98px) { .monitor-3d { grid-template-columns: 1fr; } .monitor-liste { max-height: none; } }
+/* ---------- Wartungsplan: Umschalter und Zeitachse ---------- */
+.wartung-schalter { position: static; }
+.wartung-schalter button { display: inline-flex; align-items: center; gap: 6px; }
+.zeitachse-rahmen { overflow-x: auto; overscroll-behavior-x: contain; max-height: 620px; overflow-y: auto; border-radius: 12px; }
+.zeitachse { --name-b: 190px; min-width: calc(var(--name-b) + var(--tage) * 26px); display: flex; flex-direction: column; }
+.achse-zeile {
+    display: grid; grid-template-columns: var(--name-b) repeat(var(--tage), minmax(26px, 1fr));
+    column-gap: 0; row-gap: 3px; padding: 3px 0; border-bottom: 1px solid var(--linie); align-items: stretch;
+}
+.achse-kopf { position: sticky; top: 0; z-index: 3; background: var(--karte-solid); grid-template-rows: auto; padding-top: 14px; }
+.achse-name { grid-column: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 0 8px; text-decoration: none; color: var(--text); font-size: .78rem; line-height: 1.2; position: sticky; left: 0; z-index: 1; background: var(--karte-solid); }
+.achse-name small { color: var(--text-leise); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.achse-tag { grid-row: 1; display: flex; flex-direction: column; align-items: center; font-size: .66rem; color: var(--text-leise); line-height: 1.15; padding: 2px 0; position: relative; }
+.achse-tag b { font-size: .74rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.achse-tag.wochenende { background: color-mix(in srgb, var(--text-leise) 8%, transparent); }
+.achse-tag.heute { background: var(--akzent); border-radius: 8px; }
+.achse-tag.heute b, .achse-tag.heute small { color: var(--akzent-text); }
+.achse-monat { position: absolute; top: -13px; left: 2px; font-weight: 700; text-transform: uppercase; font-size: .58rem; }
+.achse-heute { background: color-mix(in srgb, var(--akzent) 14%, transparent); border-left: 2px solid var(--akzent); }
+.achse-balken {
+    position: relative; z-index: 1; min-width: 0; margin: 0 1px; padding: 0 5px; border: 0; border-radius: 6px;
+    font-size: .64rem; font-weight: 600; color: #fff; text-align: left; overflow: visible; white-space: nowrap;
+    background: var(--orange); transition: transform var(--uebergang), box-shadow var(--uebergang);
+}
+/* Aufgabe als Text rechts neben dem Balken (ein Tag ist zu schmal für Text) */
+.achse-balken span { position: absolute; left: calc(100% + 3px); top: 50%; transform: translateY(-50%); color: var(--text); font-weight: 500; font-size: .72rem; pointer-events: none; padding: 1px 5px; border-radius: 5px; background: color-mix(in srgb, var(--karte-solid) 88%, transparent); }
+.achse-balken.art-ueberfaellig { background: var(--rot); }
+.achse-balken.art-erledigt { background: var(--gruen); }
+.achse-balken.art-geplant { background: color-mix(in srgb, var(--orange) 55%, var(--karte-solid)); color: var(--text); }
+.achse-balken:hover { transform: translateY(-1px); box-shadow: var(--schatten-hover); }
+.achse-balken.gewaehlt { box-shadow: 0 0 0 2px var(--akzent); }

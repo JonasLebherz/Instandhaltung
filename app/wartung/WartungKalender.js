@@ -11,7 +11,7 @@
  * Datumswerte sind Text 'JJJJ-MM-TT'; gerechnet wird in UTC, damit keine Zeitzone stört.
  */
 import Link from 'next/link';
-import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
+import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/components/SpracheKontext';
@@ -45,10 +45,14 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
   const sichtbarePlaene = plaene.filter((p) => !werk || String(p.standort_id) === werk);
   const planVon = useMemo(() => new Map(plaene.map((p) => [p.id, p])), [plaene]);
 
-  // Termine des angezeigten Monats je Tag: { 'JJJJ-MM-TT': [{ plan, art }] }
-  const termine = useMemo(() => {
-    const anfang = `${monat}-01`;
-    const ende = plusTage(zuText(new Date(Date.UTC(Number(monat.slice(0, 4)), Number(monat.slice(5)), 1))), -1);
+  // Ansicht: Monatskalender oder Zeitachse (gemerkt im Browser)
+  const [ansicht, setAnsicht] = useState('kalender');
+  useEffect(() => { try { if (localStorage.getItem('wartungansicht') === 'zeitachse') setAnsicht('zeitachse'); } catch { /* privat */ } }, []);
+  function ansichtWaehlen(a) { setAnsicht(a); try { localStorage.setItem('wartungansicht', a); } catch { /* privat */ } }
+  const [achseStart, setAchseStart] = useState(() => plusTage(heute, -7));   // Zeitachse: 5 Wochen ab hier
+
+  // Termine eines Zeitraums je Tag: { 'JJJJ-MM-TT': [{ plan, art }] } – für Kalender, Zeitachse und Tagesliste
+  const termineZwischen = useCallback((anfang, ende) => {
     const liste = {};
     const dazu = (datum, eintrag) => { (liste[datum] ??= []).push(eintrag); };
     for (const p of sichtbarePlaene) {
@@ -66,7 +70,9 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
       if (p && d.datum >= anfang && d.datum <= ende && (!werk || String(p.standort_id) === werk)) dazu(d.datum, { plan: p, art: 'erledigt', person: d.person });
     }
     return liste;
-  }, [monat, sichtbarePlaene, erledigt, planVon, heute, werk]);
+  }, [sichtbarePlaene, erledigt, planVon, heute, werk]);
+  const termine = useMemo(() => termineZwischen(`${monat}-01`,
+    plusTage(zuText(new Date(Date.UTC(Number(monat.slice(0, 4)), Number(monat.slice(5)), 1))), -1)), [termineZwischen, monat]);
 
   // Raster: Wochen ab Montag
   const tage = useMemo(() => {
@@ -86,7 +92,7 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
   // Liste rechts
   const anstehend = sichtbarePlaene.filter((p) => p.tage_bis <= 7);
   const eintraege = tag
-    ? (termine[tag] ?? []).sort((a, b) => ['ueberfaellig', 'faellig', 'geplant', 'erledigt'].indexOf(a.art) - ['ueberfaellig', 'faellig', 'geplant', 'erledigt'].indexOf(b.art))
+    ? (termineZwischen(tag, tag)[tag] ?? []).sort((a, b) => ['ueberfaellig', 'faellig', 'geplant', 'erledigt'].indexOf(a.art) - ['ueberfaellig', 'faellig', 'geplant', 'erledigt'].indexOf(b.art))
     : anstehend.map((p) => ({ plan: p, art: p.tage_bis < 0 ? 'ueberfaellig' : 'faellig' }));
 
   function erledigen(plan) {
@@ -106,18 +112,34 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
 
   return (
     <div className="row g-4">
-      <div className="col-xl-8">
+      {/* Zeitachse braucht die volle Breite, die Liste steht dann darunter */}
+      <div className={ansicht === 'zeitachse' ? 'col-12' : 'col-xl-8'}>
         <section className="karte wartung-kalender" style={{ '--i': 4 }}>
           <div className="kalender-kopf">
-            <div className="d-flex align-items-center gap-2">
-              <button type="button" className="rund-knopf" onClick={() => blaettern(-1)} aria-label={t('Vorheriger Monat')}><i className="bi bi-chevron-left" /></button>
-              <h2 className="abschnitt-titel mb-0 kalender-monat">{monatsName}</h2>
-              <button type="button" className="rund-knopf" onClick={() => blaettern(1)} aria-label={t('Nächster Monat')}><i className="bi bi-chevron-right" /></button>
-              {monat !== heute.slice(0, 7) && (
-                <button type="button" className="btn btn-sekundaer btn-klein" onClick={() => { setMonat(heute.slice(0, 7)); setTag(null); }}>{t('Heute')}</button>
-              )}
-            </div>
+            {ansicht === 'kalender' ? (
+              <div className="d-flex align-items-center gap-2">
+                <button type="button" className="rund-knopf" onClick={() => blaettern(-1)} aria-label={t('Vorheriger Monat')}><i className="bi bi-chevron-left" /></button>
+                <h2 className="abschnitt-titel mb-0 kalender-monat">{monatsName}</h2>
+                <button type="button" className="rund-knopf" onClick={() => blaettern(1)} aria-label={t('Nächster Monat')}><i className="bi bi-chevron-right" /></button>
+                {monat !== heute.slice(0, 7) && (
+                  <button type="button" className="btn btn-sekundaer btn-klein" onClick={() => { setMonat(heute.slice(0, 7)); setTag(null); }}>{t('Heute')}</button>
+                )}
+              </div>
+            ) : (
+              <div className="d-flex align-items-center gap-2">
+                <button type="button" className="rund-knopf" onClick={() => setAchseStart(plusTage(achseStart, -7))} aria-label={t('Eine Woche zurück')}><i className="bi bi-chevron-left" /></button>
+                <h2 className="abschnitt-titel mb-0 kalender-monat">{t('Zeitachse')}</h2>
+                <button type="button" className="rund-knopf" onClick={() => setAchseStart(plusTage(achseStart, 7))} aria-label={t('Eine Woche vor')}><i className="bi bi-chevron-right" /></button>
+                {achseStart !== plusTage(heute, -7) && (
+                  <button type="button" className="btn btn-sekundaer btn-klein" onClick={() => setAchseStart(plusTage(heute, -7))}>{t('Heute')}</button>
+                )}
+              </div>
+            )}
             <div className="d-flex align-items-center gap-2 flex-wrap">
+              <div className="sprach-schalter wartung-schalter" role="group" aria-label={t('Ansicht')}>
+                <button type="button" aria-pressed={ansicht === 'kalender'} onClick={() => ansichtWaehlen('kalender')}><i className="bi bi-calendar3" aria-hidden="true" /> {t('Kalender')}</button>
+                <button type="button" aria-pressed={ansicht === 'zeitachse'} onClick={() => ansichtWaehlen('zeitachse')}><i className="bi bi-bar-chart-steps" aria-hidden="true" /> {t('Zeitachse')}</button>
+              </div>
               <div className="kalender-werk"><Auswahl id="wartung-werk" optionen={werke} wert={werk} onAendern={setWerk} klein ariaLabel={t('Werk')} /></div>
               {darf && (
                 <button type="button" className="btn btn-primary btn-klein" onClick={() => setPlanen(true)}>
@@ -133,6 +155,9 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
             <span><i className="kal-punkt erledigt" />{t('erledigt')}</span>
           </div>
 
+          {ansicht === 'zeitachse' ? (
+            <Zeitachse start={achseStart} heute={heute} termineZwischen={termineZwischen} gewaehlt={tag} onTag={setTag} />
+          ) : (
           <div className="kalender" role="grid" aria-label={monatsName}>
             {wochentage.map((w) => <div key={w} className="kalender-wochentag" role="columnheader">{w}</div>)}
             {tage.map((d) => {
@@ -154,11 +179,12 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
               );
             })}
           </div>
+          )}
         </section>
       </div>
 
-      <div className="col-xl-4">
-        <section className="karte wartung-liste" style={{ '--i': 5 }}>
+      <div className={ansicht === 'zeitachse' ? 'col-12' : 'col-xl-4'}>
+        <section className={`karte wartung-liste${ansicht === 'zeitachse' ? ' liste-breit' : ''}`} style={{ '--i': 5 }}>
           <div className="karte-kopf">
             <h2 className="abschnitt-titel mb-0">{tag ? datumLang(tag) : t('Anstehend')}</h2>
             {tag && <button type="button" className="link-knopf" onClick={() => setTag(null)}>{t('Anstehend zeigen')}</button>}
@@ -198,6 +224,86 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
         <PlanenDialog maschinen={maschinen} heute={heute} onSchliessen={() => setPlanen(false)}
                       onGeplant={(text) => { setPlanen(false); setMeldung({ art: 'erfolg', text }); setTag(null); router.refresh(); }} />
       )}
+    </div>
+  );
+}
+
+/**
+ * Zeitachse: 5 Wochen nebeneinander (Spalte je Tag), Zeile je Maschine mit Terminen im Zeitraum.
+ * Heute ist hervorgehoben. Mehrere Termine einer Maschine am selben Tag stehen übereinander
+ * (Überschneidung sichtbar); Wartungen länger als ein Arbeitstag (8 h) reichen über mehrere Tage.
+ * Klick auf einen Termin zeigt rechts die Termine dieses Tages.
+ */
+const ACHSE_TAGE = 35;
+const MAX_ZEILEN = 60;
+function Zeitachse({ start, heute, termineZwischen, gewaehlt, onTag }) {
+  const t = useT();
+  const tage = Array.from({ length: ACHSE_TAGE }, (_, i) => plusTage(start, i));
+  const ende = tage[tage.length - 1];
+  const termine = termineZwischen(start, ende);
+  // Zeilen: je Maschine alle Termine, sortiert nach dem ersten Termin
+  const zeilen = new Map();
+  for (const [datum, liste] of Object.entries(termine)) {
+    for (const e of liste) {
+      const z = zeilen.get(e.plan.maschine_id) ?? { plan: e.plan, termine: [] };
+      z.termine.push({ ...e, datum });
+      zeilen.set(e.plan.maschine_id, z);
+    }
+  }
+  const sortiert = [...zeilen.values()].map((z) => ({ ...z, termine: z.termine.sort((a, b) => a.datum.localeCompare(b.datum)) }))
+    .sort((a, b) => a.termine[0].datum.localeCompare(b.termine[0].datum) || a.plan.anlagennummer.localeCompare(b.plan.anlagennummer));
+  const tagFormat = new Intl.DateTimeFormat(t.locale, { weekday: 'narrow', timeZone: 'UTC' });
+  const monatFormat = new Intl.DateTimeFormat(t.locale, { month: 'short', timeZone: 'UTC' });
+  const spalte = (datum) => Math.round((zuDatum(datum) - zuDatum(start)) / TAG) + 2;   // Spalte 1 = Beschriftung
+  const heuteSpalte = heute >= start && heute <= ende ? spalte(heute) : null;
+
+  return (
+    <div className="zeitachse-rahmen">
+      <div className="zeitachse" style={{ '--tage': ACHSE_TAGE }}>
+        {/* Kopf: Monat/Tag/Wochentag */}
+        <div className="achse-zeile achse-kopf">
+          <span className="achse-name" />
+          {tage.map((d) => (
+            <span key={d} className={`achse-tag${d === heute ? ' heute' : ''}${[0, 6].includes(zuDatum(d).getUTCDay()) ? ' wochenende' : ''}`}
+                  style={{ gridColumn: spalte(d) }}>
+              {(d.slice(8) === '01' || d === start) && <small className="achse-monat">{monatFormat.format(zuDatum(d))}</small>}
+              <b>{Number(d.slice(8))}</b>
+              <small>{tagFormat.format(zuDatum(d))}</small>
+            </span>
+          ))}
+        </div>
+        {sortiert.slice(0, MAX_ZEILEN).map(({ plan, termine: liste }) => {
+          // Stapel je Tag: zweiter Termin am selben Tag eine Ebene tiefer
+          const belegt = {};
+          const balken = liste.map((e) => {
+            const tageDauer = Math.max(1, Math.ceil(e.plan.dauer_min / 480));
+            let ebene = 0;
+            while (Array.from({ length: tageDauer }, (_, k) => belegt[`${plusTage(e.datum, k)}-${ebene}`]).some(Boolean)) ebene += 1;
+            for (let k = 0; k < tageDauer; k += 1) belegt[`${plusTage(e.datum, k)}-${ebene}`] = true;
+            const von = Math.max(2, spalte(e.datum));
+            const bis = Math.min(ACHSE_TAGE + 2, spalte(e.datum) + tageDauer);
+            return { ...e, von, bis, ebene };
+          });
+          const ebenen = Math.max(1, ...balken.map((b) => b.ebene + 1));
+          return (
+            <div key={plan.maschine_id} className="achse-zeile" style={{ gridTemplateRows: `repeat(${ebenen}, 26px)` }}>
+              <Link href={`/maschinen/${plan.maschine_id}`} className="achse-name" style={{ gridRow: `1 / span ${ebenen}` }}>
+                <strong>{plan.anlagennummer}</strong><small>{plan.maschine}</small>
+              </Link>
+              {heuteSpalte && <span className="achse-heute" style={{ gridColumn: heuteSpalte, gridRow: `1 / span ${ebenen}` }} aria-hidden="true" />}
+              {balken.map((b) => (
+                <button key={`${b.plan.id}-${b.datum}-${b.art}`} type="button" className={`achse-balken art-${b.art}${b.datum === gewaehlt ? ' gewaehlt' : ''}`}
+                        style={{ gridColumn: `${b.von} / ${b.bis}`, gridRow: b.ebene + 1 }} onClick={() => onTag(b.datum)}
+                        title={`${b.plan.aufgabe} · ${b.datum}`} aria-label={`${b.plan.anlagennummer}: ${b.plan.aufgabe}, ${b.datum}`}>
+                  <span>{b.plan.aufgabe}</span>
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      {sortiert.length === 0 && <p className="leer">{t('Keine Wartungen in diesem Zeitraum.')}</p>}
+      {sortiert.length > MAX_ZEILEN && <p className="klein mt-2 mb-0">{t('{n} weitere Maschinen – oben ein Werk wählen, um alle zu sehen.', { n: sortiert.length - MAX_ZEILEN })}</p>}
     </div>
   );
 }

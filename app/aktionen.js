@@ -310,7 +310,11 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
     fehler.allgemein = t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.');
   }
 
-  const [auftrag] = await sql`SELECT status FROM wartungsauftrag WHERE id = ${auftragId}`;
+  // Gebucht wird aus dem Lager des Werks, in dem die Maschine des Auftrags steht
+  const [auftrag] = await sql`
+    SELECT w.status, g.standort_id FROM wartungsauftrag w
+    JOIN stoermeldung s ON s.id = w.stoermeldung_id JOIN maschine m ON m.id = s.maschine_id JOIN gebaeude g ON g.id = m.gebaeude_id
+    WHERE w.id = ${auftragId}`;
   if (!auftrag) fehler.allgemein = t('Der Auftrag wurde nicht gefunden.');
   else if (auftrag.status === 'erledigt' && !fehler.allgemein) fehler.allgemein = t('Auf erledigte Aufträge können keine Teile mehr gebucht werden.');
 
@@ -321,14 +325,18 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
     // Alles in einer Transaktion: Bestand prüfen und ändern darf nicht durch
     // eine gleichzeitige Buchung eines Kollegen gestört werden.
     ergebnis = await sql.begin(async (tx) => {
-      // Ersatzteil-Zeile sperren (FOR UPDATE), bis die Transaktion endet
-      const [teil] = await tx`
-        SELECT id, bezeichnung, bestand, mindestbestand FROM ersatzteil WHERE id = ${teilId} FOR UPDATE`;
-      if (!teil) return { art: 'unbekannt' };
+      const werk = auftrag.standort_id;
+      const [katalog] = await tx`SELECT id, bezeichnung FROM ersatzteil WHERE id = ${teilId}`;
+      if (!katalog) return { art: 'unbekannt' };
+      // Lagerzeile des Werks anlegen, falls das Teil dort noch nie geführt wurde, und sperren (FOR UPDATE)
+      await tx`INSERT INTO lagerbestand (standort_id, ersatzteil_id) VALUES (${werk}, ${teilId}) ON CONFLICT DO NOTHING`;
+      const [lager] = await tx`
+        SELECT bestand, mindestbestand FROM lagerbestand WHERE standort_id = ${werk} AND ersatzteil_id = ${teilId} FOR UPDATE`;
+      const teil = { ...katalog, ...lager };
 
       if (teil.bestand >= menge) {
         /* --- Fall A: genug auf Lager → buchen --- */
-        await tx`UPDATE ersatzteil SET bestand = bestand - ${menge} WHERE id = ${teilId}`;
+        await tx`UPDATE lagerbestand SET bestand = bestand - ${menge} WHERE standort_id = ${werk} AND ersatzteil_id = ${teilId}`;
         // Wurde das Teil schon einmal gebucht, wird die Menge addiert
         // (Primärschlüssel auftrag_id + ersatzteil_id).
         await tx`
@@ -349,13 +357,13 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
                  VALUES (${auftragId}, ${person?.id ?? null}, 'status', 'wartet auf Teil')`;
       }
 
-      const [offen] = await tx`SELECT id FROM bestellung WHERE ersatzteil_id = ${teilId} AND status = 'bestellt' LIMIT 1`;
+      const [offen] = await tx`SELECT id FROM bestellung WHERE standort_id = ${werk} AND ersatzteil_id = ${teilId} AND status = 'bestellt' LIMIT 1`;
       if (offen) return { art: 'schon_bestellt', teil };
 
       // Bestellmenge: fehlende Menge + Mindestbestand wieder auffüllen
       const bestellmenge = (menge - teil.bestand) + teil.mindestbestand;
-      await tx`INSERT INTO bestellung (ersatzteil_id, menge, bestelldatum, status)
-               VALUES (${teilId}, ${bestellmenge}, current_date, 'bestellt')`;
+      await tx`INSERT INTO bestellung (ersatzteil_id, standort_id, menge, bestelldatum, status)
+               VALUES (${teilId}, ${werk}, ${bestellmenge}, current_date, 'bestellt')`;
       return { art: 'bestellt', teil, bestellmenge };
     });
   } catch (fehlerObjekt) {
@@ -399,7 +407,8 @@ export async function lieferungBuchen(formular) {
 
   const bestellungId = ganzzahl(feld(formular, 'bestellung_id'));
   // Zurück zur Seite, von der gebucht wurde (Übersicht oder Lager) – nur feste Ziele, keine fremden Adressen
-  const ziel = feld(formular, 'zurueck') === '/lager' ? '/lager' : '/';
+  const zurueck = feld(formular, 'zurueck');
+  const ziel = /^\/lager(\?werk=\d+(&teil=\d+)?)?$/.test(zurueck) ? zurueck : '/';
   if (bestellungId === null) {
     await flash('fehler', t('Ungültige Bestellung.'));
     redirect(ziel);
@@ -410,14 +419,17 @@ export async function lieferungBuchen(formular) {
     ergebnis = await sql.begin(async (tx) => {
       // Bestellung sperren, damit sie nicht doppelt gebucht wird
       const [bestellung] = await tx`
-        SELECT b.id, b.ersatzteil_id, b.menge, b.status, e.bezeichnung
+        SELECT b.id, b.ersatzteil_id, b.standort_id, b.menge, b.status, e.bezeichnung
         FROM bestellung b JOIN ersatzteil e ON e.id = b.ersatzteil_id
         WHERE b.id = ${bestellungId}
         FOR UPDATE OF b`;
       if (!bestellung || bestellung.status !== 'bestellt') return null;
 
       await tx`UPDATE bestellung SET status = 'geliefert', lieferdatum = current_date WHERE id = ${bestellungId}`;
-      await tx`UPDATE ersatzteil SET bestand = bestand + ${bestellung.menge} WHERE id = ${bestellung.ersatzteil_id}`;
+      // Wareneingang ins Lager des Werks, für das bestellt wurde
+      await tx`
+        INSERT INTO lagerbestand (standort_id, ersatzteil_id, bestand) VALUES (${bestellung.standort_id}, ${bestellung.ersatzteil_id}, ${bestellung.menge})
+        ON CONFLICT (standort_id, ersatzteil_id) DO UPDATE SET bestand = lagerbestand.bestand + EXCLUDED.bestand`;
       return bestellung;
     });
   } catch (fehlerObjekt) {
@@ -448,20 +460,24 @@ export async function teilNachbestellen(formular) {
     redirect('/lager');
   }
   const teilId = ganzzahl(feld(formular, 'ersatzteil_id'));
+  const werk = ganzzahl(feld(formular, 'standort_id'));
   const menge = ganzzahl(feld(formular, 'menge'));
-  if (teilId === null || menge === null || menge < 1 || menge > 999) {
+  const zurueck = `/lager?werk=${werk ?? ''}&teil=${teilId ?? ''}`;
+  if (teilId === null || werk === null || menge === null || menge < 1 || menge > 999) {
     await flash('fehler', t('Bitte eine Menge zwischen 1 und 999 angeben.'));
-    redirect(`/lager?teil=${teilId ?? ''}`);
+    redirect(zurueck);
   }
+  // Höchstens eine offene Bestellung je Werk und Teil
   const [neu] = await sql`
-    INSERT INTO bestellung (ersatzteil_id, menge, bestelldatum, status)
-    SELECT e.id, ${menge}, current_date, 'bestellt' FROM ersatzteil e
-    WHERE e.id = ${teilId} AND NOT EXISTS (SELECT 1 FROM bestellung b WHERE b.ersatzteil_id = e.id AND b.status = 'bestellt')
+    INSERT INTO bestellung (ersatzteil_id, standort_id, menge, bestelldatum, status)
+    SELECT e.id, st.id, ${menge}, current_date, 'bestellt' FROM ersatzteil e, standort st
+    WHERE e.id = ${teilId} AND st.id = ${werk}
+      AND NOT EXISTS (SELECT 1 FROM bestellung b WHERE b.ersatzteil_id = e.id AND b.standort_id = st.id AND b.status = 'bestellt')
     RETURNING id`;
   if (neu) await flash('erfolg', t('Nachbestellung angelegt: {menge} Stück.', { menge }));
   else await flash('fehler', t('Für dieses Teil gibt es schon eine offene Bestellung.'));
   revalidatePath('/', 'layout');
-  redirect(`/lager?teil=${teilId}`);
+  redirect(zurueck);
 }
 
 /* =====================================================================

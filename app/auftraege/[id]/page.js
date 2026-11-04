@@ -83,7 +83,11 @@ export default async function AuftragSeite({ params }) {
              COALESCE(st.name, ${t('ohne Standort')}) AS standort
       FROM techniker t LEFT JOIN standort st ON st.id = t.standort_id
       ORDER BY (t.standort_id = ${auftrag.standort_id}) DESC, st.name, t.name`,
-    sql`SELECT id, bezeichnung, bestand, mindestbestand FROM ersatzteil ORDER BY bezeichnung`,
+    // Ersatzteile mit dem Bestand im Lager des Werks dieser Maschine
+    sql`
+      SELECT e.id, e.bezeichnung, COALESCE(lb.bestand, 0) AS bestand, COALESCE(lb.mindestbestand, 0) AS mindestbestand
+      FROM ersatzteil e LEFT JOIN lagerbestand lb ON lb.ersatzteil_id = e.id AND lb.standort_id = ${auftrag.standort_id}
+      ORDER BY e.bezeichnung`,
     sql`
       SELECT e.bezeichnung, ae.menge
       FROM auftrag_ersatzteil ae JOIN ersatzteil e ON e.id = ae.ersatzteil_id

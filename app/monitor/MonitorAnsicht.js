@@ -6,9 +6,14 @@
  *  - Lädt alle 30 Sekunden neu (router.refresh, ohne Neuladen der Seite) und zeigt die Uhrzeit.
  *  - Kachel je Maschine in Ampelfarbe: grün läuft, orange Störung, rot Stillstand (blinkt).
  *  - „Vollbild“ nutzt die Vollbild-Funktion des Browsers (z. B. für einen Fernseher in der Halle).
+ *  - Umschalter 2D/3D: 3D zeigt die Halle wie in der Störungskarte (KartenExplorer kompakt, Ampeln mit
+ *    LED-Zahl), rechts die gestörten Maschinen. Wahl in localStorage "monitoransicht".
+ *    Die Kartendaten kommen aus /api/kartendaten (alle 60 s neu).
  */
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { startAusAdresse } from '@/lib/karten/adresse';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/components/SpracheKontext';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
@@ -16,6 +21,8 @@ import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
 import { gross } from '@/lib/sprache';
 
 const TAKT = 30000;
+// 3D-Halle nur bei Bedarf laden (three.js ist groß)
+const KartenExplorer = dynamic(() => import('@/components/karten/KartenExplorer'), { ssr: false, loading: () => <div className="monitor-3d-laden" /> });
 
 /** „seit 2 h 15 min“ */
 function seitText(iso, jetzt, t) {
@@ -30,6 +37,22 @@ export default function MonitorAnsicht({ ort, maschinen, stand }) {
   const t = useT();
   const router = useRouter();
   const [jetzt, setJetzt] = useState(() => new Date(stand));
+  const [dreiD, setDreiD] = useState(false);
+  const [daten, setDaten] = useState(null);
+  useEffect(() => { try { setDreiD(localStorage.getItem('monitoransicht') === '3d'); } catch { /* privat */ } }, []);
+  function ansichtWaehlen(drei) {
+    setDreiD(drei);
+    try { localStorage.setItem('monitoransicht', drei ? '3d' : '2d'); } catch { /* privat */ }
+  }
+  // 3D: Kartendaten laden und jede Minute auffrischen
+  useEffect(() => {
+    if (!dreiD) return undefined;
+    let aktuell = true;
+    const laden = () => fetch('/api/kartendaten').then((a) => (a.ok ? a.json() : null)).then((d) => { if (aktuell && d) setDaten(d); }).catch(() => {});
+    laden();
+    const takt = setInterval(() => { if (document.visibilityState === 'visible') laden(); }, 60000);
+    return () => { aktuell = false; clearInterval(takt); };
+  }, [dreiD]);
 
   useEffect(() => {
     document.documentElement.dataset.vollbild = 'an';
@@ -59,12 +82,46 @@ export default function MonitorAnsicht({ ort, maschinen, stand }) {
           <span className="ampel-rot"><strong>{zaehle('rot')}</strong>{t(AMPEL_TEXT.rot)}</span>
         </div>
         <div className="monitor-uhr" aria-label={t('Uhrzeit')}>{uhrzeit}</div>
+        <div className="sprach-schalter raum-schalter monitor-schalter" role="group" aria-label={t('Ansicht')}>
+          <button type="button" aria-pressed={!dreiD} onClick={() => ansichtWaehlen(false)}>2D</button>
+          <button type="button" aria-pressed={dreiD} onClick={() => ansichtWaehlen(true)}>3D</button>
+        </div>
         <div className="monitor-knoepfe">
           <button type="button" className="rund-knopf" onClick={vollbild} title={t('Vollbild')} aria-label={t('Vollbild')}><i className="bi bi-arrows-fullscreen" /></button>
           <Link href={`/karte?werk=${ort.werk.toLowerCase()}&halle=${ort.kuerzel.toLowerCase()}`} className="rund-knopf" title={t('Zurück zur Karte')} aria-label={t('Zurück zur Karte')}><i className="bi bi-x-lg" /></Link>
         </div>
       </header>
 
+      {dreiD ? (
+        <div className="monitor-3d">
+          <div className="monitor-3d-buehne">
+            {daten ? (
+              <KartenExplorer key={`${ort.werk}-${ort.kuerzel}`} daten={daten} kompakt groesse="monitor"
+                              start={startAusAdresse({ werk: ort.werk, halle: ort.kuerzel, ansicht: '3d' }, daten)} />
+            ) : <div className="monitor-3d-laden" />}
+          </div>
+          <ul className="monitor-liste">
+            {maschinen.filter((m) => m.offen > 0 || m.wartung_faellig > 0)
+              .sort((a, b) => ['rot', 'orange', 'gruen'].indexOf(ampelZustand(a)) - ['rot', 'orange', 'gruen'].indexOf(ampelZustand(b)))
+              .map((m) => {
+                const z = ampelZustand(m);
+                return (
+                  <li key={m.id} className={`monitor-zeile ampel-${z}`}>
+                    <span className="ampel-symbol" aria-hidden="true"><i /><i /><i /></span>
+                    <span className="monitor-zeile-text">
+                      <strong>{m.anlagennummer}</strong> {m.bezeichnung}
+                      <small>
+                        {m.offen > 0 ? `${t(AMPEL_TEXT[z])} · ${seitText(m.seit, jetzt, t)}` : ''}
+                        {m.wartung_faellig > 0 ? `${m.offen > 0 ? ' · ' : ''}${t('Wartung fällig')}` : ''}
+                      </small>
+                    </span>
+                  </li>
+                );
+              })}
+            {maschinen.every((m) => !m.offen && !m.wartung_faellig) && <li className="monitor-alles-gut"><i className="bi bi-check-circle" aria-hidden="true" /> {t('Alle Maschinen laufen.')}</li>}
+          </ul>
+        </div>
+      ) : (
       <div className="monitor-raster">
         {maschinen.map((m) => {
           const z = ampelZustand(m);
@@ -86,6 +143,7 @@ export default function MonitorAnsicht({ ort, maschinen, stand }) {
           );
         })}
       </div>
+      )}
       <footer className="monitor-fuss">{t('Aktualisiert sich alle 30 Sekunden.')}</footer>
     </div>
   );

@@ -107,14 +107,17 @@ export default async function Uebersicht() {
       ORDER BY s.prioritaet DESC, s.zeitpunkt DESC
       LIMIT 8`,
 
-    // Teile unter Mindestbestand sowie alle Teile mit offener Bestellung
+    // Teile unter Mindestbestand sowie alle Teile mit offener Bestellung – je Werk (Lager je Werk),
+    // offene Bestellungen zuerst (dort ist etwas zu tun: Wareneingang buchen)
     sql`
-      SELECT e.id, e.bezeichnung, e.bestand, e.mindestbestand,
+      SELECT e.id, e.bezeichnung, lb.bestand, lb.mindestbestand, st.id AS standort_id, st.name AS standort,
              b.id AS bestellung_id, b.menge AS bestellmenge, b.bestelldatum
-      FROM ersatzteil e
-      LEFT JOIN bestellung b ON b.ersatzteil_id = e.id AND b.status = 'bestellt'
-      WHERE e.bestand < e.mindestbestand OR b.id IS NOT NULL
-      ORDER BY (e.bestand < e.mindestbestand) DESC, e.bestand::float / NULLIF(e.mindestbestand, 0), e.bezeichnung`,
+      FROM lagerbestand lb
+      JOIN ersatzteil e   ON e.id = lb.ersatzteil_id
+      JOIN standort st    ON st.id = lb.standort_id
+      LEFT JOIN bestellung b ON b.ersatzteil_id = lb.ersatzteil_id AND b.standort_id = lb.standort_id AND b.status = 'bestellt'
+      WHERE (lb.bestand < lb.mindestbestand OR b.id IS NOT NULL) AND ${imBlick}
+      ORDER BY (b.id IS NOT NULL) DESC, b.bestelldatum DESC NULLS LAST, lb.bestand::float / NULLIF(lb.mindestbestand, 0), st.name, e.bezeichnung`,
 
     // Standorte mit offenen Störungen für die kleine Deutschlandkarte
     standorteMitZahlen(),
@@ -131,7 +134,9 @@ export default async function Uebersicht() {
   // Die Balken beziehen sich nur auf die offenen Status, damit "erledigt" sie nicht winzig macht
   const maxOffen = Math.max(1, ...statusVerteilung.filter((z) => z.status !== 'erledigt').map((z) => z.anzahl));
 
-  const anzahlKritisch = new Set(kritischeTeile.filter((teil) => teil.bestand < teil.mindestbestand).map((teil) => teil.id)).size;
+  // Fächer (Werk × Teil) unter Mindestbestand; angezeigt werden höchstens 8 Zeilen, der Rest im Lager
+  const anzahlKritisch = kritischeTeile.filter((teil) => teil.bestand < teil.mindestbestand).length;
+  const ANZEIGE_TEILE = 8;
 
   return (
     <>
@@ -319,6 +324,7 @@ export default async function Uebersicht() {
               <thead>
                 <tr>
                   <th>{t('Ersatzteil')}</th>
+                  <th className="d-none d-md-table-cell">{t('Werk')}</th>
                   <th className="zahl">{t('Bestand')}</th>
                   <th className="zahl">{t('Mindestbestand')}</th>
                   <th>{t('Nachbestellung')}</th>
@@ -326,9 +332,10 @@ export default async function Uebersicht() {
                 </tr>
               </thead>
               <tbody>
-                {kritischeTeile.map((teil) => (
-                  <tr key={`${teil.id}-${teil.bestellung_id ?? 'x'}`}>
-                    <td>{teil.bezeichnung}</td>
+                {kritischeTeile.slice(0, ANZEIGE_TEILE).map((teil) => (
+                  <tr key={`${teil.standort_id}-${teil.id}-${teil.bestellung_id ?? 'x'}`}>
+                    <td>{teil.bezeichnung}<span className="klein d-md-none d-block">{teil.standort}</span></td>
+                    <td className="d-none d-md-table-cell">{teil.standort}</td>
                     <td className="zahl">
                       {teil.bestand < teil.mindestbestand
                         ? <strong className="text-orange">{teil.bestand}</strong>
@@ -360,6 +367,11 @@ export default async function Uebersicht() {
                 ))}
               </tbody>
             </table>
+            {kritischeTeile.length > ANZEIGE_TEILE && (
+              <p className="klein mt-2 mb-0">
+                <Link href="/lager">{t('{n} weitere im Lager ansehen', { n: kritischeTeile.length - ANZEIGE_TEILE })} →</Link>
+              </p>
+            )}
           </div>
         )}
       </section>

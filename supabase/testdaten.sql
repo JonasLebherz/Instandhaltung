@@ -21,7 +21,7 @@
 -- CASCADE leert auch alle Tabellen, die per Fremdschlüssel darauf verweisen.
 TRUNCATE land, standort, gebaeude, maschine, techniker, person, ersatzteil, stoermeldung, wartungsauftrag,
          auftrag_ersatzteil, bestellung, auftrag_verlauf, nachricht, wartungsplan, wartung_durchfuehrung,
-         stoermeldung_foto RESTART IDENTITY CASCADE;
+         stoermeldung_foto, lagerbestand RESTART IDENTITY CASCADE;
 
 -- ---------------------------------------------------------------------
 -- Standorte (Werke) mit GPS-Position und Größe des Werksgeländes
@@ -211,29 +211,55 @@ INSERT INTO techniker (id, standort_id, name, qualifikation, schicht) OVERRIDING
 (20, 10, 'Anna Berger', 'Elektroniker/in für Betriebstechnik', 'Spätschicht');
 
 -- ---------------------------------------------------------------------
--- Ersatzteile (zentrales Lager, einige bewusst unter Mindestbestand)
+-- Ersatzteile (Katalog) und ihr Bestand im Hauptwerk Albstadt (einige bewusst unter Mindestbestand).
+-- Die Bestände der übrigen Werke folgen am Ende der Datei (wie migrationen/005).
 -- ---------------------------------------------------------------------
-INSERT INTO ersatzteil (id, bezeichnung, bestand, mindestbestand) OVERRIDING SYSTEM VALUE VALUES
-(1, 'Kugellager 6205-2RS', 0, 4),
-(2, 'Keilriemen SPZ 1250', 6, 2),
-(3, 'Hydraulikschlauch DN10, 1 m', 1, 3),
-(4, 'Hydraulikdichtungssatz HD-40', 4, 2),
-(5, 'Näherungsschalter M12 PNP', 9, 4),
-(6, 'Schütz 24 V DC', 5, 2),
-(7, 'Sicherung 16 A, Typ C', 25, 10),
-(8, 'Servomotor-Encoder', 1, 1),
-(9, 'Fräser VHM Ø10 mm', 3, 5),
-(10, 'Wendeschneidplatte CNMG 120408', 40, 20),
-(11, 'Förderbandgurt 600 mm', 2, 1),
-(12, 'Pneumatikzylinder Ø32 × 100', 2, 1),
-(13, 'Lackierdüse 1,4 mm', 3, 4),
-(14, 'Heizband 230 V, 400 W', 4, 2),
-(15, 'Schutzgasdüse MIG/MAG', 12, 6),
-(16, 'Luftfilter Kompressor', 6, 3),
-(17, 'Zahnriemen HTD 8M', 3, 2),
-(18, 'Lichtschranke Reflexion', 5, 3),
-(19, 'Fahrantrieb-Rolle RBG', 2, 2),
-(20, 'Greiferbacken-Satz', 4, 2);
+INSERT INTO ersatzteil (id, bezeichnung) OVERRIDING SYSTEM VALUE VALUES
+(1, 'Kugellager 6205-2RS'),
+(2, 'Keilriemen SPZ 1250'),
+(3, 'Hydraulikschlauch DN10, 1 m'),
+(4, 'Hydraulikdichtungssatz HD-40'),
+(5, 'Näherungsschalter M12 PNP'),
+(6, 'Schütz 24 V DC'),
+(7, 'Sicherung 16 A, Typ C'),
+(8, 'Servomotor-Encoder'),
+(9, 'Fräser VHM Ø10 mm'),
+(10, 'Wendeschneidplatte CNMG 120408'),
+(11, 'Förderbandgurt 600 mm'),
+(12, 'Pneumatikzylinder Ø32 × 100'),
+(13, 'Lackierdüse 1,4 mm'),
+(14, 'Heizband 230 V, 400 W'),
+(15, 'Schutzgasdüse MIG/MAG'),
+(16, 'Luftfilter Kompressor'),
+(17, 'Zahnriemen HTD 8M'),
+(18, 'Lichtschranke Reflexion'),
+(19, 'Fahrantrieb-Rolle RBG'),
+(20, 'Greiferbacken-Satz');
+
+INSERT INTO lagerbestand (standort_id, ersatzteil_id, bestand, mindestbestand)
+SELECT st.id, v.teil, v.bestand, v.mindest FROM standort st, (VALUES
+    (1, 0, 4),
+    (2, 6, 2),
+    (3, 1, 3),
+    (4, 4, 2),
+    (5, 9, 4),
+    (6, 5, 2),
+    (7, 25, 10),
+    (8, 1, 1),
+    (9, 3, 5),
+    (10, 40, 20),
+    (11, 2, 1),
+    (12, 2, 1),
+    (13, 3, 4),
+    (14, 4, 2),
+    (15, 12, 6),
+    (16, 6, 3),
+    (17, 3, 2),
+    (18, 5, 3),
+    (19, 2, 2),
+    (20, 4, 2)
+) AS v(teil, bestand, mindest)
+WHERE st.kuerzel = 'ALB';
 
 -- ---------------------------------------------------------------------
 -- Störmeldungen (älteste zuerst)
@@ -1843,7 +1869,8 @@ INSERT INTO auftrag_ersatzteil (auftrag_id, ersatzteil_id, menge) VALUES
 -- ---------------------------------------------------------------------
 -- Bestellungen (Historie + zwei offene)
 -- ---------------------------------------------------------------------
-INSERT INTO bestellung (ersatzteil_id, menge, bestelldatum, lieferdatum, status) VALUES
+INSERT INTO bestellung (ersatzteil_id, menge, bestelldatum, lieferdatum, status, standort_id)
+SELECT v.teil, v.menge, v.bestellt, v.geliefert, v.status::bestellstatus, (SELECT id FROM standort WHERE kuerzel = 'ALB') FROM (VALUES
 (11, 8, current_date - 349, current_date - 346, 'geliefert'),
 (12, 5, current_date - 326, current_date - 319, 'geliefert'),
 (6, 11, current_date - 286, current_date - 281, 'geliefert'),
@@ -1867,7 +1894,7 @@ INSERT INTO bestellung (ersatzteil_id, menge, bestelldatum, lieferdatum, status)
 (12, 4, current_date - 34, current_date - 28, 'geliefert'),
 (4, 12, current_date - 21, current_date - 16, 'geliefert'),
 (1, 6, current_date - 2, NULL, 'bestellt'),
-(9, 8, current_date - 1, NULL, 'bestellt');
+(9, 8, current_date - 1, NULL, 'bestellt')) AS v(teil, menge, bestellt, geliefert, status);
 
 -- ---------------------------------------------------------------------
 -- Personen (Rollen in der Anwendung) – gleiche Daten wie in migrationen/001
@@ -2188,3 +2215,25 @@ CROSS JOIN LATERAL generate_series(p.start_datum, current_date, make_interval(da
 WHERE NOT EXISTS (SELECT 1 FROM wartung_durchfuehrung)
   AND NOT (abs(hashtext(m.anlagennummer || p.aufgabe)) % 12 = 0
            AND d.datum::date > current_date - LEAST(p.intervall_tage, 30));
+
+-- ---------------------------------------------------------------------
+-- Lager je Werk – gleiche Daten wie in migrationen/005
+-- ---------------------------------------------------------------------
+-- Übrige Werke: Beispielbestände. Mindestbestand ähnlich wie im Hauptwerk, etwa jedes
+-- sechste Teil liegt unter dem Mindestbestand.
+INSERT INTO lagerbestand (standort_id, ersatzteil_id, bestand, mindestbestand)
+SELECT st.id, e.id,
+       GREATEST(0, CASE WHEN h % 6 = 0 THEN m - 1 - (h / 6) % 2 ELSE m + (h / 7) % (m * 2 + 3) END),
+       m
+FROM standort st
+CROSS JOIN ersatzteil e
+CROSS JOIN LATERAL (SELECT abs(hashtext(st.kuerzel || '-' || e.id)) AS h) x
+CROSS JOIN LATERAL (SELECT GREATEST(1, COALESCE((SELECT lb.mindestbestand FROM lagerbestand lb
+                                                 WHERE lb.ersatzteil_id = e.id ORDER BY lb.standort_id LIMIT 1), 2)
+                                       + (x.h % 3) - 1) AS m) y
+ON CONFLICT (standort_id, ersatzteil_id) DO NOTHING;
+
+-- Lagerplatz: in allen Werken gleich aufgebaut (Regal A–D, je 5 Fächer)
+UPDATE lagerbestand
+SET lagerplatz = chr(65 + ((ersatzteil_id - 1) / 5) % 26) || '-' || lpad((((ersatzteil_id - 1) % 5) + 1)::text, 2, '0')
+WHERE lagerplatz IS NULL;

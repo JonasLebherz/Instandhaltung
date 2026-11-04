@@ -13,6 +13,8 @@ import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import QrCode from '@/components/QrCode';
+import Logo from '@/components/Logo';
+import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import DruckKnopf from './DruckKnopf';
 
 export const dynamic = 'force-dynamic';
@@ -56,15 +58,28 @@ export default async function QrSeite({ searchParams }) {
       ) : (
         <div className="qr-etiketten">
           {maschinen.map((m) => (
-            <div key={m.id} className="qr-etikett">
-              <QrCode text={`${basis}/melden?maschine=${m.id}`} titel={t('QR-Code für {name}', { name: m.anlagennummer })} />
-              <div className="qr-text">
-                <strong>{m.anlagennummer}</strong>
-                <span>{m.bezeichnung}</span>
-                <span className="qr-ort">{m.standort} · {m.gebaeude}</span>
-                <span className="qr-hinweis"><i className="bi bi-phone" aria-hidden="true" /> {t('Scannen, um eine Störung zu melden')}</span>
+            // Etikett 90 × 55 mm (beim Drucken): Kopfband, QR-Code, Maschine, Anleitung
+            <article key={m.id} className="qr-etikett">
+              <header className="qr-band">
+                <Logo groesse={18} />
+                <span>{t('Instandhaltung')}</span>
+                <strong>{t('Störung melden')}</strong>
+              </header>
+              <div className="qr-inhalt">
+                <QrCode text={`${basis}/melden?maschine=${m.id}`} titel={t('QR-Code für {name}', { name: m.anlagennummer })} />
+                <div className="qr-text">
+                  <span className="qr-nummer">{m.anlagennummer}</span>
+                  <span className="qr-name">{m.bezeichnung}</span>
+                  <span className="qr-typ"><i className={`bi ${MASCHINEN_SYMBOLE[m.typ] ?? 'bi-gear'}`} aria-hidden="true" /> {t(m.typ)}</span>
+                  <span className="qr-ort">{m.standort} · {m.halle}</span>
+                </div>
               </div>
-            </div>
+              <footer className="qr-schritte">
+                <span><b>1</b> {t('Kamera öffnen')}</span>
+                <span><b>2</b> {t('Code scannen')}</span>
+                <span><b>3</b> {t('Störung beschreiben')}</span>
+              </footer>
+            </article>
           ))}
         </div>
       )}

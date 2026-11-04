@@ -1046,7 +1046,7 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
 
   const welt = useRef(null);
   // Gebäude flach machen (3D → 2D) bzw. aus der Fläche wachsen lassen (2D → 3D, Szene beginnt flach)
-  const { invalidate } = useThree();
+  const { invalidate } = useThree();   // gl kommt von oben (Zeile mit useThree am Anfang der Szene)
   const flachStand = useRef(flach ? 1 : 0);
   useLayoutEffect(() => { if (welt.current && flachStand.current === 1) welt.current.scale.y = 0.015; }, []);
   useFrame((_, dt) => {
@@ -1056,6 +1056,9 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     flachStand.current = ziel ? Math.min(1, flachStand.current + schritt) : Math.max(0, flachStand.current - schritt);
     welt.current.scale.y = 1 - 0.985 * easing(flachStand.current);
     if (flachStand.current === 1) onFlachFertig?.();   // ganz flach → jetzt darf die 2D-Zeichnung überblenden
+    // Schatten in jedem Bild neu: Sonst rechnet SchattenTakt sie nur jedes dritte Bild – während die Gebäude
+    // sinken bzw. wachsen passten sie dann nicht zur Form und sprangen sichtbar (Flackern beim Wechsel 2D ↔ 3D)
+    gl.shadowMap.needsUpdate = true;
     invalidate();
   });
   const schatten = Math.max(B, T) * 0.7;

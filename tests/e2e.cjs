@@ -153,10 +153,15 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click('form:has(#ersatzteil_id) button[type=submit]')]);
     await p.waitForLoadState('networkidle'); await p.waitForTimeout(500);
   };
+  // Lager je Werk: gebucht wird aus dem Lager des Werks der Maschine (Dortmund). Ausgangslage festlegen:
+  // Hydraulikschlauch (id 3) knapp mit 1 von 3, keine offene Bestellung
+  const dor = sql("SELECT id FROM standort WHERE kuerzel = 'DOR'");
+  const lager = (teil) => sql(`SELECT bestand FROM lagerbestand WHERE standort_id = ${dor} AND ersatzteil_id = ${teil}`);
+  sql(`UPDATE lagerbestand SET bestand = 1, mindestbestand = 3 WHERE standort_id = ${dor} AND ersatzteil_id = 3; DELETE FROM bestellung WHERE standort_id = ${dor} AND ersatzteil_id = 3 AND status = 'bestellt'`);
   // 7. Teil auf Lager (Keilriemen id 2)
-  const vorher = Number(sql('SELECT bestand FROM ersatzteil WHERE id=2'));
+  const vorher = Number(lager(2));
   await buchen(2, 2);
-  pruefe('Bestand reduziert', Number(sql('SELECT bestand FROM ersatzteil WHERE id=2')) === vorher - 2);
+  pruefe('Bestand im Lager des Werks reduziert', Number(lager(2)) === vorher - 2);
   await buchen(2, 1);
   pruefe('Zweite Buchung addiert Menge', sql(`SELECT menge FROM auftrag_ersatzteil WHERE auftrag_id=${auftrag} AND ersatzteil_id=2`) === '3');
   // 8. Ungültige Menge
@@ -164,27 +169,28 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Menge 0 abgelehnt', (await p.content()).includes('Menge zwischen 1 und 999'));
   // 9. Nicht auf Lager (Hydraulikschlauch id 3, Bestand 1)
   await p.goto(`${BASE}/auftraege/${auftrag}`);
-  const bestVorher = Number(sql("SELECT count(*) FROM bestellung WHERE ersatzteil_id=3 AND status='bestellt'"));
+  const offeneBestellung = `FROM bestellung WHERE ersatzteil_id=3 AND standort_id=${dor} AND status='bestellt'`;
+  const bestVorher = Number(sql(`SELECT count(*) ${offeneBestellung}`));
   await buchen(3, 2);
   pruefe('Status → wartet auf Teil', sql(`SELECT status FROM wartungsauftrag WHERE id=${auftrag}`) === 'wartet auf Teil');
-  pruefe('Bestellung angelegt (Menge 1+3=4)', Number(sql("SELECT count(*) FROM bestellung WHERE ersatzteil_id=3 AND status='bestellt'")) === bestVorher + 1
-    && sql("SELECT menge FROM bestellung WHERE ersatzteil_id=3 AND status='bestellt'") === '4');
+  pruefe('Bestellung für das Werk angelegt (Menge 1+3=4)', Number(sql(`SELECT count(*) ${offeneBestellung}`)) === bestVorher + 1
+    && sql(`SELECT menge ${offeneBestellung}`) === '4');
   pruefe('Hinweis zur Bestellung angezeigt', (await p.textContent('main')).includes('Bestellung über 4 Stück'));
   await buchen(3, 5);
-  pruefe('Keine doppelte Bestellung', Number(sql("SELECT count(*) FROM bestellung WHERE ersatzteil_id=3 AND status='bestellt'")) === bestVorher + 1
+  pruefe('Keine doppelte Bestellung', Number(sql(`SELECT count(*) ${offeneBestellung}`)) === bestVorher + 1
     && (await p.textContent('main')).includes('bereits eine Bestellung'));
   // 10. Lieferung buchen
   await p.goto(BASE + '/');
   await p.screenshot({ path: SHOTS + 'n-index-hell.png', fullPage: true });
-  const bid = sql("SELECT id FROM bestellung WHERE ersatzteil_id=3 AND status='bestellt'");
+  const bid = sql(`SELECT id ${offeneBestellung}`);
   await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click(`form:has(input[name=bestellung_id][value="${bid}"]) button`)]);
   await p.waitForTimeout(800);
-  pruefe('Lieferung: Bestand 1+4=5', sql('SELECT bestand FROM ersatzteil WHERE id=3') === '5');
+  pruefe('Lieferung ins Lager des Werks: Bestand 1+4=5', lager(3) === '5');
   pruefe('Lieferung: geliefert + Datum', sql(`SELECT status::text || '|' || (lieferdatum IS NOT NULL)::text FROM bestellung WHERE id=${bid}`) === 'geliefert|true');
   // 11. Abschluss: Fehler
   await p.goto(`${BASE}/auftraege/${auftrag}`);
   await buchen(3, 2);
-  pruefe('Nach Lieferung buchbar (Bestand 3)', sql('SELECT bestand FROM ersatzteil WHERE id=3') === '3');
+  pruefe('Nach Lieferung buchbar (Bestand 3)', lager(3) === '3');
   const start = await p.inputValue('#start_zeit');
   await speichern({ status: 'erledigt', ende: '2020-01-01T10:00', massnahme: '' });
   const h2 = await p.content();
@@ -260,7 +266,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.reload(); await p.waitForTimeout(600);
   pruefe('Seitenleiste: Zustand bleibt nach Neuladen', (await p.getAttribute('html', 'data-leiste')) === 'zu');
   await p.hover('.leiste-link[href="/statistik"]'); await p.waitForTimeout(300);
-  pruefe('Seitenleiste: Name erscheint beim Darüberfahren', await p.isVisible('.leiste-link[href="/statistik"] .leiste-text'));
+  // Die Sprechblase liegt fest im Fenster (.leiste-tipp), weil der mittlere Teil der Leiste scrollen kann
+  pruefe('Seitenleiste: Name erscheint beim Darüberfahren', await p.isVisible('.leiste-tipp') && (await p.textContent('.leiste-tipp')).includes('Statistik'));
   await p.click('.leiste-konto'); await p.waitForTimeout(200);
   pruefe('Konto-Menü mit Abmelden', await p.isVisible('.aufklapp-menue button:has-text("Abmelden")'));
   await p.keyboard.press('Escape');
@@ -303,8 +310,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
 
   // 15c. Datenbasis: Tabellen, Beziehungen, Vorschau, Verbindungen
   await p.goto(BASE + '/datenbasis'); await p.waitForTimeout(2000);
-  pruefe('Datenbasis: 16 Tabellen im Diagramm', (await p.$$eval('.er-tabelle', (z) => z.length)) === 16);
-  pruefe('Datenbasis: Beziehungslinien gezeichnet', (await p.$$eval('.er-linie', (z) => z.length)) === 23, await p.$$eval('.er-linie', (z) => z.length));
+  pruefe('Datenbasis: 17 Tabellen im Diagramm', (await p.$$eval('.er-tabelle', (z) => z.length)) === 17);
+  pruefe('Datenbasis: Beziehungslinien gezeichnet', (await p.$$eval('.er-linie', (z) => z.length)) === 26, await p.$$eval('.er-linie', (z) => z.length));
   pruefe('Datenbasis: 5 Views', (await p.$$eval('.er-view', (z) => z.length)) === 5);
   pruefe('Datenbasis: Verbindung zur Datenbank geprüft', (await p.textContent('.verbund-knoten[style*="db"]')).includes('verbunden'));
   pruefe('Datenbasis: einfach erklärt, ohne Power BI und Commit-Texte', (await p.$$eval('.verbund-knoten', (z) => z.length)) === 5
@@ -612,22 +619,32 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Wartung planen: Plan gespeichert, Fenster zu', Number(sql('SELECT count(*) FROM wartungsplan')) === plaeneVorher + 1 && (await p.$('.wartung-dialog')) === null
     && sql("SELECT intervall_tage FROM wartungsplan WHERE aufgabe = 'Testwartung Schmierung'") === '14');
   await p.screenshot({ path: SHOTS + 'r-wartung.png', fullPage: true });
+  await p.click('.wartung-schalter button:has-text("Zeitachse")'); await p.waitForTimeout(500);
+  pruefe('Wartung: Zeitachse mit Heute und Terminen', (await p.$('.achse-tag.heute')) !== null && (await p.$$eval('.achse-balken', (z) => z.length)) > 5);
+  await p.click('.achse-balken >> nth=0'); await p.waitForTimeout(300);
+  pruefe('Wartung: Klick in der Zeitachse zeigt die Termine des Tages', (await p.textContent('.wartung-liste h2')) !== 'Anstehend');
+  await p.click('.wartung-schalter button:has-text("Kalender")'); await p.waitForTimeout(300);
 
   // 19d. Maschinen-Seite: Wartungspläne, QR-Code, Ausfallkosten; QR-Etiketten einer Halle
   await p.goto(BASE + '/maschinen/5'); await p.waitForTimeout(1500);
   pruefe('Maschine: Wartungspläne wie in SQL', (await p.$$eval('.wartung-eintrag', (z) => z.length)) === Number(sql('SELECT count(*) FROM wartungsplan WHERE maschine_id = 5 AND aktiv')));
   pruefe('Maschine: QR-Code und Ausfallkosten', (await p.$('.qr-karte svg.qr-code path')) !== null && (await p.textContent('main')).includes('Ausfallkosten'));
   await p.goto(BASE + '/qr?werk=alb&halle=h1'); await p.waitForTimeout(800);
+  pruefe('QR-Etiketten: Anlagennummer und Anleitung', (await p.textContent('.qr-etikett .qr-nummer')).startsWith('ALB-H1-') && (await p.textContent('.qr-etikett .qr-schritte')).includes('Kamera öffnen'));
   pruefe('QR-Etiketten: eines je Maschine der Halle', (await p.$$eval('.qr-etikett', (z) => z.length)) === Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE st.kuerzel = 'ALB' AND g.kuerzel = 'H1'")));
 
-  // 19e. Lager: 3D-Regal mit einem Fach je Teil, Nachbestellen
-  await p.goto(BASE + '/lager'); await p.waitForSelector('.lager-3d[data-faecher]', { timeout: 30000 }).catch(() => {}); await p.waitForTimeout(1500);
-  pruefe('Lager: ein Fach je Ersatzteil, Kennzahl wie in SQL', Number(await p.getAttribute('.lager-3d[data-faecher]', 'data-faecher')) === Number(sql('SELECT count(*) FROM ersatzteil'))
-    && (await p.textContent('.kennzahl >> nth=1')).includes(sql('SELECT count(*) FROM ersatzteil WHERE bestand < mindestbestand')));
-  const ohneBestellung = sql("SELECT bezeichnung FROM ersatzteil e WHERE NOT EXISTS (SELECT 1 FROM bestellung b WHERE b.ersatzteil_id = e.id AND b.status = 'bestellt') ORDER BY bezeichnung LIMIT 1");
-  await p.click(`.lager-tabelle tr:has-text("${ohneBestellung}") button`); await p.waitForTimeout(300);
-  await Promise.all([p.waitForURL(/[/]lager[?]teil=/), p.click('.lager-nachbestellen button[type=submit]')]); await p.waitForTimeout(800);
-  pruefe('Lager: Nachbestellen legt eine Bestellung an', sql(`SELECT count(*) FROM bestellung b JOIN ersatzteil e ON e.id = b.ersatzteil_id WHERE e.bezeichnung = '${ohneBestellung}' AND b.status = 'bestellt'`) === '1'
+  // 19e. Lager je Werk: alle Werke, Regal eines Werks (ein Fach je Teil), Nachbestellen für das Werk
+  await p.goto(BASE + '/lager?werk=alle'); await p.waitForTimeout(800);
+  pruefe('Lager: Kachel je Werk', (await p.$$eval('.lager-werk', (z) => z.length)) === Number(sql('SELECT count(*) FROM standort')));
+  await p.click('.lager-werk:has-text("Stammwerk Albstadt")'); await p.waitForURL(/werk=1/); await p.waitForTimeout(1200);
+  pruefe('Lager: Regal mit einem Fach je Ersatzteil, Kennzahl wie in SQL', (await p.$$eval('.lager-fach', (z) => z.length)) === Number(sql('SELECT count(*) FROM ersatzteil'))
+    && (await p.textContent('.kennzahl >> nth=1')).includes(sql('SELECT count(*) FROM lagerbestand WHERE standort_id = 1 AND bestand < mindestbestand')));
+  pruefe('Lager: Fach zeigt Art, Lagerplatz und Bestand', (await p.textContent('.lager-fach >> nth=0')).includes('A-01') && (await p.$('.lager-fach .lager-fach-symbol i.bi')) !== null);
+  const ohneBestellung = sql("SELECT e.id FROM ersatzteil e WHERE NOT EXISTS (SELECT 1 FROM bestellung b WHERE b.ersatzteil_id = e.id AND b.standort_id = 1 AND b.status = 'bestellt') ORDER BY e.id LIMIT 1");
+  await p.click(`.lager-fach[data-teil="${ohneBestellung}"]`); await p.waitForTimeout(300);
+  pruefe('Lager: Details mit „In anderen Werken“', (await p.textContent('.lager-detail')).includes('In anderen Werken'));
+  await Promise.all([p.waitForURL(/[/]lager[?]werk=1&teil=/), p.click('.lager-nachbestellen button[type=submit]')]); await p.waitForTimeout(800);
+  pruefe('Lager: Nachbestellen legt eine Bestellung für dieses Werk an', sql(`SELECT count(*) FROM bestellung WHERE ersatzteil_id = ${ohneBestellung} AND standort_id = 1 AND status = 'bestellt'`) === '1'
     && (await p.textContent('.lager-detail')).includes('bestellt am'));
   await p.screenshot({ path: SHOTS + 'r-lager.png', fullPage: true });
 
@@ -635,6 +652,9 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.goto(BASE + '/monitor?werk=ham&halle=h2'); await p.waitForTimeout(1000);
   pruefe('Hallen-Monitor: Kachel je Maschine, Seitenleiste ausgeblendet', (await p.$$eval('.monitor-kachel', (z) => z.length)) === Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE st.kuerzel = 'HAM' AND g.kuerzel = 'H2'"))
     && !(await p.isVisible('.seitenleiste')));
+  await p.click('.monitor-schalter button:has-text("3D")'); await p.waitForSelector('.monitor-3d .explorer-kompakt', { timeout: 30000 }).catch(() => {});
+  pruefe('Hallen-Monitor: Umschalter auf 3D zeigt die Halle', (await p.$('.monitor-3d .explorer-kompakt')) !== null && (await p.evaluate(() => localStorage.getItem('monitoransicht'))) === '3d');
+  await p.click('.monitor-schalter button:has-text("2D")'); await p.waitForTimeout(300);
   await p.goto(BASE + '/'); await p.waitForTimeout(500);
   pruefe('Hallen-Monitor: Seitenleiste danach wieder da', await p.isVisible('.seitenleiste'));
 
