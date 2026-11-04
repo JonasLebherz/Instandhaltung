@@ -69,6 +69,7 @@ const BEREICHE = [
     titel: T('System'),
     seiten: [
       { pfad: '/datenbasis', text: T('Datenbasis'), symbol: 'bi-database', symbolAktiv: 'bi-database-fill' },
+      { pfad: '/spiel', text: T('Gabelstapler-Spiel'), symbol: 'bi-controller', symbolAktiv: 'bi-controller' },
     ],
   },
 ];
