@@ -291,6 +291,14 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.goto(BASE + '/statistik?von=2000-01-01&bis=2100-12-31'); await p.waitForTimeout(1200);
   await p.evaluate(() => { window.__ohneNeuladen = true; });
   pruefe('Statistik: 8 Länder im Vergleich', (await p.$$eval('.stat-kachel', (z) => z.length)) === 8);
+  // „i“-Knopf: Quelle (Tabellen) und Berechnung je Wert
+  pruefe('Statistik: „i“ an jeder Kennzahl, jedem Leistenwert und jedem Abschnitt', (await p.$$eval('.kennzahl .info-knopf', (z) => z.length)) === 4
+    && (await p.$$eval('.stat-leiste .info-knopf', (z) => z.length)) === 8 && (await p.$$eval('h2.abschnitt-titel .info-knopf', (z) => z.length)) >= 12);
+  await p.click('.kennzahl .info-knopf >> nth=0'); await p.waitForTimeout(300);
+  const infoText = await p.textContent('.info-fenster');
+  pruefe('Statistik: „i“ zeigt Tabellen und Berechnung der MTTR', infoText.includes('wartungsauftrag') && infoText.includes('Berechnung') && infoText.includes('ende_zeit − start_zeit'));
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  pruefe('Statistik: „i“-Fenster schließt mit Esc', (await p.$('.info-fenster')) === null);
   await p.click('.stat-kachel:has-text("Deutschland")'); await p.waitForTimeout(900);
   const deAnzahl = Number(sql("SELECT count(*) FROM stoermeldung s JOIN maschine m ON m.id=s.maschine_id JOIN gebaeude g ON g.id=m.gebaeude_id JOIN standort st ON st.id=g.standort_id WHERE st.land_kuerzel='DE'"));
   pruefe('Statistik: Zoom auf Deutschland (10 Werke, Anzahl, Adresse)', (await p.textContent('h1')) === 'Deutschland' && /land=de/.test(p.url())

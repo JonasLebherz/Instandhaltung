@@ -440,12 +440,14 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 /* „…“-Knopf je Eintrag – öffnet das Menü (Umbenennen, 2D/3D, Entfernen) */
 .favorit-mehr {
     position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
-    width: 26px; height: 26px; border: 0; border-radius: 8px; display: grid; place-items: center;
+    width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; display: grid; place-items: center;   /* padding 0: sonst schiebt der Standard-Innenabstand des Knopfs die Punkte nach rechts */
     background: transparent; color: var(--text-leise); font-size: .9rem; opacity: 0; transition: opacity .15s ease, background-color .15s ease;
 }
 .favorit:hover .favorit-mehr, .favorit:focus-within .favorit-mehr, .favorit.menue-offen .favorit-mehr { opacity: 1; }
 @media (hover: none) { .favorit-mehr { opacity: 1; } }
 .favorit-mehr:hover, .favorit.menue-offen .favorit-mehr { background: var(--karte-solid); color: var(--text); }
+/* Symbol genau mittig: Bootstrap-Icons sitzen sonst wegen vertical-align/line-height etwas zu tief */
+.favorit-mehr .bi, .favorit-mehr .bi::before { display: block; line-height: 1; vertical-align: 0; }
 /* Menü liegt fest im Fenster (position: fixed, Lage aus dem Knopf) – so schneidet die Leiste nichts ab */
 .aufklapp-menue.favorit-menue { position: fixed; right: auto; bottom: auto; z-index: 1100; min-width: 220px; background: var(--karte-solid); transform-origin: top left; }
 .favorit-menue .menue-titel { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -724,12 +726,11 @@ a.karte:hover {
    darunter die Zahl. Farbe nur, wenn sie etwas bedeutet (Warnung, unter Mindestbestand …). */
 .kennzahl-kopf {
     display: flex;
-    flex-direction: row-reverse;
-    justify-content: flex-end;
     align-items: baseline;
     gap: 7px;
     margin-bottom: 8px;
 }
+.kennzahl-info { margin-left: auto; align-self: flex-start; }
 .kennzahl-label {
     color: var(--text-leise);
     font-size: .9rem;
@@ -759,6 +760,38 @@ a.karte:hover {
 .kennzahl-warnung .kennzahl-wert, .kennzahl-warnung .kennzahl-symbol { color: var(--orange); }
 .kennzahl-rot .kennzahl-symbol { color: var(--rot); }
 .kennzahl-gruen .kennzahl-symbol { color: var(--gruen); }
+
+/* ---------- „i“-Knopf: Quelle und Berechnung eines Werts (components/InfoKnopf.js) ---------- */
+.info-knopf {
+    display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; margin-left: 6px; vertical-align: 2px;
+    border: 1px solid var(--feld-rand); border-radius: 50%; background: transparent; color: var(--text-leise);
+    font-size: .95rem; line-height: 1; cursor: pointer; transition: color var(--uebergang), border-color var(--uebergang), background-color var(--uebergang);
+}
+.info-knopf .bi, .info-knopf .bi::before { display: block; line-height: 1; vertical-align: 0; }
+.info-knopf:hover, .info-knopf.offen { color: var(--akzent); border-color: var(--akzent); background: var(--akzent-zart); }
+/* größere Trefferfläche ohne größeres Symbol; negative Ränder: der Knopf macht die Textzeile nicht höher */
+.info-knopf { position: relative; margin-block: -4px; }
+.info-knopf::after { content: ""; position: absolute; inset: -8px; }
+.abschnitt-titel .info-knopf { vertical-align: 3px; }
+.info-fenster {
+    position: fixed; z-index: 1200; padding: 14px 16px; border-radius: 14px;
+    background: var(--karte-erhoeht); backdrop-filter: var(--glas-unschaerfe); -webkit-backdrop-filter: var(--glas-unschaerfe);
+    border: 1px solid var(--glas-rand); box-shadow: var(--glas-kante), var(--schatten-hover);
+    font-size: .85rem; color: var(--text); animation: aufklappen .16s var(--weich);
+}
+.info-titel { font-weight: 650; font-size: .95rem; margin-bottom: 10px; }
+.info-abschnitt + .info-abschnitt { margin-top: 10px; }
+.info-label { display: block; font-size: .75rem; font-weight: 650; color: var(--text-leise); margin-bottom: 4px; }
+.info-tabellen { display: flex; flex-wrap: wrap; gap: 4px; }
+.info-tabellen code, .info-formel {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .75rem; color: var(--text);
+    background: var(--fuellung); border-radius: 6px;
+}
+.info-tabellen code { padding: 2px 7px; }
+.info-abschnitt p { margin: 0; line-height: 1.45; }
+.info-formel { margin: 6px 0 0; padding: 6px 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.info-grundlage { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--linie); font-size: .75rem; color: var(--text-leise); line-height: 1.4; }
+.info-link { display: inline-block; margin-top: 8px; font-size: .8rem; font-weight: 600; }
 
 /* ---------- Status-Pills ---------- */
 

@@ -29,6 +29,8 @@ import { datum, datumZeit, zahl, euro } from '@/lib/format';
 import { URSACHEN_LISTE, MASCHINEN_SYMBOLE, PRIORITAET_LISTE } from '@/lib/konstanten';
 import Diagramm from './Diagramm';
 import ExportKnopf from '@/components/ExportKnopf';
+import InfoKnopf from '@/components/InfoKnopf';
+import { STATISTIK_INFO, STATISTIK_GRUNDLAGE } from '@/lib/statistikInfo';
 
 // Schichten nach Uhrzeit der Meldung (deutsche Zeit)
 const SCHICHTEN = [
@@ -267,6 +269,8 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
   /* ---------- Anzeige ---------- */
   const k = a.kennzahlen;
   const s = t.sprache;
+  // „i“-Knopf: Quelle (Tabellen) und Berechnung des Werts (Texte in lib/statistikInfo.js)
+  const info = (schluessel, titel) => <InfoKnopf titel={titel} info={STATISTIK_INFO[schluessel]} grundlage={STATISTIK_GRUNDLAGE} />;
   const stunden = (min) => (min === null ? null : min / 60);
   const zeitraumTage = (new Date(zeitraum.bisVor) - new Date(zeitraum.ab)) / 86400000;
   const titel = maschine?.bezeichnung ?? halle?.bezeichnung ?? standort?.name ?? (land ? t(land.name) : t('Statistik'));
@@ -355,18 +359,18 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           <div className="row g-4 mb-2">
             <div className="col-6 col-lg-3">
               <Kennzahl titel={t('MTTR')} wert={stunden(k.mttr_min)} nachkomma={1} einheit="h"
-                        zusatz={t('Ø Reparaturdauer')} symbol="bi-stopwatch" i={1} />
+                        zusatz={t('Ø Reparaturdauer')} symbol="bi-stopwatch" i={1} info={info('mttr', t('MTTR'))} />
             </div>
             <div className="col-6 col-lg-3">
               <Kennzahl titel={t('Ausfallzeit')} wert={Math.round(k.ausfall_min / 60)} einheit="h"
-                        zusatz={t('≈ {betrag} Ausfallkosten', { betrag: euro(a.ausfallkosten, s) })} symbol="bi-hourglass-split" art="warnung" i={2} />
+                        zusatz={t('≈ {betrag} Ausfallkosten', { betrag: euro(a.ausfallkosten, s) })} symbol="bi-hourglass-split" art="warnung" i={2} info={info('ausfallzeit', t('Ausfallzeit'))} />
             </div>
             <div className="col-6 col-lg-3">
-              <Kennzahl titel={t('Störungen')} wert={k.anzahl} zusatz={t('im Zeitraum gemeldet')} symbol="bi-activity" i={3} />
+              <Kennzahl titel={t('Störungen')} wert={k.anzahl} zusatz={t('im Zeitraum gemeldet')} symbol="bi-activity" i={3} info={info('stoerungen', t('Störungen'))} />
             </div>
             <div className="col-6 col-lg-3">
               <Kennzahl titel={t('Davon offen')} wert={k.offen} zusatz={t('noch nicht erledigt')} symbol="bi-hourglass"
-                        art={k.offen > 0 ? 'rot' : 'gruen'} i={4} />
+                        art={k.offen > 0 ? 'rot' : 'gruen'} i={4} info={info('offen', t('Davon offen'))} />
             </div>
           </div>
 
@@ -375,41 +379,41 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             {stufe === 'maschine' ? (
               <div>
                 <strong>{k.anzahl ? zahl(zeitraumTage / k.anzahl, 1, s) : '–'}</strong>
-                <span>{t('Ø Tage zwischen Störungen (MTBF)')}</span>
+                <span>{t('Ø Tage zwischen Störungen (MTBF)')}{info('mtbf', t('Ø Tage zwischen Störungen (MTBF)'))}</span>
               </div>
             ) : (
               <div>
                 <strong>{zahl(a.maschinenAnzahl ? k.anzahl / a.maschinenAnzahl : 0, 1, s)}</strong>
-                <span>{t('Störungen je Maschine ({n} Maschinen)', { n: a.maschinenAnzahl })}</span>
+                <span>{t('Störungen je Maschine ({n} Maschinen)', { n: a.maschinenAnzahl })}{info('jeMaschine', t('Störungen je Maschine ({n} Maschinen)', { n: a.maschinenAnzahl }))}</span>
               </div>
             )}
             <div>
               <strong>{k.erledigt ? `${zahl(k.ausfall_min / k.erledigt / 60, 1, s)} h` : '–'}</strong>
-              <span>{t('Ø Ausfall je Störung')}</span>
+              <span>{t('Ø Ausfall je Störung')}{info('ausfallJeStoerung', t('Ø Ausfall je Störung'))}</span>
             </div>
             <div>
               <strong>{zahl(anteil(k.hoch, k.anzahl), 0, s)} %</strong>
-              <span>{t('Anteil Priorität hoch')}</span>
+              <span>{t('Anteil Priorität hoch')}{info('anteilHoch', t('Anteil Priorität hoch'))}</span>
             </div>
             <div>
               <strong>{zahl(anteil(k.erledigt, k.anzahl), 0, s)} %</strong>
-              <span>{t('Erledigungsquote')}</span>
+              <span>{t('Erledigungsquote')}{info('erledigungsquote', t('Erledigungsquote'))}</span>
             </div>
             <div>
               <strong>{a.maschinenAnzahl ? `${zahl(Math.max(0, 100 - anteil(k.ausfall_min, a.maschinenAnzahl * zeitraumTage * 1440)), 2, s)} %` : '–'}</strong>
-              <span>{t('Verfügbarkeit (ohne Ausfall)')}</span>
+              <span>{t('Verfügbarkeit (ohne Ausfall)')}{info('verfuegbarkeit', t('Verfügbarkeit (ohne Ausfall)'))}</span>
             </div>
             <div>
               <strong>{a.reaktionGesamt === null ? '–' : `${zahl(a.reaktionGesamt / 60, 1, s)} h`}</strong>
-              <span>{t('Ø Reaktionszeit bis Arbeitsbeginn')}</span>
+              <span>{t('Ø Reaktionszeit bis Arbeitsbeginn')}{info('reaktion', t('Ø Reaktionszeit bis Arbeitsbeginn'))}</span>
             </div>
             <div>
               <strong>{zahl(anteil(a.wiederholt, k.anzahl), 0, s)} %</strong>
-              <span>{t('Wiederholungen (≤ 7 Tage an derselben Maschine)')}</span>
+              <span>{t('Wiederholungen (≤ 7 Tage an derselben Maschine)')}{info('wiederholung', t('Wiederholungen (≤ 7 Tage an derselben Maschine)'))}</span>
             </div>
             <div>
               <strong>{zahl(k.anzahl / Math.max(1, zeitraumTage / 7), 1, s)}</strong>
-              <span>{t('Störungen pro Woche')}</span>
+              <span>{t('Störungen pro Woche')}{info('proWoche', t('Störungen pro Woche'))}</span>
             </div>
           </section>
 
@@ -417,7 +421,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           {stufe !== 'maschine' ? (
             <section className="karte" style={{ '--i': 6 }}>
               <div className="karte-kopf">
-                <h2 className="abschnitt-titel">{kinderTitel}</h2>
+                <h2 className="abschnitt-titel">{kinderTitel}{info('vergleich', kinderTitel)}</h2>
                 <span className="klein">{t('Anklicken zum Hineinzoomen · sortiert nach Ausfallzeit')}</span>
               </div>
               <div className="stat-kacheln">
@@ -449,7 +453,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           ) : (
             <section className="karte" style={{ '--i': 6 }}>
               <div className="karte-kopf">
-                <h2 className="abschnitt-titel">{t('Störungen dieser Maschine')}</h2>
+                <h2 className="abschnitt-titel">{t('Störungen dieser Maschine')}{info('maschinenListe', t('Störungen dieser Maschine'))}</h2>
                 <span className="d-flex gap-3">
                   <Link href={`/maschinen/${maschine.id}`}>{t('Maschinenhistorie')}</Link>
                   <Link href={`/melden?maschine=${maschine.id}`}>{t('Störung melden')}</Link>
@@ -480,14 +484,14 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           <div className="row g-4">
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 7 }}>
-                <h2 className="abschnitt-titel">{t('Störungen pro Monat')}</h2>
+                <h2 className="abschnitt-titel">{t('Störungen pro Monat')}{info('proMonat', t('Störungen pro Monat'))}</h2>
                 <Diagramm titel={t('Störungen pro Monat')} art="saeulen" labels={a.proMonat.map((m) => m.label)} werte={a.proMonat.map((m) => m.anzahl)}
                           einheit={t('Störungen')} spalte={t('Monat')} beschreibung={t('Säulendiagramm: Anzahl der Störungen pro Monat')} />
               </section>
             </div>
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 8 }}>
-                <h2 className="abschnitt-titel">{t('MTTR pro Monat')}</h2>
+                <h2 className="abschnitt-titel">{t('MTTR pro Monat')}{info('mttrMonat', t('MTTR pro Monat'))}</h2>
                 <Diagramm titel={t('MTTR pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.proMonat.map((m) => (m.mttr === null ? null : m.mttr / 60))}
                           einheit="h" nachkomma={1} spalte={t('Monat')} beschreibung={t('Liniendiagramm: durchschnittliche Reparaturdauer pro Monat in Stunden')} />
               </section>
@@ -496,7 +500,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
 
           {/* Ursachen */}
           <section className="karte" style={{ '--i': 9 }}>
-            <h2 className="abschnitt-titel">{t('Störursachen')}</h2>
+            <h2 className="abschnitt-titel">{t('Störursachen')}{info('ursachen', t('Störursachen'))}</h2>
             <Diagramm titel={t('Störursachen')} art="balken" labels={a.ursachen.map((u) => t(u.ursache))} werte={a.ursachen.map((u) => u.anzahl)} hoehe={260}
                       einheit={t('Störungen')} spalte={t('Ursache')} beschreibung={t('Balkendiagramm: Störungen nach Ursache')} />
           </section>
@@ -505,7 +509,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           <div className="row g-4">
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 11 }}>
-                <h2 className="abschnitt-titel">{t('Prioritäten')}</h2>
+                <h2 className="abschnitt-titel">{t('Prioritäten')}{info('prioritaeten', t('Prioritäten'))}</h2>
                 <div className="karte-export">
                   <ExportKnopf titel={t('Prioritäten')} daten={() => ({
                     spalten: [t('Priorität'), t('Anzahl'), t('Anteil (%)')],
@@ -531,7 +535,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             </div>
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 12 }}>
-                <h2 className="abschnitt-titel">{t('Störungen nach Schicht')}</h2>
+                <h2 className="abschnitt-titel">{t('Störungen nach Schicht')}{info('schichten', t('Störungen nach Schicht'))}</h2>
                 <BalkenListe titel={t('Störungen nach Schicht')} zeilen={a.schichten.map((sch) => ({
                   name: t(sch.name), zusatz: t('{zeit} Uhr', { zeit: sch.zeit }), wert: sch.anzahl,
                   text: `${sch.anzahl} · ${zahl(anteil(sch.anzahl, k.anzahl), 0, s)} %`,
@@ -544,14 +548,14 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           <div className="row g-4">
             <div className="col-lg-7">
               <section className="karte" style={{ '--i': 13 }}>
-                <h2 className="abschnitt-titel">{t('Verfügbarkeit pro Monat')}</h2>
+                <h2 className="abschnitt-titel">{t('Verfügbarkeit pro Monat')}{info('verfuegbarkeitMonat', t('Verfügbarkeit pro Monat'))}</h2>
                 <Diagramm titel={t('Verfügbarkeit pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.verfuegbarkeit} einheit="%" nachkomma={2} abNull={false}
                           spalte={t('Monat')} beschreibung={t('Liniendiagramm: Anteil der Zeit ohne Ausfall pro Monat in Prozent')} />
               </section>
             </div>
             <div className="col-lg-5">
               <section className="karte" style={{ '--i': 14 }}>
-                <h2 className="abschnitt-titel">{t('Reaktionszeit nach Priorität')}</h2>
+                <h2 className="abschnitt-titel">{t('Reaktionszeit nach Priorität')}{info('reaktionPrio', t('Reaktionszeit nach Priorität'))}</h2>
                 <p className="klein text-leise">{t('Ø Zeit von der Meldung bis zum Arbeitsbeginn')}</p>
                 <BalkenListe titel={t('Reaktionszeit nach Priorität')} zeilen={a.reaktion.filter((r) => r.anzahl > 0).map((r) => ({
                   name: gross(t(r.prioritaet)), zusatz: t('{n} Aufträge', { n: r.anzahl }), wert: r.min ?? 0,
@@ -566,7 +570,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             <div className="row g-4">
               <div className="col-lg-6">
                 <section className="karte" style={{ '--i': 15 }}>
-                  <h2 className="abschnitt-titel">{t('Größte Zeitfresser (Pareto)')}</h2>
+                  <h2 className="abschnitt-titel">{t('Größte Zeitfresser (Pareto)')}{info('pareto', t('Größte Zeitfresser (Pareto)'))}</h2>
                   <p className="klein text-leise">{t('Maschinen mit der meisten Ausfallzeit – rechts der Anteil an der gesamten Ausfallzeit (kumuliert)')}</p>
                   {a.pareto.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
                     <BalkenListe titel={t('Größte Zeitfresser (Pareto)')} zeilen={a.pareto.map((z) => ({
@@ -578,7 +582,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
               </div>
               <div className="col-lg-6">
                 <section className="karte" style={{ '--i': 16 }}>
-                  <h2 className="abschnitt-titel">{t('Ausfallzeit nach Maschinentyp')}</h2>
+                  <h2 className="abschnitt-titel">{t('Ausfallzeit nach Maschinentyp')}{info('ausfallTyp', t('Ausfallzeit nach Maschinentyp'))}</h2>
                   {a.ausfallTyp.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
                     <BalkenListe titel={t('Ausfallzeit nach Maschinentyp')} zeilen={a.ausfallTyp.map((x) => ({ name: t(x.typ), wert: x.h, text: `${zahl(x.h, 0, s)} h` }))} />
                   )}
@@ -591,7 +595,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           <div className="row g-4">
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 17 }}>
-                <h2 className="abschnitt-titel">{t('Offene Aufträge nach Alter')}</h2>
+                <h2 className="abschnitt-titel">{t('Offene Aufträge nach Alter')}{info('alter', t('Offene Aufträge nach Alter'))}</h2>
                 <p className="klein text-leise">{t('Wie lange warten die noch offenen Störungen schon?')}</p>
                 {k.offen === 0 ? <p className="leer"><i className="bi bi-check-circle" />{t('Keine offenen Aufträge.')}</p> : (
                   <BalkenListe titel={t('Offene Aufträge nach Alter')} zeilen={a.alter.map((st) => ({ name: t(st.name), wert: st.anzahl, text: String(st.anzahl) }))} />
@@ -601,7 +605,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             {stufe !== 'maschine' && (
               <div className="col-lg-6">
                 <section className="karte" style={{ '--i': 18 }}>
-                  <h2 className="abschnitt-titel">{t('Störungen nach Maschinenalter')}</h2>
+                  <h2 className="abschnitt-titel">{t('Störungen nach Maschinenalter')}{info('maschinenalter', t('Störungen nach Maschinenalter'))}</h2>
                   <p className="klein text-leise">{t('Ø Störungen je Maschine im Zeitraum, nach Baujahr gruppiert')}</p>
                   <BalkenListe titel={t('Störungen nach Maschinenalter')} zeilen={a.nachAlter.map((st) => ({
                     name: t(st.name), zusatz: t('{n} Maschinen', { n: st.maschinen }), wert: st.jeMaschine, text: zahl(st.jeMaschine, 1, s),
@@ -615,7 +619,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           <div className="row g-4">
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 19 }}>
-                <h2 className="abschnitt-titel">{t('Techniker')}</h2>
+                <h2 className="abschnitt-titel">{t('Techniker')}{info('techniker', t('Techniker'))}</h2>
                 <div className="karte-export">
                   <ExportKnopf titel={t('Techniker')} daten={() => ({
                     spalten: [t('Techniker'), t('Qualifikation'), t('Aufträge'), t('Erledigt'), 'MTTR (h)'],
@@ -652,7 +656,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             </div>
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 20 }}>
-                <h2 className="abschnitt-titel">{t('Verbaute Ersatzteile')}</h2>
+                <h2 className="abschnitt-titel">{t('Verbaute Ersatzteile')}{info('ersatzteile', t('Verbaute Ersatzteile'))}</h2>
                 {a.ersatzteile.length === 0 ? (
                   <p className="leer">{t('Keine Ersatzteile im Zeitraum gebucht.')}</p>
                 ) : (
