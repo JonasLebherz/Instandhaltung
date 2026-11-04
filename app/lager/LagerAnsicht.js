@@ -4,13 +4,18 @@
  *
  *  - Kopf: Auswahl Land/Werk (gruppiert nach Land, oben „Alle Werke“) – wechselt die Adresse ?werk=.
  *  - Alle Werke: Kachel je Werk (unter Mindestbestand, knapp, bestellt), gruppiert nach Land.
- *  - Ein Werk: Kennzahlen und das Regal als Fächer (Regal A–D, Fach 01–05). Jedes Fach zeigt Symbol der
- *    Teile-Art, Name, Lagerplatz, Bestand/Mindestbestand und einen Füllbalken in Zustandsfarbe (lib/lager.js).
+ *  - Ein Werk: Kennzahlen und das Regal, wahlweise
+ *      3D: echtes Regal von vorn, jedes Teil als 3D-Modell, fehlende Stücke rot durchsichtig
+ *          (components/karten/raum/LagerRegal3D.js, nur im Browser und bei Bedarf geladen) oder
+ *      Liste: Fächer als Kacheln (Regal A–D, Fach 01–05) mit Symbol der Teile-Art, Name, Lagerplatz,
+ *          Bestand/Mindestbestand und Füllbalken in Zustandsfarbe (lib/lager.js).
+ *    Wahl in localStorage "lageransicht"; ohne Wahl 3D ab 768 px Breite, wenn der Browser WebGL kann.
  *    Klick auf ein Fach: rechts Details mit Verbrauch, „Reicht noch“, Bestellung bzw. Nachbestellen und
  *    „In anderen Werken“ (wo das Teil sonst noch liegt – z. B. zum Umlagern).
  */
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/components/SpracheKontext';
 import Auswahl from '@/components/Auswahl';
@@ -21,6 +26,17 @@ import { T } from '@/lib/sprache';
 import { lieferungBuchen, teilNachbestellen } from '@/app/aktionen';
 import { lagerZustand, teilArt } from '@/lib/lager';
 
+// 3D-Regal nur im Browser laden (three.js ist groß); Platzhalter in Regalfarbe, bis es da ist
+const LagerRegal3D = dynamic(() => import('@/components/karten/raum/LagerRegal3D'), { ssr: false, loading: () => <div className="regal3d" style={{ aspectRatio: '1.8 / 1' }} /> });
+
+/** Kann der Browser WebGL (3D)? */
+function webglVorhanden() {
+  try {
+    const c = document.createElement('canvas');
+    return Boolean(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch { return false; }
+}
+
 const ZUSTAND_TEXT = { rot: T('Unter Mindestbestand'), orange: T('Knapp'), gruen: T('Ausreichend') };
 
 export default function LagerAnsicht({ werke, werk, teile, verteilung, start, darf }) {
@@ -28,6 +44,20 @@ export default function LagerAnsicht({ werke, werk, teile, verteilung, start, da
   const router = useRouter();
   const [gewaehlt, setGewaehlt] = useState(start ?? teile.find((x) => lagerZustand(x) === 'rot')?.id ?? teile[0]?.id ?? null);
   const [suche, setSuche] = useState('');
+  // Ansicht des Regals: null = noch nicht entschieden (erst im Browser bekannt), '3d' oder 'liste'
+  const [ansicht, setAnsicht] = useState(null);
+  const [webgl, setWebgl] = useState(false);
+  useEffect(() => {
+    const kann = webglVorhanden();
+    setWebgl(kann);
+    let gemerkt = null;
+    try { gemerkt = localStorage.getItem('lageransicht'); } catch { /* privat */ }
+    setAnsicht(kann && (gemerkt === '3d' || (!gemerkt && window.innerWidth >= 768)) ? '3d' : 'liste');
+  }, []);
+  function ansichtWaehlen(neu) {
+    setAnsicht(neu);
+    try { localStorage.setItem('lageransicht', neu); } catch { /* privat */ }
+  }
 
   // Auswahl: „Alle Werke“ und je Land die Werke
   const optionen = useMemo(() => {
@@ -84,6 +114,7 @@ export default function LagerAnsicht({ werke, werk, teile, verteilung, start, da
   const sichtbar = teile.filter((x) => !suche || x.bezeichnung.toLowerCase().includes(suche.toLowerCase()) || (x.lagerplatz ?? '').toLowerCase().includes(suche.toLowerCase()));
   // Regale nach dem Buchstaben des Lagerplatzes (A-03 → Regal A); Teile ohne Platz in „Ohne Lagerplatz“
   const regale = [...new Set(sichtbar.map((x) => x.lagerplatz?.split('-')[0] ?? '–'))];
+  const treffer = suche ? new Set(sichtbar.map((x) => x.id)) : null;
   const unter = teile.filter((x) => lagerZustand(x) === 'rot').length;
   const anderswo = teil ? verteilung.filter((v) => v.teil === teil.id && v.werk !== werk.id).slice(0, 5) : [];
   const vorschlag = teil ? Math.max(1, teil.mindestbestand * 2 - teil.bestand) : 1;
@@ -103,16 +134,27 @@ export default function LagerAnsicht({ werke, werk, teile, verteilung, start, da
           <section className="karte" style={{ '--i': 4 }}>
             <div className="karte-kopf flex-wrap">
               <h2 className="abschnitt-titel mb-0">{t('Regal')}</h2>
-              <input type="search" className="form-control lager-suche" value={suche} onChange={(e) => setSuche(e.target.value)}
-                     placeholder={t('Teil oder Lagerplatz suchen …')} aria-label={t('Teil suchen')} />
+              <div className="lager-werkzeuge">
+                {webgl && (
+                  <div className="sprach-schalter lager-schalter" role="group" aria-label={t('Ansicht')}>
+                    <button type="button" aria-pressed={ansicht === '3d'} onClick={() => ansichtWaehlen('3d')}><i className="bi bi-box" aria-hidden="true" /> 3D</button>
+                    <button type="button" aria-pressed={ansicht === 'liste'} onClick={() => ansichtWaehlen('liste')}><i className="bi bi-grid-3x3-gap" aria-hidden="true" /> {t('Liste')}</button>
+                  </div>
+                )}
+                <input type="search" className="form-control lager-suche" value={suche} onChange={(e) => setSuche(e.target.value)}
+                       placeholder={t('Teil oder Lagerplatz suchen …')} aria-label={t('Teil suchen')} />
+              </div>
             </div>
             <div className="lager-legende klein mb-3">
               <span><i className="kal-punkt ueberfaellig" />{t('unter Mindestbestand')}</span>
               <span><i className="kal-punkt faellig" />{t('knapp')}</span>
               <span><i className="kal-punkt erledigt" />{t('ausreichend')}</span>
+              {ansicht === '3d' && <span><i className="geist-muster" />{t('fehlt bis zum Mindestbestand')}</span>}
               <span><i className="bi bi-truck" aria-hidden="true" /> {t('bestellt')}</span>
             </div>
-            {regale.map((regal) => (
+            {ansicht === null && <div className="regal3d" style={{ aspectRatio: '1.8 / 1' }} />}
+            {ansicht === '3d' && <LagerRegal3D teile={teile} gewaehlt={gewaehlt} onWaehle={setGewaehlt} treffer={treffer} />}
+            {ansicht === 'liste' && regale.map((regal) => (
               <div key={regal} className="lager-regal">
                 <div className="lager-regal-titel">{regal === '–' ? t('Ohne Lagerplatz') : t('Regal {r}', { r: regal })}</div>
                 <div className="lager-faecher">
@@ -138,7 +180,7 @@ export default function LagerAnsicht({ werke, werk, teile, verteilung, start, da
                 </div>
               </div>
             ))}
-            {sichtbar.length === 0 && <p className="leer">{t('Kein Teil gefunden.')}</p>}
+            {ansicht !== '3d' && sichtbar.length === 0 && <p className="leer">{t('Kein Teil gefunden.')}</p>}
           </section>
         </div>
 

@@ -637,10 +637,21 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.goto(BASE + '/lager?werk=alle'); await p.waitForTimeout(800);
   pruefe('Lager: Kachel je Werk', (await p.$$eval('.lager-werk', (z) => z.length)) === Number(sql('SELECT count(*) FROM standort')));
   await p.click('.lager-werk:has-text("Stammwerk Albstadt")'); await p.waitForURL(/werk=1/); await p.waitForTimeout(1200);
-  pruefe('Lager: Regal mit einem Fach je Ersatzteil, Kennzahl wie in SQL', (await p.$$eval('.lager-fach', (z) => z.length)) === Number(sql('SELECT count(*) FROM ersatzteil'))
+  // Standard am PC: 3D-Regal von vorn – ein Knopf je Fach, leeres Fach mit „Fehlt“
+  await p.waitForSelector('.regal3d.fertig', { timeout: 20000 }).catch(() => {});
+  pruefe('Lager 3D: Regal mit einem Fach je Ersatzteil, Kennzahl wie in SQL', (await p.$$eval('.regal3d-fach', (z) => z.length)) === Number(sql('SELECT count(*) FROM ersatzteil'))
     && (await p.textContent('.kennzahl >> nth=1')).includes(sql('SELECT count(*) FROM lagerbestand WHERE standort_id = 1 AND bestand < mindestbestand')));
-  pruefe('Lager: Fach zeigt Art, Lagerplatz und Bestand', (await p.textContent('.lager-fach >> nth=0')).includes('A-01') && (await p.$('.lager-fach .lager-fach-symbol i.bi')) !== null);
+  const leeresTeil = sql('SELECT ersatzteil_id FROM lagerbestand WHERE standort_id = 1 AND bestand = 0 ORDER BY ersatzteil_id LIMIT 1');
+  pruefe('Lager 3D: leeres Fach zeigt „Fehlt“, Schild mit Lagerplatz', !leeresTeil || (await p.textContent(`.regal3d-fach[data-teil="${leeresTeil}"]`)).includes('Fehlt')
+    && (await p.textContent('.regal3d-fach >> nth=0')).includes('A-01'));
   const ohneBestellung = sql("SELECT e.id FROM ersatzteil e WHERE NOT EXISTS (SELECT 1 FROM bestellung b WHERE b.ersatzteil_id = e.id AND b.standort_id = 1 AND b.status = 'bestellt') ORDER BY e.id LIMIT 1");
+  await p.click(`.regal3d-fach[data-teil="${ohneBestellung}"]`); await p.waitForTimeout(300);
+  pruefe('Lager 3D: Klick auf ein Fach wählt das Teil', (await p.getAttribute(`.regal3d-fach[data-teil="${ohneBestellung}"]`, 'aria-pressed')) === 'true'
+    && (await p.textContent('.lager-detail h2')) === sql(`SELECT bezeichnung FROM ersatzteil WHERE id = ${ohneBestellung}`));
+  // Umschalten auf die Liste (Fächer als Kacheln)
+  await p.click('.lager-schalter button:has-text("Liste")'); await p.waitForTimeout(300);
+  pruefe('Lager Liste: ein Fach je Ersatzteil mit Art, Lagerplatz und Bestand', (await p.$$eval('.lager-fach', (z) => z.length)) === Number(sql('SELECT count(*) FROM ersatzteil'))
+    && (await p.textContent('.lager-fach >> nth=0')).includes('A-01') && (await p.$('.lager-fach .lager-fach-symbol i.bi')) !== null);
   await p.click(`.lager-fach[data-teil="${ohneBestellung}"]`); await p.waitForTimeout(300);
   pruefe('Lager: Details mit „In anderen Werken“', (await p.textContent('.lager-detail')).includes('In anderen Werken'));
   await Promise.all([p.waitForURL(/[/]lager[?]werk=1&teil=/), p.click('.lager-nachbestellen button[type=submit]')]); await p.waitForTimeout(800);

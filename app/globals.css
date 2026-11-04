@@ -90,6 +90,8 @@
     --raum-person-0: #ff9f0a; --raum-person-1: #0071e3; --raum-person-2: #2e9b4a; --raum-haut: #e8c2a2;
     --raum-ampel-rot: #ff3b30; --raum-ampel-orange: #ff9500; --raum-ampel-gruen: #34c759; --raum-licht: #ffd58a;
     --raum-himmel-tag: #dfe8f0; --raum-himmel-daemmerung: #f0cfae; --raum-himmel-nacht: #1a2232;
+    /* Lagerregal (LagerRegal3D): blaue Pfosten, orange Träger, verzinkte Böden, Hallenwand dahinter */
+    --raum-regal-stuetze: #2f5d8a; --raum-regal-traeger: #e0782a; --raum-regal-boden: #c4c9cf; --raum-regal-wand: #e9ebee;
     color-scheme: light;
 }
 
@@ -148,6 +150,7 @@
     --raum-person-0: #ff9f0a; --raum-person-1: #2997ff; --raum-person-2: #30d158; --raum-haut: #ba9b82;
     --raum-ampel-rot: #ff453a; --raum-ampel-orange: #ff9f0a; --raum-ampel-gruen: #30d158; --raum-licht: #ffcf7a;
     --raum-himmel-tag: #4a5868; --raum-himmel-daemmerung: #5a4a4a; --raum-himmel-nacht: #121826;
+    --raum-regal-stuetze: #264b6f; --raum-regal-traeger: #b46022; --raum-regal-boden: #9da1a6; --raum-regal-wand: #babcbf;
     color-scheme: dark;
 }
 
@@ -2588,7 +2591,50 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .lager-werkwahl { min-width: 240px; }
 .lager-legende { display: flex; gap: 14px; flex-wrap: wrap; }
 .lager-legende span { display: inline-flex; align-items: center; gap: 6px; }
+.lager-werkzeuge { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .lager-suche { max-width: 260px; }
+/* 3D-Regal von vorn (components/karten/raum/LagerRegal3D.js): Knöpfe über der Zeichenfläche */
+.regal3d { position: relative; width: 100%; min-height: 240px; border-radius: 14px; overflow: hidden; background: var(--raum-regal-wand); }
+.regal3d canvas { touch-action: pan-y; }
+.regal3d-titel {
+    position: absolute; transform: translate(-50%, calc(-100% - 6px)); padding: 2px 10px; border-radius: 6px;
+    background: var(--logo-unten); color: var(--logo-zeichen); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; pointer-events: none;
+}
+.regal3d-fach {
+    position: absolute; padding: 0; border: 0; background: transparent; border-radius: 8px; cursor: pointer;
+    transition: background-color var(--uebergang), box-shadow var(--uebergang), opacity var(--uebergang);
+}
+.regal3d-fach:hover { background: color-mix(in srgb, var(--qr-hell) 16%, transparent); }
+.regal3d-fach:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--akzent); }
+.regal3d-fach.gewaehlt { box-shadow: inset 0 0 0 2px var(--akzent), 0 0 0 3px var(--akzent-ring); background: color-mix(in srgb, var(--qr-hell) 10%, transparent); }
+/* Suche: nicht passende Fächer mit einem Schleier abdecken */
+.regal3d-fach.gedimmt { background: color-mix(in srgb, var(--raum-regal-wand) 72%, transparent); }
+/* Schild am Träger: Lagerplatz, Bestand/Mindestbestand – Farbe nach Zustand. Beim Darüberfahren bzw. am
+   gewählten Fach klappt der Name auf (darf über das Fach hinausragen, liegt dann über den Nachbarn). */
+.r3-schild {
+    position: absolute; left: 6%; bottom: 0; height: var(--balken); display: inline-flex; align-items: center; gap: 6px;
+    padding: 0 6px; border-radius: 3px; background: var(--qr-hell); color: var(--qr-dunkel); border-left: 4px solid var(--gruen);
+    font-size: .68rem; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+}
+.r3-schild b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; }
+.r3-schild .bi { color: var(--orange); }
+.r3-name { display: none; font-weight: 600; }
+.regal3d-fach:hover .r3-name, .regal3d-fach:focus-visible .r3-name, .regal3d-fach.gewaehlt .r3-name { display: inline; }
+.regal3d:has(.regal3d-fach:hover) .regal3d-fach.gewaehlt:not(:hover) .r3-name { display: none; }
+.regal3d-fach.zustand-orange .r3-schild { border-left-color: var(--orange); }
+.regal3d-fach.zustand-rot .r3-schild { border-left-color: var(--rot); }
+.regal3d-fach.zustand-rot .r3-zahl { color: var(--rot); font-weight: 700; }
+/* Abzeichen „Fehlt“ / „2 fehlen“ hinten im Schild (oben im Fach stünde es vor den fehlenden Teilen) */
+.r3-fehlt { padding: 2px 6px; margin-right: -3px; border-radius: 999px; background: var(--rot); color: var(--qr-hell); font-size: .62rem; font-weight: 700; }
+/* wenig Platz: nur Lagerplatz und Bestand, ohne Abzeichen und Lkw (die Farbe zeigt den Zustand) */
+.regal3d { container-type: inline-size; }
+@container (max-width: 520px) {
+    .r3-schild { font-size: .62rem; gap: 4px; padding: 0 4px; border-left-width: 3px; }
+    .regal3d-fach:not(:hover):not(.gewaehlt) .r3-fehlt, .regal3d-fach:not(:hover):not(.gewaehlt) .r3-schild .bi { display: none; }
+}
+.regal3d-fach:hover, .regal3d-fach:focus-visible { z-index: 3; }
+.regal3d-fach.gewaehlt { z-index: 2; }
+.lager-legende .geist-muster { width: 14px; height: 14px; border-radius: 4px; border: 1.5px dashed var(--rot); background: color-mix(in srgb, var(--rot) 22%, transparent); }
 .lager-regal + .lager-regal { margin-top: 18px; }
 .lager-regal-titel { font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-leise); margin-bottom: 8px; }
 /* Fächer: gleich breite Kacheln, auf schmalen Bildschirmen weniger je Zeile */
