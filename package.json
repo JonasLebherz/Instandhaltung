@@ -23,6 +23,7 @@
     "chart.js": "4.4.1",
     "next": "15.5.28",
     "postgres": "3.4.9",
+    "qrcode-generator": "2.0.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "server-only": "0.0.1",

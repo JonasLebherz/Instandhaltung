@@ -90,7 +90,7 @@ export default async function StatistikSeite({ searchParams }) {
   const [orte, ereignisse, teile, techniker] = await Promise.all([
     // Alle Maschinen mit Gebäude und Standort – daraus entstehen die Ebenen
     sql`
-      SELECT m.id, m.anlagennummer, m.bezeichnung, m.typ::text AS typ, m.baujahr,
+      SELECT m.id, m.anlagennummer, m.bezeichnung, m.typ::text AS typ, m.baujahr, m.kosten_pro_stunde::float AS kosten_pro_stunde,
              g.id AS gebaeude_id, g.kuerzel AS gebaeude_kuerzel, g.bezeichnung AS gebaeude,
              st.id AS standort_id, st.kuerzel AS standort_kuerzel, st.name AS standort, st.stadt,
              l.kuerzel AS land, l.name AS land_name, l.hauptsitz

@@ -7,20 +7,27 @@
  *   MTBF          = Zeitraum / Anzahl Störungen
  *   Verfügbarkeit = 1 − Ausfallzeit / Zeitraum
  *   Reaktionszeit = Ø (start_zeit − Meldezeitpunkt)
- * 4 Abfragen gleichzeitig (Maschine, Historie, Ersatzteile, Techniker des Werks).
+ * Ausfallkosten  = Ausfallzeit in Stunden × kosten_pro_stunde der Maschine
+ * Dazu Wartungsplan (MaschinenWartung.js) und QR-Code zum Ausdrucken (/qr?maschine=<id>).
+ * 5 Abfragen gleichzeitig (Maschine, Historie, Ersatzteile, Techniker des Werks, Wartungspläne).
  */
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
 import { uebersetzer } from '@/lib/sprache/server';
 import { gross } from '@/lib/sprache';
-import { zahl, dauer } from '@/lib/format';
+import { zahl, dauer, euro } from '@/lib/format';
+import { aktuellePerson, darfBearbeiten } from '@/lib/person';
+import { wartungsplaene } from '@/lib/wartung';
+import QrCode from '@/components/QrCode';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
 import Kennzahl from '@/components/Kennzahl';
 import MaschinenHistorie from './MaschinenHistorie';
 import MaschinenModell from './MaschinenModell';
+import MaschinenWartung from './MaschinenWartung';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,9 +48,9 @@ export default async function MaschinenSeite({ params }) {
   if (!/^\d+$/.test(id)) notFound();
   const maschineId = Number(id);
 
-  const [[maschine], historie, teile, techniker] = await Promise.all([
+  const [[maschine], historie, teile, techniker, plaene] = await Promise.all([
     sql`
-      SELECT m.id, m.anlagennummer, m.bezeichnung, m.typ::text AS typ, m.baujahr, m.breite_m, m.tiefe_m,
+      SELECT m.id, m.anlagennummer, m.bezeichnung, m.typ::text AS typ, m.baujahr, m.breite_m, m.tiefe_m, m.kosten_pro_stunde::float AS kosten_pro_stunde,
              g.id AS gebaeude_id, g.kuerzel AS gebaeude_kuerzel, g.bezeichnung AS gebaeude,
              st.id AS standort_id, st.kuerzel AS standort_kuerzel, st.name AS standort, st.stadt, l.name AS land,
              (SELECT COUNT(*)::int FROM stoermeldung s JOIN wartungsauftrag w ON w.stoermeldung_id = s.id
@@ -83,8 +90,12 @@ export default async function MaschinenSeite({ params }) {
       FROM techniker t
       WHERE t.standort_id = (SELECT g.standort_id FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id WHERE m.id = ${maschineId})
       ORDER BY t.name`,
+    wartungsplaene(sql`m.id = ${maschineId}`),
   ]);
   if (!maschine) notFound();
+  const person = await aktuellePerson();   // für die Rechte (Produktion darf keine Wartung eintragen)
+  const h = await headers();
+  const qrAdresse = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('x-forwarded-host') ?? h.get('host')}/melden?maschine=${maschine.id}`;
 
   // Kennzahlen der letzten 12 Monate (im Browser bzw. hier aus derselben Liste wie die Historie)
   const zeitraum = historie.filter((h) => h.im_zeitraum);
@@ -136,7 +147,7 @@ export default async function MaschinenSeite({ params }) {
             <div className="col-6 col-md-4"><Kennzahl titel={t('Verfügbarkeit')} wert={verfuegbarkeit} nachkomma={2} einheit="%" zusatz={t('letzte 12 Monate')} symbol="bi-speedometer2" i={2} /></div>
             <div className="col-6 col-md-4"><Kennzahl titel="MTTR" wert={mttrMin === null ? null : mttrMin / 60} nachkomma={1} einheit="h" zusatz={t('Ø Reparaturdauer')} symbol="bi-wrench" i={3} /></div>
             <div className="col-6 col-md-4"><Kennzahl titel="MTBF" wert={mtbfTage} nachkomma={1} einheit={t('Tage')} zusatz={t('Ø Tage zwischen Störungen')} symbol="bi-arrow-left-right" i={4} /></div>
-            <div className="col-6 col-md-4"><Kennzahl titel={t('Ausfallzeit')} wert={ausfallMin / 60} nachkomma={1} einheit="h" zusatz={t('letzte 12 Monate')} symbol="bi-hourglass-split" i={5} /></div>
+            <div className="col-6 col-md-4"><Kennzahl titel={t('Ausfallzeit')} wert={ausfallMin / 60} nachkomma={1} einheit="h" zusatz={t('≈ {betrag} Ausfallkosten', { betrag: euro(ausfallMin / 60 * maschine.kosten_pro_stunde, s) })} symbol="bi-hourglass-split" i={5} /></div>
             <div className="col-6 col-md-4"><Kennzahl titel={t('Ø Reaktionszeit')} wert={reaktionMin === null ? null : reaktionMin / 60} nachkomma={1} einheit="h" zusatz={t('bis Arbeitsbeginn')} symbol="bi-stopwatch" i={6} /></div>
           </div>
         </div>
@@ -145,9 +156,27 @@ export default async function MaschinenSeite({ params }) {
       {/* Historie (Tabelle mit Filter) und kleine Auswertungen – Client-Komponente */}
       <MaschinenHistorie historie={historie.map((h) => ({ ...h, zeitpunkt: h.zeitpunkt.toISOString(), start_zeit: h.start_zeit?.toISOString() ?? null, ende_zeit: h.ende_zeit?.toISOString() ?? null }))} />
 
+      {/* Wartungsplan und QR-Code */}
+      <div className="row g-4 mb-4">
+        <div className="col-lg-8">
+          <MaschinenWartung plaene={plaene} darf={darfBearbeiten(person)} />
+        </div>
+        <div className="col-lg-4">
+          <section className="karte h-100 qr-karte" style={{ '--i': 9 }}>
+            <h2 className="abschnitt-titel">{t('QR-Code')}</h2>
+            <QrCode text={qrAdresse} titel={t('QR-Code für {name}', { name: maschine.anlagennummer })} className="qr-gross" />
+            <p className="klein mt-2">{t('Scannen öffnet „Störung melden“ für diese Maschine.')}</p>
+            <div className="d-flex gap-2 flex-wrap">
+              <Link href={`/qr?maschine=${maschine.id}`} className="btn btn-sekundaer btn-klein"><i className="bi bi-printer" aria-hidden="true" /> {t('Etikett drucken')}</Link>
+              <Link href={`/qr?werk=${maschine.standort_kuerzel.toLowerCase()}&halle=${maschine.gebaeude_kuerzel.toLowerCase()}`} className="btn btn-sekundaer btn-klein">{t('Ganze Halle')}</Link>
+            </div>
+          </section>
+        </div>
+      </div>
+
       <div className="row g-4">
         <div className="col-lg-6">
-          <section className="karte h-100" style={{ '--i': 9 }}>
+          <section className="karte h-100" style={{ '--i': 10 }}>
             <h2 className="abschnitt-titel">{t('Verbaute Ersatzteile')}</h2>
             {teile.length === 0 ? (
               <p className="leer"><i className="bi bi-box-seam" />{t('Noch keine Ersatzteile an dieser Maschine verbaut.')}</p>
@@ -168,7 +197,7 @@ export default async function MaschinenSeite({ params }) {
           </section>
         </div>
         <div className="col-lg-6">
-          <section className="karte h-100" style={{ '--i': 10 }}>
+          <section className="karte h-100" style={{ '--i': 11 }}>
             <h2 className="abschnitt-titel">{t('Zuständige Techniker')}</h2>
             <p className="klein">{maschine.standort}</p>
             <ul className="ort-liste">

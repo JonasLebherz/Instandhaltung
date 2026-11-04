@@ -40,6 +40,28 @@ function ganzzahl(text) {
 /* =====================================================================
  * Störmeldung anlegen
  * ================================================================== */
+/* =====================================================================
+ * Fotos prüfen (Störmeldung): höchstens 3, je höchstens 1,5 MB, nur JPEG/PNG/WebP.
+ * Der Typ wird an den ersten Bytes erkannt, nicht an der Dateiendung.
+ * Gibt { fotos: [{ daten, mime }] } oder { fehler } zurück.
+ * ================================================================== */
+const MAX_FOTOS = 3;
+async function fotosPruefen(formular, t, vorhanden = 0) {
+  const dateien = formular.getAll('fotos').filter((d) => typeof d === 'object' && d.size > 0);
+  if (dateien.length + vorhanden > MAX_FOTOS) return { fehler: t('Höchstens {n} Fotos je Meldung.', { n: MAX_FOTOS }) };
+  const fotos = [];
+  for (const datei of dateien) {
+    if (datei.size > 1500000) return { fehler: t('Ein Foto ist zu groß (höchstens 1,5 MB).') };
+    const daten = Buffer.from(await datei.arrayBuffer());
+    const mime = daten[0] === 0xff && daten[1] === 0xd8 ? 'image/jpeg'
+      : daten.subarray(0, 4).toString('hex') === '89504e47' ? 'image/png'
+        : daten.subarray(0, 4).toString() === 'RIFF' && daten.subarray(8, 12).toString() === 'WEBP' ? 'image/webp' : null;
+    if (!mime) return { fehler: t('Nur Fotos im Format JPEG, PNG oder WebP.') };
+    fotos.push({ daten, mime });
+  }
+  return { fotos };
+}
+
 export async function meldungAnlegen(vorherigerZustand, formular) {
   await benutzerPflicht();
   const t = await uebersetzer();   // Meldungen in der gewählten Sprache
@@ -83,6 +105,10 @@ export async function meldungAnlegen(vorherigerZustand, formular) {
   if (!URSACHEN_LISTE.includes(eingabe.ursache_kategorie)) fehler.ursache_kategorie = t('Bitte eine Ursache auswählen.');
   if (!PRIORITAET_WERTE.includes(eingabe.prioritaet)) fehler.prioritaet = t('Bitte eine Priorität auswählen.');
 
+  // Fotos (optional)
+  const fotoPruefung = await fotosPruefen(formular, t);
+  if (fotoPruefung.fehler) fehler.fotos = fotoPruefung.fehler;
+
   if (Object.keys(fehler).length > 0) {
     return { fehler, eingabe };
   }
@@ -101,6 +127,9 @@ export async function meldungAnlegen(vorherigerZustand, formular) {
       const [auftrag] = await tx`INSERT INTO wartungsauftrag (stoermeldung_id, status) VALUES (${meldung.id}, 'gemeldet') RETURNING id`;
       // Verlauf: wer hat gemeldet (gewählte Person, falls vorhanden)
       await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion) VALUES (${auftrag.id}, ${person?.id ?? null}, 'gemeldet')`;
+      for (const foto of fotoPruefung.fotos) {
+        await tx`INSERT INTO stoermeldung_foto (stoermeldung_id, datei, mime, person_id) VALUES (${meldung.id}, ${foto.daten}, ${foto.mime}, ${person?.id ?? null})`;
+      }
       return meldung.id;
     });
   } catch (fehlerObjekt) {
@@ -231,6 +260,19 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
     if (neuerTechniker && technikerId !== null) {
       const [tech] = await tx`SELECT name FROM techniker WHERE id = ${technikerId}`;
       await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion, details) VALUES (${auftragId}, ${personId}, 'zugewiesen', ${tech.name})`;
+      // Chat: Die zuweisende Person schreibt dem Techniker automatisch eine Nachricht mit dem Auftrag
+      // (nur mit gewählter Person und nicht an sich selbst – Nachrichten haben immer einen Absender)
+      const [empfaenger] = await tx`SELECT id FROM person WHERE techniker_id = ${technikerId}`;
+      if (personId && empfaenger && empfaenger.id !== personId) {
+        const [info] = await tx`
+          SELECT m.anlagennummer, m.bezeichnung, s.beschreibung FROM wartungsauftrag w
+          JOIN stoermeldung s ON s.id = w.stoermeldung_id JOIN maschine m ON m.id = s.maschine_id WHERE w.id = ${auftragId}`;
+        const text = t('Neuer Auftrag für dich: {maschine} ({nummer}) – {beschreibung}', {
+          maschine: info.bezeichnung, nummer: info.anlagennummer,
+          beschreibung: info.beschreibung.length > 120 ? `${info.beschreibung.slice(0, 117)}…` : info.beschreibung,
+        });
+        await tx`INSERT INTO nachricht (von_id, an_id, text, auftrag_id) VALUES (${personId}, ${empfaenger.id}, ${text}, ${auftragId})`;
+      }
     }
     if (neuerStatus) {
       await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion, details) VALUES (${auftragId}, ${personId}, 'status', ${status})`;
@@ -356,9 +398,11 @@ export async function lieferungBuchen(formular) {
   const t = await uebersetzer();   // Meldungen in der gewählten Sprache
 
   const bestellungId = ganzzahl(feld(formular, 'bestellung_id'));
+  // Zurück zur Seite, von der gebucht wurde (Übersicht oder Lager) – nur feste Ziele, keine fremden Adressen
+  const ziel = feld(formular, 'zurueck') === '/lager' ? '/lager' : '/';
   if (bestellungId === null) {
     await flash('fehler', t('Ungültige Bestellung.'));
-    redirect('/');
+    redirect(ziel);
   }
 
   let ergebnis = null;
@@ -379,7 +423,7 @@ export async function lieferungBuchen(formular) {
   } catch (fehlerObjekt) {
     console.error(fehlerObjekt);
     await flash('fehler', t('Der Wareneingang konnte nicht gespeichert werden.'));
-    redirect('/');
+    redirect(ziel);
   }
 
   if (ergebnis) {
@@ -389,7 +433,35 @@ export async function lieferungBuchen(formular) {
     await flash('fehler', t('Diese Bestellung ist nicht (mehr) offen.'));
   }
   revalidatePath('/', 'layout');
-  redirect('/');
+  redirect(ziel);
+}
+
+/* =====================================================================
+ * Ersatzteil nachbestellen (Lager-Seite) – höchstens eine offene Bestellung je Teil
+ * ================================================================== */
+export async function teilNachbestellen(formular) {
+  await benutzerPflicht();
+  const t = await uebersetzer();
+  const person = await aktuellePerson();
+  if (!darfBearbeiten(person)) {
+    await flash('fehler', t('Als Person aus der Produktion kannst du keine Teile bestellen.'));
+    redirect('/lager');
+  }
+  const teilId = ganzzahl(feld(formular, 'ersatzteil_id'));
+  const menge = ganzzahl(feld(formular, 'menge'));
+  if (teilId === null || menge === null || menge < 1 || menge > 999) {
+    await flash('fehler', t('Bitte eine Menge zwischen 1 und 999 angeben.'));
+    redirect(`/lager?teil=${teilId ?? ''}`);
+  }
+  const [neu] = await sql`
+    INSERT INTO bestellung (ersatzteil_id, menge, bestelldatum, status)
+    SELECT e.id, ${menge}, current_date, 'bestellt' FROM ersatzteil e
+    WHERE e.id = ${teilId} AND NOT EXISTS (SELECT 1 FROM bestellung b WHERE b.ersatzteil_id = e.id AND b.status = 'bestellt')
+    RETURNING id`;
+  if (neu) await flash('erfolg', t('Nachbestellung angelegt: {menge} Stück.', { menge }));
+  else await flash('fehler', t('Für dieses Teil gibt es schon eine offene Bestellung.'));
+  revalidatePath('/', 'layout');
+  redirect(`/lager?teil=${teilId}`);
 }
 
 /* =====================================================================
@@ -423,5 +495,128 @@ export async function nachrichtenGelesen(mitId) {
   const mit = Number(mitId);
   if (!ich || !Number.isInteger(mit)) return { ok: false };
   await sql`UPDATE nachricht SET gelesen_am = now() WHERE an_id = ${ich.id} AND von_id = ${mit} AND gelesen_am IS NULL`;
+  return { ok: true };
+}
+
+/* =====================================================================
+ * Wartungsplan (Seite „Wartungsplan“ und Maschinen-Seite)
+ *
+ *  wartungErledigen     – geplante Wartung heute als erledigt eintragen (ohne Weiterleitung)
+ *  wartungPlanen        – neuer Plan für eine Maschine (Formular mit useActionState, ohne Weiterleitung)
+ *  wartungsplanEntfernen – Plan abschalten (bleibt für den Verlauf erhalten)
+ * Produktion darf keine Wartungen eintragen oder planen (wie bei den Aufträgen).
+ * ================================================================== */
+export async function wartungErledigen(planId, notiz = '') {
+  await benutzerPflicht();
+  const t = await uebersetzer();
+  const person = await aktuellePerson();
+  if (!darfBearbeiten(person)) return { fehler: t('Als Person aus der Produktion kannst du keine Wartungen eintragen.') };
+  const id = Number(planId);
+  if (!Number.isInteger(id)) return { fehler: t('Ungültiger Wartungsplan.') };
+  const text = String(notiz ?? '').trim().slice(0, 300) || null;
+  // Höchstens einmal pro Tag und Plan (doppelte Klicks)
+  const [neu] = await sql`
+    INSERT INTO wartung_durchfuehrung (plan_id, datum, person_id, notiz)
+    SELECT p.id, current_date, ${person?.id ?? null}, ${text} FROM wartungsplan p
+    WHERE p.id = ${id} AND p.aktiv
+      AND NOT EXISTS (SELECT 1 FROM wartung_durchfuehrung d WHERE d.plan_id = p.id AND d.datum = current_date)
+    RETURNING id`;
+  revalidatePath('/', 'layout');
+  return neu ? { ok: true } : { fehler: t('Diese Wartung ist heute schon eingetragen.') };
+}
+
+export async function wartungPlanen(vorherigerZustand, formular) {
+  await benutzerPflicht();
+  const t = await uebersetzer();
+  const eingabe = {
+    maschine_id: feld(formular, 'maschine_id'),
+    aufgabe: feld(formular, 'aufgabe'),
+    intervall_tage: feld(formular, 'intervall_tage'),
+    dauer_min: feld(formular, 'dauer_min'),
+    start_datum: feld(formular, 'start_datum'),
+  };
+  const person = await aktuellePerson();
+  if (!darfBearbeiten(person)) return { fehler: { allgemein: t('Als Person aus der Produktion kannst du keine Wartungen planen.') }, eingabe };
+
+  const fehler = {};
+  const maschineId = ganzzahl(eingabe.maschine_id);
+  const [maschine] = maschineId ? await sql`SELECT id FROM maschine WHERE id = ${maschineId}` : [];
+  if (!maschine) fehler.maschine_id = t('Bitte eine Maschine auswählen.');
+  if (eingabe.aufgabe.length < 3) fehler.aufgabe = t('Bitte die Aufgabe beschreiben (mindestens 3 Zeichen).');
+  else if (eingabe.aufgabe.length > 150) fehler.aufgabe = t('Höchstens 150 Zeichen.');
+  const intervall = ganzzahl(eingabe.intervall_tage);
+  if (intervall === null || intervall < 1 || intervall > 1095) fehler.intervall_tage = t('Bitte ein Intervall zwischen 1 und 1095 Tagen angeben.');
+  const dauer = ganzzahl(eingabe.dauer_min);
+  if (dauer === null || dauer < 5 || dauer > 1440) fehler.dauer_min = t('Bitte eine Dauer zwischen 5 und 1440 Minuten angeben.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.start_datum) || Number.isNaN(Date.parse(eingabe.start_datum))) {
+    fehler.start_datum = t('Bitte ein gültiges Datum angeben.');
+  }
+  if (Object.keys(fehler).length > 0) return { fehler, eingabe };
+
+  await sql`
+    INSERT INTO wartungsplan (maschine_id, aufgabe, intervall_tage, dauer_min, start_datum)
+    VALUES (${maschineId}, ${eingabe.aufgabe}, ${intervall}, ${dauer}, ${eingabe.start_datum})`;
+  revalidatePath('/', 'layout');
+  // Ohne Weiterleitung: Das Fenster schließt sich, der Kalender lädt neu und zeigt die Meldung
+  return { fehler: {}, eingabe, ok: t('Wartung geplant: {aufgabe} alle {n} Tage.', { aufgabe: eingabe.aufgabe, n: intervall }) };
+}
+
+export async function wartungsplanEntfernen(planId) {
+  await benutzerPflicht();
+  const t = await uebersetzer();
+  const person = await aktuellePerson();
+  if (!darfBearbeiten(person)) return { fehler: t('Als Person aus der Produktion kannst du keine Wartungen planen.') };
+  const id = Number(planId);
+  if (!Number.isInteger(id)) return { fehler: t('Ungültiger Wartungsplan.') };
+  await sql`UPDATE wartungsplan SET aktiv = false WHERE id = ${id}`;
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/* =====================================================================
+ * Fotos nachträglich zu einer Störmeldung hinzufügen (Auftragsseite) – ohne Weiterleitung.
+ * Fotos darf jede Person ergänzen (auch Produktion: Sie hat die Störung ja gesehen).
+ * ================================================================== */
+export async function fotosHinzufuegen(meldungId, vorherigerZustand, formular) {
+  await benutzerPflicht();
+  const t = await uebersetzer();
+  const person = await aktuellePerson();
+  const id = Number(meldungId);
+  const [meldung] = Number.isInteger(id) ? await sql`
+    SELECT s.id, (SELECT COUNT(*)::int FROM stoermeldung_foto f WHERE f.stoermeldung_id = s.id) AS anzahl
+    FROM stoermeldung s WHERE s.id = ${id}` : [];
+  if (!meldung) return { fehler: t('Die Störmeldung wurde nicht gefunden.') };
+  const pruefung = await fotosPruefen(formular, t, meldung.anzahl);
+  if (pruefung.fehler) return { fehler: pruefung.fehler };
+  if (pruefung.fotos.length === 0) return { fehler: t('Bitte ein Foto auswählen.') };
+  for (const foto of pruefung.fotos) {
+    await sql`INSERT INTO stoermeldung_foto (stoermeldung_id, datei, mime, person_id) VALUES (${id}, ${foto.daten}, ${foto.mime}, ${person?.id ?? null})`;
+  }
+  revalidatePath('/', 'layout');
+  return { ok: Date.now() };
+}
+
+/* =====================================================================
+ * Checkliste am Auftrag: einen Prüfpunkt (Nummer) abhaken bzw. zurücknehmen – ohne Weiterleitung.
+ * Gespeichert als JSON-Liste der abgehakten Nummern in wartungsauftrag.checkliste.
+ * ================================================================== */
+export async function checklistePunkt(auftragId, nummer, erledigt) {
+  await benutzerPflicht();
+  const t = await uebersetzer();
+  const person = await aktuellePerson();
+  if (!darfBearbeiten(person)) return { fehler: t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.') };
+  const id = Number(auftragId);
+  const nr = Number(nummer);
+  if (!Number.isInteger(id) || !Number.isInteger(nr) || nr < 0 || nr > 20) return { fehler: t('Ungültiger Prüfpunkt.') };
+  // Atomar in der Datenbank: Nummer hinzufügen bzw. entfernen, ohne Doppelte
+  await sql`
+    UPDATE wartungsauftrag
+    SET checkliste = (
+      SELECT COALESCE(jsonb_agg(DISTINCT x ORDER BY x), '[]'::jsonb)
+      FROM (SELECT jsonb_array_elements(checkliste)::int AS x
+            UNION SELECT ${nr}::int WHERE ${Boolean(erledigt)}) n
+      WHERE x <> ${nr} OR ${Boolean(erledigt)})
+    WHERE id = ${id} AND status <> 'erledigt'`;
+  revalidatePath(`/auftraege/${id}`);
   return { ok: true };
 }

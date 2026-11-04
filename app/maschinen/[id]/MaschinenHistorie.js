@@ -42,7 +42,7 @@ export default function MaschinenHistorie({ historie }) {
         <div className="col-lg-7">
           <section className="karte h-100" style={{ '--i': 7 }}>
             <h2 className="abschnitt-titel">{t('Störungen pro Monat')}</h2>
-            <Diagramm art="saeulen" labels={auswertung.proMonat.map((m) => monatKurz(Number(m.mo.slice(5)), t.sprache))} werte={auswertung.proMonat.map((m) => m.anzahl)}
+            <Diagramm titel={t('Störungen pro Monat')} art="saeulen" labels={auswertung.proMonat.map((m) => monatKurz(Number(m.mo.slice(5)), t.sprache))} werte={auswertung.proMonat.map((m) => m.anzahl)}
                       beschreibung={t('Störungen pro Monat')} spalte={t('Störungen')} hoehe={220} />
           </section>
         </div>
@@ -52,7 +52,7 @@ export default function MaschinenHistorie({ historie }) {
             {auswertung.ursachen.length === 0 ? (
               <p className="leer"><i className="bi bi-check-circle" />{t('Keine Störungen in den letzten 12 Monaten.')}</p>
             ) : (
-              <Diagramm art="balken" labels={auswertung.ursachen.map(([u]) => t(u))} werte={auswertung.ursachen.map(([, n]) => n)}
+              <Diagramm titel={t('Nach Ursache')} art="balken" labels={auswertung.ursachen.map(([u]) => t(u))} werte={auswertung.ursachen.map(([, n]) => n)}
                         beschreibung={t('Störungen nach Ursache')} spalte={t('Störungen')} hoehe={220} />
             )}
           </section>

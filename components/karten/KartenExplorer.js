@@ -990,6 +990,17 @@ function InfoSpalte({
           ))}
         </ul>
       )}
+      {/* Hallen-Monitor (Vollbild für einen Bildschirm in der Halle) und QR-Etiketten aller Maschinen */}
+      {standort && (
+        <div className="d-flex gap-2 flex-wrap mt-3">
+          <Link href={`/monitor?werk=${standort.kuerzel.toLowerCase()}&halle=${gebaeudeAktuell.kuerzel.toLowerCase()}`} className="btn btn-sekundaer btn-klein hallen-monitor-link" prefetch={false}>
+            <i className="bi bi-display" aria-hidden="true" /> {t('Hallen-Monitor')}
+          </Link>
+          <Link href={`/qr?werk=${standort.kuerzel.toLowerCase()}&halle=${gebaeudeAktuell.kuerzel.toLowerCase()}`} className="btn btn-sekundaer btn-klein" prefetch={false}>
+            <i className="bi bi-qr-code" aria-hidden="true" /> {t('QR-Etiketten')}
+          </Link>
+        </div>
+      )}
     </section>
   );
 }

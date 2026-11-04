@@ -47,6 +47,8 @@ const BEREICHE = [
       { pfad: '/melden', text: T('Störung melden'), symbol: 'bi-exclamation-triangle', symbolAktiv: 'bi-exclamation-triangle-fill' },
       { pfad: '/auftraege', text: T('Aufträge'), symbol: 'bi-clipboard-check', symbolAktiv: 'bi-clipboard-check-fill', zaehler: 'auftraege' },
       { pfad: '/maschinen', text: T('Maschinen'), symbol: 'bi-cpu', symbolAktiv: 'bi-cpu-fill' },
+      { pfad: '/wartung', text: T('Wartungsplan'), symbol: 'bi-calendar-check', symbolAktiv: 'bi-calendar-check-fill' },
+      { pfad: '/lager', text: T('Lager'), symbol: 'bi-box-seam', symbolAktiv: 'bi-box-seam-fill' },
     ],
   },
   {

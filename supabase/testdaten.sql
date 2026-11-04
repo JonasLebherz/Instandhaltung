@@ -20,7 +20,8 @@
 -- Vorhandene Daten löschen und die fortlaufenden Nummern (IDs) zurücksetzen.
 -- CASCADE leert auch alle Tabellen, die per Fremdschlüssel darauf verweisen.
 TRUNCATE land, standort, gebaeude, maschine, techniker, person, ersatzteil, stoermeldung, wartungsauftrag,
-         auftrag_ersatzteil, bestellung, auftrag_verlauf, nachricht RESTART IDENTITY CASCADE;
+         auftrag_ersatzteil, bestellung, auftrag_verlauf, nachricht, wartungsplan, wartung_durchfuehrung,
+         stoermeldung_foto RESTART IDENTITY CASCADE;
 
 -- ---------------------------------------------------------------------
 -- Standorte (Werke) mit GPS-Position und Größe des Werksgeländes
@@ -2143,3 +2144,47 @@ JOIN person tech ON tech.techniker_id = v.techniker_id
 JOIN person von  ON von.id = COALESCE((SELECT id FROM person WHERE name = v.von_name), tech.id)
 JOIN person an   ON an.id = CASE WHEN v.von_name IS NULL THEN (SELECT id FROM person WHERE name = 'Claudia Richter') ELSE tech.id END
 WHERE NOT EXISTS (SELECT 1 FROM nachricht);
+
+-- ---------------------------------------------------------------------
+-- Ausfallkosten und Wartungspläne – gleiche Daten wie in migrationen/004
+-- ---------------------------------------------------------------------
+UPDATE maschine SET kosten_pro_stunde = CASE typ
+    WHEN 'Fräsen' THEN 380 WHEN 'Drehen' THEN 320 WHEN 'Spritzguss' THEN 450 WHEN 'Laserschneiden' THEN 520
+    WHEN 'Schweißen' THEN 410 WHEN 'Pressen' THEN 600 WHEN 'Fördertechnik' THEN 250 WHEN 'Lackieren' THEN 480
+    WHEN 'Montage' THEN 350 WHEN 'Druckluft' THEN 900 WHEN 'Lagertechnik' THEN 200 ELSE 300 END;
+
+-- Beispiel-Wartungspläne
+-- Je Maschinentyp ein bis zwei typische Aufgaben. Die Termine sind per hashtext gestreut
+-- (bei jedem Lauf gleich); etwa jede zwölfte Wartung ist überfällig.
+INSERT INTO wartungsplan (maschine_id, aufgabe, intervall_tage, dauer_min, start_datum)
+SELECT m.id, a.aufgabe, a.intervall, a.dauer,
+       current_date - 365 + (abs(hashtext(m.anlagennummer || a.aufgabe)) % a.intervall)
+FROM maschine m
+JOIN (VALUES
+    ('Fräsen', 'Kühlschmierstoff prüfen und nachfüllen', 30, 30), ('Fräsen', 'Führungen schmieren, Spindel prüfen', 90, 90),
+    ('Drehen', 'Spannfutter reinigen und schmieren', 30, 30), ('Drehen', 'Hydraulik und Riemen prüfen', 180, 120),
+    ('Spritzguss', 'Düse und Heizbänder prüfen', 60, 60), ('Spritzguss', 'Hydrauliköl wechseln', 365, 180),
+    ('Laserschneiden', 'Linse und Düse reinigen', 14, 20), ('Laserschneiden', 'Spiegel und Strahlweg prüfen', 180, 120),
+    ('Schweißen', 'Schweißdüsen und Kontaktrohre tauschen', 30, 30), ('Schweißen', 'Roboterachsen kalibrieren', 180, 120),
+    ('Pressen', 'Lichtgitter und Not-Halt prüfen', 30, 30), ('Pressen', 'Hydrauliköl und Filter wechseln', 365, 240),
+    ('Fördertechnik', 'Bänder und Rollen prüfen', 30, 45), ('Fördertechnik', 'Antriebe schmieren', 90, 60),
+    ('Lackieren', 'Kabinenfilter wechseln', 30, 60), ('Lackieren', 'Düsen und Pumpen reinigen', 60, 90),
+    ('Montage', 'Greifer und Sensoren prüfen', 60, 45),
+    ('Druckluft', 'Kondensat ablassen, Filter prüfen', 30, 20), ('Druckluft', 'Öl und Abscheider wechseln', 180, 120),
+    ('Lagertechnik', 'Fahr- und Hubwerk prüfen', 90, 60), ('Lagertechnik', 'Regalprüfung (DIN EN 15635)', 365, 240)
+) AS a(typ, aufgabe, intervall, dauer) ON a.typ = m.typ::text
+WHERE NOT EXISTS (SELECT 1 FROM wartungsplan);
+
+-- Verlauf: Durchführungen im Intervall seit dem Start bis heute. Bei etwa jeder zwölften
+-- Wartung fehlt die letzte Durchführung (nur, wenn sie in den letzten 30 Tagen lag) –
+-- sie ist damit höchstens 30 Tage überfällig.
+INSERT INTO wartung_durchfuehrung (plan_id, datum, person_id)
+SELECT p.id, d.datum::date,
+       (SELECT pe.id FROM person pe JOIN techniker t ON t.id = pe.techniker_id JOIN gebaeude g ON g.standort_id = t.standort_id
+        WHERE g.id = m.gebaeude_id ORDER BY abs(hashtext(pe.name || d.datum::text)) LIMIT 1)
+FROM wartungsplan p
+JOIN maschine m ON m.id = p.maschine_id
+CROSS JOIN LATERAL generate_series(p.start_datum, current_date, make_interval(days => p.intervall_tage)) AS d(datum)
+WHERE NOT EXISTS (SELECT 1 FROM wartung_durchfuehrung)
+  AND NOT (abs(hashtext(m.anlagennummer || p.aufgabe)) % 12 = 0
+           AND d.datum::date > current_date - LEAST(p.intervall_tage, 30));

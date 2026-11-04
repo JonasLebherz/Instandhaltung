@@ -7,16 +7,19 @@
  * Bearbeitungsformular. Rechts: verwendete Ersatzteile, Teilebuchung und der
  * Verlauf (wer hat wann gemeldet, zugewiesen, den Status geändert, Teile gebucht).
  * Wer als Person aus der Produktion arbeitet, sieht den Auftrag nur an.
+ * Unter der Meldung: Fotos (Fotos.js) und die Checkliste je Maschinentyp (Checkliste.js).
  * Die Formulare liegen in Formulare.js, die Logik in app/aktionen.js.
  */
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
-import { STATUS_WERTE } from '@/lib/konstanten';
+import { STATUS_WERTE, checklisteFuer } from '@/lib/konstanten';
 import { datumZeit, dauer, fuerDatetimeInput } from '@/lib/format';
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import { BearbeitungsFormular, TeilBuchenFormular } from './Formulare';
+import Fotos from './Fotos';
+import Checkliste from './Checkliste';
 import { uebersetzer } from '@/lib/sprache/server';
 import { gross } from '@/lib/sprache';
 import { aktuellePerson, darfBearbeiten } from '@/lib/person';
@@ -58,7 +61,8 @@ export default async function AuftragSeite({ params }) {
     SELECT w.id, w.stoermeldung_id, w.techniker_id, w.status, w.start_zeit, w.ende_zeit, w.massnahme,
            s.zeitpunkt, s.gemeldet_von, s.beschreibung, s.ursache_kategorie, s.prioritaet,
            tech.name AS techniker, zv.name AS zugewiesen_von,
-           m.id AS maschine_id, m.bezeichnung AS maschine, m.anlagennummer,
+           m.id AS maschine_id, m.bezeichnung AS maschine, m.anlagennummer, m.typ::text AS typ, w.checkliste,
+           (SELECT COALESCE(json_agg(f.id ORDER BY f.id), '[]') FROM stoermeldung_foto f WHERE f.stoermeldung_id = s.id) AS fotos,
            g.kuerzel AS gebaeude_kuerzel, g.bezeichnung AS gebaeude,
            st.id AS standort_id, st.kuerzel AS standort_kuerzel, st.name AS standort
     FROM wartungsauftrag w
@@ -145,7 +149,8 @@ export default async function AuftragSeite({ params }) {
           {/* Störmeldung (nur lesend) */}
           <section className="karte" style={{ '--i': 0 }}>
             <h2 className="abschnitt-titel">{t('Störmeldung')}</h2>
-            <p className="mb-4" style={{ whiteSpace: 'pre-line' }}>{auftrag.beschreibung}</p>
+            <p className="mb-3" style={{ whiteSpace: 'pre-line' }}>{auftrag.beschreibung}</p>
+            <Fotos meldungId={auftrag.stoermeldung_id} fotos={auftrag.fotos} />
             <dl className="details mb-4">
               <dt>{t('Gemeldet am')}</dt><dd>{datumZeit(auftrag.zeitpunkt, t.sprache)}</dd>
               <dt>{t('Gemeldet von')}</dt><dd>{auftrag.gemeldet_von}</dd>
@@ -176,6 +181,9 @@ export default async function AuftragSeite({ params }) {
               ))}
             </ol>
           </section>
+
+          <Checkliste auftragId={auftragId} punkte={checklisteFuer(auftrag.typ)} erledigt={auftrag.checkliste}
+                      gesperrt={gesperrt || auftrag.status === 'erledigt'} />
 
           <BearbeitungsFormular auftragId={auftragId} techniker={techniker} startwerte={startwerte}
                                 person={person ? { rolle: person.rolle, techniker_id: person.techniker_id } : null} gesperrt={gesperrt} />

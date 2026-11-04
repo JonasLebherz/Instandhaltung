@@ -21,7 +21,7 @@
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS v_stoerung_details, v_stoerungen_monat, v_ausfallzeit_maschine, v_mttr_maschine,
                     v_kennzahlen_standort;
-DROP TABLE IF EXISTS nachricht, auftrag_verlauf, bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
+DROP TABLE IF EXISTS stoermeldung_foto, wartung_durchfuehrung, wartungsplan, nachricht, auftrag_verlauf, bestellung, auftrag_ersatzteil, ersatzteil, wartungsauftrag,
                      stoermeldung, person, techniker, maschine, gebaeude, standort, land CASCADE;
 DROP TYPE IF EXISTS auftragsstatus, prioritaet, schicht, bestellstatus, ursache, maschinentyp, rolle;
 
@@ -107,7 +107,9 @@ CREATE TABLE maschine (
     pos_x_m        REAL NOT NULL CHECK (pos_x_m >= 0),
     pos_y_m        REAL NOT NULL CHECK (pos_y_m >= 0),
     breite_m       REAL NOT NULL CHECK (breite_m > 0),
-    tiefe_m        REAL NOT NULL CHECK (tiefe_m > 0)
+    tiefe_m        REAL NOT NULL CHECK (tiefe_m > 0),
+    -- Was eine Stunde Stillstand kostet (für die Ausfallkosten in Statistik und Maschinen-Seite)
+    kosten_pro_stunde NUMERIC(8, 2) NOT NULL DEFAULT 300 CHECK (kosten_pro_stunde >= 0)
 );
 COMMENT ON TABLE maschine IS 'Maschinen und Anlagen der Produktion';
 CREATE INDEX idx_maschine_gebaeude ON maschine (gebaeude_id);
@@ -184,6 +186,8 @@ CREATE TABLE wartungsauftrag (
     massnahme        VARCHAR(2000) NULL,     -- durchgeführte Arbeiten
     -- Wer den Techniker zugewiesen hat (Person, als die man in der App arbeitet)
     zugewiesen_von   INTEGER NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE SET NULL,
+    -- Abgehakte Punkte der Checkliste je Maschinentyp (Nummern, siehe lib/konstanten.js)
+    checkliste       JSONB NOT NULL DEFAULT '[]'::jsonb,
     -- Plausibilität: Ende nicht vor Beginn
     CONSTRAINT chk_wartungsauftrag_zeiten CHECK (ende_zeit IS NULL OR start_zeit IS NULL OR ende_zeit >= start_zeit),
     -- Ein erledigter Auftrag braucht ein Ende
@@ -226,6 +230,8 @@ CREATE TABLE nachricht (
     von_id      INTEGER NOT NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE CASCADE,
     an_id       INTEGER NOT NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE CASCADE,
     text        VARCHAR(1000) NOT NULL CHECK (length(trim(text)) > 0),
+    -- Nachricht gehört zu einem Auftrag (z. B. „Neuer Auftrag für dich“)
+    auftrag_id  INTEGER NULL REFERENCES wartungsauftrag (id) ON UPDATE CASCADE ON DELETE SET NULL,
     zeitpunkt   TIMESTAMPTZ NOT NULL DEFAULT now(),
     gelesen_am  TIMESTAMPTZ NULL,
     CONSTRAINT chk_nachricht_nicht_an_sich CHECK (von_id <> an_id)
@@ -234,6 +240,44 @@ COMMENT ON TABLE nachricht IS 'Nachrichten zwischen Personen (Chat)';
 -- Index für „ungelesene Nachrichten an mich“ und für den Verlauf zweier Personen
 CREATE INDEX idx_nachricht_an ON nachricht (an_id, gelesen_am);
 CREATE INDEX idx_nachricht_verlauf ON nachricht (von_id, an_id, zeitpunkt);
+
+-- ---------- Wartungsplan ----------
+CREATE TABLE wartungsplan (
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    maschine_id     INTEGER NOT NULL REFERENCES maschine (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    aufgabe         VARCHAR(150) NOT NULL,
+    intervall_tage  INTEGER NOT NULL CHECK (intervall_tage BETWEEN 1 AND 1095),
+    dauer_min       INTEGER NOT NULL DEFAULT 60 CHECK (dauer_min BETWEEN 5 AND 1440),
+    -- Erste Fälligkeit; danach: letzte Durchführung + Intervall
+    start_datum     DATE NOT NULL DEFAULT current_date,
+    aktiv           BOOLEAN NOT NULL DEFAULT true
+);
+COMMENT ON TABLE wartungsplan IS 'Vorbeugende Wartung je Maschine mit festem Intervall';
+CREATE INDEX idx_wartungsplan_maschine ON wartungsplan (maschine_id);
+
+CREATE TABLE wartung_durchfuehrung (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    plan_id    INTEGER NOT NULL REFERENCES wartungsplan (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    datum      DATE NOT NULL,
+    person_id  INTEGER NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE SET NULL,
+    notiz      VARCHAR(300) NULL
+);
+COMMENT ON TABLE wartung_durchfuehrung IS 'Erledigte Wartungen aus dem Wartungsplan';
+CREATE INDEX idx_wartung_durchfuehrung_plan ON wartung_durchfuehrung (plan_id, datum);
+
+-- ---------- Fotos zu Störmeldungen ----------
+-- Das Bild liegt direkt in der Datenbank (bytea). Der Browser verkleinert es vorher
+-- (höchstens 1280 px, JPEG), deshalb bleibt jedes Foto bei wenigen hundert KB.
+CREATE TABLE stoermeldung_foto (
+    id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    stoermeldung_id  INTEGER NOT NULL REFERENCES stoermeldung (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    datei            BYTEA NOT NULL CHECK (octet_length(datei) <= 1500000),
+    mime             VARCHAR(30) NOT NULL CHECK (mime IN ('image/jpeg', 'image/png', 'image/webp')),
+    erstellt         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    person_id        INTEGER NULL REFERENCES person (id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+COMMENT ON TABLE stoermeldung_foto IS 'Fotos zu einer Störmeldung';
+CREATE INDEX idx_stoermeldung_foto_meldung ON stoermeldung_foto (stoermeldung_id);
 
 -- Bestellungen von Ersatzteilen
 CREATE TABLE bestellung (
@@ -272,6 +316,9 @@ ALTER TABLE bestellung         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE person             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auftrag_verlauf    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nachricht          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wartungsplan       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wartung_durchfuehrung ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stoermeldung_foto  ENABLE ROW LEVEL SECURITY;
 
 
 -- =====================================================================

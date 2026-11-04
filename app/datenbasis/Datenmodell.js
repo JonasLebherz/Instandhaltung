@@ -28,13 +28,14 @@ const PLATZ = {
   standort: [0, 0], gebaeude: [1, 0], maschine: [2, 0], stoermeldung: [3, 0],
   land: [0, 1], techniker: [1, 1], person: [2, 1], wartungsauftrag: [3, 1],
   bestellung: [0, 2], ersatzteil: [1, 2], auftrag_ersatzteil: [2, 2], auftrag_verlauf: [3, 2],
-  nachricht: [2, 3],
+  wartungsplan: [0, 3], wartung_durchfuehrung: [1, 3], nachricht: [2, 3], stoermeldung_foto: [3, 3],
 };
 
 // Thema jeder Tabelle (Farbe der Karte und Legende)
 const GRUPPEN = [
   { id: 'orte', name: T('Werke & Maschinen'), tabellen: ['land', 'standort', 'gebaeude', 'maschine'] },
-  { id: 'stoerung', name: T('Störungen & Aufträge'), tabellen: ['stoermeldung', 'wartungsauftrag', 'auftrag_verlauf'] },
+  { id: 'stoerung', name: T('Störungen & Aufträge'), tabellen: ['stoermeldung', 'wartungsauftrag', 'auftrag_verlauf', 'stoermeldung_foto'] },
+  { id: 'wartung', name: T('Wartung'), tabellen: ['wartungsplan', 'wartung_durchfuehrung'] },
   { id: 'personen', name: T('Personen'), tabellen: ['techniker', 'person', 'nachricht'] },
   { id: 'material', name: T('Ersatzteile'), tabellen: ['ersatzteil', 'auftrag_ersatzteil', 'bestellung'] },
 ];

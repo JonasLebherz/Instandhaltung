@@ -10,6 +10,7 @@
  * Geöffnete Nachrichten werden als gelesen markiert (Server-Aktion nachrichtenGelesen); danach meldet
  * das Ereignis "nachrichtenwechsel" der Seitenleiste, die rote Zahl neu zu holen.
  */
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/components/SpracheKontext';
 import { RollenAbzeichen, PersonWaehlenKnopf } from '@/components/PersonWahl';
@@ -139,6 +140,12 @@ export default function Chat({ ich, personen, mit, onMit }) {
               neuerTag && <div key={`tag-${n.id}`} className="chat-tag">{tag}</div>,
               <div key={n.id} className={`chat-blase${meine ? ' meine' : ''}`}>
                 <span className="chat-text">{n.text}</span>
+                {/* Nachricht zu einem Auftrag (z. B. automatisch bei der Zuweisung): Link zum Auftrag */}
+                {n.auftrag_id && (
+                  <Link href={`/auftraege/${n.auftrag_id}`} className="chat-auftrag">
+                    <i className="bi bi-clipboard-check" aria-hidden="true" /> {t('Auftrag Nr. {n} öffnen', { n: n.auftrag_id })}
+                  </Link>
+                )}
                 <span className="chat-zeit">
                   {uhrzeit(n.zeitpunkt, t.sprache)}
                   {meine && <i className={`bi ${n.gelesen_am ? 'bi-check2-all' : 'bi-check2'}`} title={n.gelesen_am ? t('gelesen') : t('gesendet')} aria-label={n.gelesen_am ? t('gelesen') : t('gesendet')} />}

@@ -303,8 +303,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
 
   // 15c. Datenbasis: Tabellen, Beziehungen, Vorschau, Verbindungen
   await p.goto(BASE + '/datenbasis'); await p.waitForTimeout(2000);
-  pruefe('Datenbasis: 13 Tabellen im Diagramm', (await p.$$eval('.er-tabelle', (z) => z.length)) === 13);
-  pruefe('Datenbasis: Beziehungslinien gezeichnet', (await p.$$eval('.er-linie', (z) => z.length)) === 17, await p.$$eval('.er-linie', (z) => z.length));
+  pruefe('Datenbasis: 16 Tabellen im Diagramm', (await p.$$eval('.er-tabelle', (z) => z.length)) === 16);
+  pruefe('Datenbasis: Beziehungslinien gezeichnet', (await p.$$eval('.er-linie', (z) => z.length)) === 23, await p.$$eval('.er-linie', (z) => z.length));
   pruefe('Datenbasis: 5 Views', (await p.$$eval('.er-view', (z) => z.length)) === 5);
   pruefe('Datenbasis: Verbindung zur Datenbank geprüft', (await p.textContent('.verbund-knoten[style*="db"]')).includes('verbunden'));
   pruefe('Datenbasis: einfach erklärt, ohne Power BI und Commit-Texte', (await p.$$eval('.verbund-knoten', (z) => z.length)) === 5
@@ -591,6 +591,88 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.favorit-kachel-leer'); await p.waitForSelector('.favorit-wahl');
   pruefe('Übersicht: Favorit-Kachel, ohne Favoriten Hinweis', (await p.textContent('.favorit-wahl')).includes('Ansicht anpinnen'));
   await p.keyboard.press('Escape');
+
+  // 19c. Wartungsplan: Kennzahl gegen SQL, Kalender, „Erledigt“, neuen Plan anlegen (ohne Person: alles erlaubt)
+  const faelligSql = "SELECT count(*) FROM (SELECT COALESCE(max(d.datum) + p.intervall_tage, p.start_datum) f FROM wartungsplan p LEFT JOIN wartung_durchfuehrung d ON d.plan_id = p.id WHERE p.aktiv GROUP BY p.id) x WHERE f < current_date";
+  await p.goto(BASE + '/wartung'); await p.waitForTimeout(1500);
+  pruefe('Wartung: überfällig wie in SQL', (await p.textContent('.kennzahl >> nth=0')).includes(sql(faelligSql)), sql(faelligSql));
+  pruefe('Wartung: Kalender mit 42 Tagen und Terminen', (await p.$$eval('.kalender-tag', (z) => z.length)) === 42 && (await p.$$eval('.kal-marke', (z) => z.length)) > 10);
+  const wartungVorher = Number(sql('SELECT count(*) FROM wartung_durchfuehrung WHERE datum = current_date'));
+  await p.click('.wartung-liste .wartung-erledigen >> nth=0'); await p.waitForTimeout(1500);
+  pruefe('Wartung: „Erledigt“ trägt die Wartung ein', Number(sql('SELECT count(*) FROM wartung_durchfuehrung WHERE datum = current_date')) === wartungVorher + 1
+    && (await p.textContent('.wartung-liste .hinweis')).includes('Erledigt'));
+  await p.click('.kalender-tag.heute'); await p.waitForTimeout(300);
+  pruefe('Wartung: Klick auf einen Tag zeigt seine Termine', (await p.textContent('.wartung-liste h2')) !== 'Anstehend' && (await p.$$('.wartung-eintrag.art-erledigt')).length >= 1);
+  await p.click('button:has-text("Wartung planen")'); await p.waitForSelector('.wartung-dialog');
+  await p.click('.wartung-dialog button[type=submit]'); await p.waitForTimeout(800);
+  pruefe('Wartung planen: Pflichtfelder werden geprüft', (await p.textContent('.wartung-dialog')).includes('Bitte eine Maschine auswählen.'));
+  const plaeneVorher = Number(sql('SELECT count(*) FROM wartungsplan'));
+  await waehle(p, 'maschine_id', '5'); await p.fill('#aufgabe', 'Testwartung Schmierung'); await p.fill('#intervall_tage', '14');
+  await p.click('.wartung-dialog button[type=submit]'); await p.waitForSelector('.wartung-dialog', { state: 'detached', timeout: 10000 }).catch(() => {});
+  pruefe('Wartung planen: Plan gespeichert, Fenster zu', Number(sql('SELECT count(*) FROM wartungsplan')) === plaeneVorher + 1 && (await p.$('.wartung-dialog')) === null
+    && sql("SELECT intervall_tage FROM wartungsplan WHERE aufgabe = 'Testwartung Schmierung'") === '14');
+  await p.screenshot({ path: SHOTS + 'r-wartung.png', fullPage: true });
+
+  // 19d. Maschinen-Seite: Wartungspläne, QR-Code, Ausfallkosten; QR-Etiketten einer Halle
+  await p.goto(BASE + '/maschinen/5'); await p.waitForTimeout(1500);
+  pruefe('Maschine: Wartungspläne wie in SQL', (await p.$$eval('.wartung-eintrag', (z) => z.length)) === Number(sql('SELECT count(*) FROM wartungsplan WHERE maschine_id = 5 AND aktiv')));
+  pruefe('Maschine: QR-Code und Ausfallkosten', (await p.$('.qr-karte svg.qr-code path')) !== null && (await p.textContent('main')).includes('Ausfallkosten'));
+  await p.goto(BASE + '/qr?werk=alb&halle=h1'); await p.waitForTimeout(800);
+  pruefe('QR-Etiketten: eines je Maschine der Halle', (await p.$$eval('.qr-etikett', (z) => z.length)) === Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE st.kuerzel = 'ALB' AND g.kuerzel = 'H1'")));
+
+  // 19e. Lager: 3D-Regal mit einem Fach je Teil, Nachbestellen
+  await p.goto(BASE + '/lager'); await p.waitForSelector('.lager-3d[data-faecher]', { timeout: 30000 }).catch(() => {}); await p.waitForTimeout(1500);
+  pruefe('Lager: ein Fach je Ersatzteil, Kennzahl wie in SQL', Number(await p.getAttribute('.lager-3d[data-faecher]', 'data-faecher')) === Number(sql('SELECT count(*) FROM ersatzteil'))
+    && (await p.textContent('.kennzahl >> nth=1')).includes(sql('SELECT count(*) FROM ersatzteil WHERE bestand < mindestbestand')));
+  const ohneBestellung = sql("SELECT bezeichnung FROM ersatzteil e WHERE NOT EXISTS (SELECT 1 FROM bestellung b WHERE b.ersatzteil_id = e.id AND b.status = 'bestellt') ORDER BY bezeichnung LIMIT 1");
+  await p.click(`.lager-tabelle tr:has-text("${ohneBestellung}") button`); await p.waitForTimeout(300);
+  await Promise.all([p.waitForURL(/[/]lager[?]teil=/), p.click('.lager-nachbestellen button[type=submit]')]); await p.waitForTimeout(800);
+  pruefe('Lager: Nachbestellen legt eine Bestellung an', sql(`SELECT count(*) FROM bestellung b JOIN ersatzteil e ON e.id = b.ersatzteil_id WHERE e.bezeichnung = '${ohneBestellung}' AND b.status = 'bestellt'`) === '1'
+    && (await p.textContent('.lager-detail')).includes('bestellt am'));
+  await p.screenshot({ path: SHOTS + 'r-lager.png', fullPage: true });
+
+  // 19f. Hallen-Monitor: Kachel je Maschine, ohne Seitenleiste
+  await p.goto(BASE + '/monitor?werk=ham&halle=h2'); await p.waitForTimeout(1000);
+  pruefe('Hallen-Monitor: Kachel je Maschine, Seitenleiste ausgeblendet', (await p.$$eval('.monitor-kachel', (z) => z.length)) === Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE st.kuerzel = 'HAM' AND g.kuerzel = 'H2'"))
+    && !(await p.isVisible('.seitenleiste')));
+  await p.goto(BASE + '/'); await p.waitForTimeout(500);
+  pruefe('Hallen-Monitor: Seitenleiste danach wieder da', await p.isVisible('.seitenleiste'));
+
+  // 19g. Störung mit Foto melden, Foto auf der Auftragsseite, Checkliste abhaken
+  await p.goto(BASE + '/melden?maschine=3'); await p.waitForSelector('#beschreibung');
+  await p.setInputFiles('[data-foto-eingabe]', __dirname + '/../docs/beispielfotos/beispiel-presse.jpg');
+  await p.waitForSelector('.foto-vorschau img');
+  await p.fill('#gemeldet_von', 'Foto Test'); await p.fill('#beschreibung', 'Test mit Foto: Schutzabdeckung gerissen');
+  await waehle(p, 'ursache_kategorie', 'Verschleiß'); await p.check('#prio-mittel', { force: true });
+  await Promise.all([p.waitForURL(BASE + '/'), p.click('button[type=submit]')]);
+  const fotoAuftrag = sql('SELECT max(id) FROM wartungsauftrag');
+  pruefe('Foto: mit der Meldung gespeichert (verkleinert, JPEG)', sql(`SELECT count(*) || '|' || min(f.mime) FROM stoermeldung_foto f JOIN wartungsauftrag w ON w.stoermeldung_id = f.stoermeldung_id WHERE w.id = ${fotoAuftrag}`) === '1|image/jpeg');
+  await p.goto(BASE + '/auftraege/' + fotoAuftrag); await p.waitForTimeout(1200);
+  pruefe('Foto: auf der Auftragsseite sichtbar', await p.$eval('.foto-klein img', (i) => i.complete && i.naturalWidth > 0));
+  await p.click('.checkliste input >> nth=0'); await p.waitForTimeout(1200);
+  pruefe('Checkliste: Haken gespeichert', sql(`SELECT checkliste::text FROM wartungsauftrag WHERE id = ${fotoAuftrag}`) === '[0]');
+  await p.reload(); await p.waitForTimeout(800);
+  pruefe('Checkliste: nach dem Neuladen abgehakt', await p.isChecked('.checkliste input >> nth=0') && (await p.textContent('.checkliste-stand')).startsWith('1/'));
+
+  // 19h. Chat: Schichtleitung weist einen Techniker zu → Nachricht mit Auftrag an ihn
+  const claudiaId = Number(sql("SELECT id FROM person WHERE name = 'Claudia Richter'"));
+  await p.context().addCookies([{ name: 'person', value: encodeURIComponent(JSON.stringify({ id: claudiaId, name: 'Claudia Richter', rolle: 'Schichtleitung', stadt: 'Albstadt' })), url: BASE }]);
+  await p.goto(BASE + '/auftraege/' + fotoAuftrag); await p.waitForTimeout(800);
+  await waehle(p, 'techniker_id', '1');
+  await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click('form:has(#status) button[type=submit]')]); await p.waitForTimeout(800);
+  pruefe('Chat: Nachricht bei Zuweisung an den Techniker', sql(`SELECT count(*) FROM nachricht n JOIN person p ON p.id = n.an_id WHERE n.auftrag_id = ${fotoAuftrag} AND n.von_id = ${claudiaId} AND p.techniker_id = 1`) === '1');
+  await p.context().clearCookies({ name: 'person' });
+
+  // 19i. Export: Diagramm als Excel (echte .xlsx = ZIP) und CSV
+  await p.goto(BASE + '/statistik'); await p.waitForTimeout(2000);
+  await p.click('.diagramm .export-knopf .rund-knopf >> nth=0');
+  const [xlsx] = await Promise.all([p.waitForEvent('download'), p.click('.export-menue button:has-text("Excel")')]);
+  const xlsxPfad = SHOTS + 'export.xlsx'; await xlsx.saveAs(xlsxPfad);
+  pruefe('Export: Excel-Datei (ZIP) mit Titel als Name', xlsx.suggestedFilename() === 'Stoerungen-pro-Monat.xlsx' && fs.readFileSync(xlsxPfad).subarray(0, 2).toString() === 'PK');
+  await p.click('.diagramm .export-knopf .rund-knopf >> nth=0');
+  const [csv] = await Promise.all([p.waitForEvent('download'), p.click('.export-menue button:has-text("CSV")')]);
+  const csvText = fs.readFileSync(await csv.path(), 'utf8');
+  pruefe('Export: CSV mit Kopfzeile und Semikolon', csvText.startsWith('﻿Monat;Störungen'));
 
   // 20. Ansicht (Konto): nur Werk Hamburg, danach wieder alles
   await p.goto(BASE + '/'); await p.waitForTimeout(800);

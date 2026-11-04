@@ -38,7 +38,7 @@ export async function GET(anfrage) {
     antwort.gespraeche.sort((a, b) => new Date(b.zeitpunkt) - new Date(a.zeitpunkt));
   } else if (Number.isInteger(mit) && mit > 0) {
     antwort.nachrichten = (await sql`
-      SELECT id, von_id, text, zeitpunkt, gelesen_am FROM nachricht
+      SELECT id, von_id, text, zeitpunkt, gelesen_am, auftrag_id FROM nachricht
       WHERE (von_id = ${ich.id} AND an_id = ${mit}) OR (von_id = ${mit} AND an_id = ${ich.id})
       ORDER BY zeitpunkt DESC, id DESC LIMIT 200`).reverse();
   }

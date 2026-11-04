@@ -81,6 +81,7 @@
 
     /* 3D-Ansicht und Werks-Deko (components/karten/raum/) – feste Farben, weil WebGL keine Transparenz-Mischung wie CSS kann */
     --raum-akzent: #5b6b7f;
+    --raum-regal-stuetze: #2f5d8a; --raum-regal-traeger: #e0782a; --raum-karton: #c9a26b; --raum-palette: #b88d5a;
     --raum-umgebung: #e6e9ee; --raum-gelaende: #d3dfca; --raum-beton: #e4e5e3; --raum-strasse: #c9ced6; --raum-markierung: #ffffff;
     --raum-wand: #f6f7f9; --raum-fenster: #9db4cf; --raum-tor: #8e96a3;
     --raum-dach-0: #8f9bab; --raum-dach-1: #b39c86; --raum-dach-2: #8ea597; --raum-dach-3: #a3a4c2;
@@ -139,6 +140,7 @@
 
     --raum-akzent: #9fb3cc;
     /* Dunkelmodus: dieselbe Welt wie am Tag, nur etwas gedämpft (Nacht kommt von der Ortszeit, nicht vom Modus) */
+    --raum-regal-stuetze: #264b6f; --raum-regal-traeger: #b46022; --raum-karton: #a18256; --raum-palette: #937148;
     --raum-umgebung: #20242a; --raum-gelaende: #a9b2a2; --raum-beton: #b6b7b6; --raum-strasse: #a1a5ab; --raum-markierung: #d9dde3;
     --raum-wand: #c5c6c7; --raum-fenster: #7e90a6; --raum-tor: #727882;
     --raum-dach-0: #727c89; --raum-dach-1: #8f7d6b; --raum-dach-2: #728479; --raum-dach-3: #82839b;
@@ -1916,6 +1918,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .gruppe-stoerung { --gruppe: var(--orange); }
 .gruppe-personen { --gruppe: var(--lila); }
 .gruppe-material { --gruppe: var(--gruen); }
+.gruppe-wartung  { --gruppe: var(--blau); }
 .gruppe-sonst    { --gruppe: var(--grau); }
 .er-tabelle { border-top: 3px solid var(--gruppe); }
 .er-tabelle .er-kopf > .bi { color: var(--gruppe); }
@@ -2413,3 +2416,218 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .chat-eingabe { display: flex; gap: 8px; align-items: flex-end; padding-top: 12px; border-top: 1px solid var(--linie); }
 .chat-eingabe textarea { resize: none; min-height: 40px; max-height: 120px; field-sizing: content; border-radius: 20px; padding: 8px 14px; }
 .chat-senden { flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+
+/* =====================================================================
+ * Wartungsplan (app/wartung/) – Kalender und Liste
+ * ================================================================== */
+.kalender-kopf { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.kalender-monat { min-width: 170px; text-align: center; text-transform: capitalize; }
+.kalender-werk { min-width: 200px; }
+.kalender-legende { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.kalender-legende span { display: inline-flex; align-items: center; gap: 6px; }
+.kal-punkt { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.kal-punkt.ueberfaellig, .kal-marke.ueberfaellig { background: var(--rot); }
+.kal-punkt.faellig, .kal-marke.faellig { background: var(--orange); }
+.kal-punkt.erledigt, .kal-marke.erledigt { background: var(--gruen); }
+.kalender { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.kalender-wochentag { font-size: .72rem; font-weight: 600; color: var(--text-leise); text-align: center; padding-bottom: 2px; text-transform: uppercase; letter-spacing: .03em; }
+.kalender-tag {
+    min-height: 76px; padding: 6px 8px; border-radius: 12px; border: 1px solid var(--linie);
+    background: var(--karte-solid); color: var(--text); text-align: left;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 4px;
+    transition: border-color var(--uebergang), box-shadow var(--uebergang), transform var(--uebergang);
+}
+.kalender-tag:hover { border-color: color-mix(in srgb, var(--akzent) 45%, var(--linie)); }
+.kalender-tag.anderer-monat { opacity: .45; }
+.kalender-tag.heute .kalender-zahl { background: var(--akzent); color: var(--akzent-text); }
+.kalender-tag.gewaehlt { border-color: var(--akzent); box-shadow: 0 0 0 3px var(--akzent-ring); }
+.kalender-zahl { align-self: flex-start; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; font-size: .82rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kalender-marken { display: flex; gap: 4px; flex-wrap: wrap; }
+.kal-marke { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 999px; color: #fff; font-size: .68rem; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.wartung-eintraege { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.wartung-eintrag { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 12px; background: var(--fuellung); border-left: 3px solid var(--orange); }
+.wartung-eintrag.art-ueberfaellig { border-left-color: var(--rot); }
+.wartung-eintrag.art-erledigt { border-left-color: var(--gruen); }
+.wartung-eintrag.art-geplant { border-left-color: var(--linie); }
+.wartung-symbol { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--karte-solid); color: var(--akzent); }
+.wartung-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.wartung-text strong { font-weight: 600; font-size: .9rem; }
+.wartung-status { font-size: .74rem; font-weight: 600; margin-top: 2px; }
+.wartung-status.ueberfaellig { color: var(--rot); }
+.wartung-status.faellig { color: var(--orange); }
+.wartung-status.erledigt { color: var(--gruen); }
+.wartung-status.geplant { color: var(--text-leise); }
+.wartung-erledigen { flex: none; align-self: center; width: 36px; height: 36px; color: var(--gruen); background: var(--karte-solid); }
+.wartung-erledigen:hover { background: var(--gruen-bg); }
+.wartung-maschine { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wartung-dialog { width: min(640px, calc(100vw - 32px)); }
+@media (min-width: 1200px) { .wartung-liste { position: sticky; top: 20px; max-height: calc(100dvh - 40px); overflow-y: auto; } }
+@media (max-width: 575.98px) {
+    .kalender { gap: 3px; }
+    .kalender-tag { min-height: 54px; padding: 4px; border-radius: 9px; }
+    .kalender-zahl { min-width: 22px; height: 22px; font-size: .74rem; padding: 0 4px; }
+    .kal-marke { min-width: 8px; width: 8px; height: 8px; padding: 0; font-size: 0; }
+}
+
+/* =====================================================================
+ * QR-Etiketten (app/qr/) und Drucken
+ * ================================================================== */
+:root { --qr-dunkel: #111; --qr-hell: #fff; }   /* bewusst fest: Scanner brauchen dunkel auf hell */
+.qr-code { display: block; width: 100%; height: auto; border-radius: 6px; }
+.qr-etiketten { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.qr-etikett {
+    display: flex; gap: 14px; align-items: center; padding: 14px; border-radius: 14px;
+    background: var(--qr-hell); color: var(--qr-dunkel); border: 1px solid var(--linie); break-inside: avoid;
+}
+.qr-etikett .qr-code { width: 120px; flex: none; }
+.qr-karte .qr-gross { width: min(190px, 100%); margin: 0 auto; border: 1px solid var(--linie); }
+.wartung-entfernen { flex: none; align-self: center; width: 36px; height: 36px; color: var(--text-leise); background: var(--karte-solid); }
+.wartung-entfernen:hover { color: var(--rot); }
+.qr-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: .85rem; }
+.qr-text strong { font-size: 1.1rem; letter-spacing: .02em; }
+.qr-ort { color: #555; font-size: .75rem; }
+.qr-hinweis { margin-top: 6px; font-size: .72rem; font-weight: 600; }
+@media print {
+    @page { margin: 12mm; }
+    .seitenleiste, .mobil-kopf, .nicht-drucken, .app-footer { display: none !important; }
+    .app-rahmen { padding: 0 !important; margin: 0 !important; }
+    body::before { display: none !important; }
+    body { background: #fff !important; }
+    .qr-etiketten { grid-template-columns: repeat(2, 1fr); gap: 8mm; }
+    .qr-etikett { border: 1px dashed #999; border-radius: 0; animation: none !important; }
+    .karte { box-shadow: none !important; background: #fff !important; animation: none !important; }
+}
+
+/* =====================================================================
+ * Fotos (Melden und Auftrag) und Checkliste (Auftrag)
+ * ================================================================== */
+.foto-vorschauen, .foto-reihe { display: flex; gap: 10px; flex-wrap: wrap; }
+.foto-reihe { margin-bottom: 12px; }
+.foto-vorschau, .foto-klein, .foto-hinzu { position: relative; width: 104px; height: 104px; border-radius: 12px; overflow: hidden; flex: none; }
+.foto-vorschau img, .foto-klein img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foto-klein { padding: 0; border: 1px solid var(--linie); background: var(--fuellung); cursor: zoom-in; transition: transform var(--uebergang); }
+.foto-klein:hover { transform: scale(1.03); }
+.foto-weg {
+    position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0;
+    display: grid; place-items: center; font-size: .7rem; background: rgba(0, 0, 0, .55); color: #fff;
+}
+.foto-hinzu {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+    border: 1.5px dashed color-mix(in srgb, var(--akzent) 45%, var(--linie)); color: var(--akzent);
+    font-size: .74rem; font-weight: 600; text-align: center; padding: 6px; background: var(--fuellung);
+}
+.foto-hinzu .bi { font-size: 1.4rem; }
+.foto-hinzu:hover { background: var(--akzent-zart); }
+.foto-hinzu:focus-within { outline: 2px solid var(--akzent); outline-offset: 2px; }
+.foto-gross { position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, .82); display: grid; place-items: center; padding: 24px; cursor: zoom-out; animation: einblenden .2s ease backwards; }
+.foto-gross img { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+.foto-gross .rund-knopf { position: absolute; top: 16px; right: 16px; background: rgba(255, 255, 255, .9); color: #111; }
+.checkliste-stand { font-size: .8rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--fuellung); color: var(--text-leise); font-variant-numeric: tabular-nums; }
+.checkliste-stand.fertig { background: var(--gruen-bg); color: var(--gruen); }
+.checkliste-balken { height: 6px; border-radius: 3px; background: var(--fuellung); overflow: hidden; margin: 12px 0 8px; }
+.checkliste-balken span { display: block; height: 100%; background: var(--gruen); border-radius: 3px; transition: width .3s var(--weich); }
+.checkliste { list-style: none; margin: 0; padding: 0; }
+.checkliste li + li { border-top: 1px solid var(--linie); }
+.checkliste label { display: flex; gap: 12px; align-items: flex-start; padding: 10px 2px; cursor: pointer; font-size: .9rem; }
+.checkliste label .form-check-input { flex: none; margin-top: 2px; width: 1.15em; height: 1.15em; }
+.checkliste label.erledigt span { color: var(--text-leise); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-leise) 60%, transparent); }
+.checkliste .form-check-input:checked { background-color: var(--gruen); border-color: var(--gruen); }
+.chat-auftrag {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 10px; border-radius: 10px;
+    font-size: .8rem; font-weight: 600; background: var(--karte-solid); color: var(--akzent); text-decoration: none;
+}
+.chat-blase.meine .chat-auftrag { background: rgba(255, 255, 255, .92); color: var(--akzent); }
+.chat-auftrag:hover { text-decoration: underline; }
+
+/* =====================================================================
+ * Lager (app/lager/) – 3D-Regal, Details, Liste
+ * ================================================================== */
+.lager-3d { position: relative; height: clamp(320px, 52vh, 560px); border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, var(--raum-umgebung), var(--raum-hallenboden)); }
+.lager-3d canvas { touch-action: pan-y; }
+.lager-legende { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.lager-legende span { display: inline-flex; align-items: center; gap: 6px; }
+.lager-marke {
+    position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; transform: translate(-200%, -200%);
+    display: flex; flex-direction: column; align-items: center; gap: 1px; white-space: nowrap;
+    padding: 5px 10px; border-radius: 10px; font-size: .75rem; line-height: 1.25;
+    background: var(--karte-solid); color: var(--text); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
+}
+.lager-marke span { font-variant-numeric: tabular-nums; color: var(--text-leise); }
+.lager-zustand { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; }
+.lager-zustand.zustand-rot { background: var(--rot-bg); color: var(--rot); }
+.lager-zustand.zustand-orange { background: var(--orange-bg); color: var(--orange); }
+.lager-zustand.zustand-gruen { background: var(--gruen-bg); color: var(--gruen); }
+.lager-bestand { display: flex; align-items: baseline; gap: 8px; }
+.lager-bestand strong { font-size: 2.2rem; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.lager-bestand span { color: var(--text-leise); font-size: .85rem; }
+.lager-balken { position: relative; height: 8px; border-radius: 4px; background: var(--fuellung); margin-top: 6px; }
+.lager-balken span { display: block; height: 100%; border-radius: 4px; transition: width .4s var(--weich); }
+.lager-balken span.zustand-rot { background: var(--rot); }
+.lager-balken span.zustand-orange { background: var(--orange); }
+.lager-balken span.zustand-gruen { background: var(--gruen); }
+.lager-balken i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text-leise); border-radius: 1px; }
+.lager-bestellung { padding: 12px; border-radius: 12px; background: var(--fuellung); font-size: .88rem; }
+.lager-nachbestellen { margin-top: 8px; }
+.lager-suche { max-width: 240px; }
+.lager-tabelle tbody tr { cursor: pointer; }
+.lager-tabelle tbody tr.gewaehlt td { background: var(--akzent-zart); }
+@media (min-width: 1200px) { .lager-detail { position: sticky; top: 20px; } }
+
+/* =====================================================================
+ * Hallen-Monitor (app/monitor/) – Vollbild ohne Seitenleiste
+ * ================================================================== */
+:root[data-vollbild="an"] .seitenleiste, :root[data-vollbild="an"] .mobil-kopf, :root[data-vollbild="an"] .app-footer { display: none !important; }
+:root[data-vollbild="an"] .app-rahmen { margin-left: 0 !important; transition: none; }
+:root[data-vollbild="an"] .app-main { max-width: none; padding: 20px 28px; }
+.monitor { min-height: calc(100dvh - 40px); display: flex; flex-direction: column; gap: 18px; }
+.monitor-kopf { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.monitor-kopf h1 { font-size: clamp(1.6rem, 2.6vw, 2.6rem); margin: 0; letter-spacing: -.02em; }
+.monitor-ort { color: var(--text-leise); font-weight: 600; font-size: .95rem; }
+.monitor-summen { display: flex; gap: 10px; margin-left: auto; }
+.monitor-summen span {
+    display: flex; flex-direction: column; align-items: center; min-width: 92px; padding: 8px 14px; border-radius: 14px;
+    background: var(--karte-solid); border: 1px solid var(--linie); font-size: .8rem; font-weight: 600; color: var(--text-leise);
+}
+.monitor-summen strong { font-size: 1.8rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.monitor-summen .ampel-gruen strong { color: var(--gruen); }
+.monitor-summen .ampel-orange strong { color: var(--orange); }
+.monitor-summen .ampel-rot strong { color: var(--rot); }
+.monitor-uhr { font-size: clamp(1.6rem, 2.4vw, 2.4rem); font-weight: 700; font-variant-numeric: tabular-nums; }
+.monitor-knoepfe { display: flex; gap: 8px; }
+.monitor-raster { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; align-content: start; }
+.monitor-kachel {
+    --zustand-farbe: var(--gruen);
+    position: relative; display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 20px; overflow: hidden;
+    background: var(--karte-solid); border: 1px solid var(--linie); border-top: 8px solid var(--zustand-farbe);
+    box-shadow: var(--schatten);
+}
+.monitor-kachel.ampel-orange { --zustand-farbe: var(--orange); background: color-mix(in srgb, var(--orange) 8%, var(--karte-solid)); }
+.monitor-kachel.ampel-rot { --zustand-farbe: var(--rot); background: color-mix(in srgb, var(--rot) 10%, var(--karte-solid)); }
+.monitor-kachel-kopf { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; }
+.monitor-kachel-kopf > .bi { color: var(--zustand-farbe); }
+.monitor-nummer { font-weight: 700; font-size: 1.15rem; letter-spacing: .02em; }
+.monitor-kachel .ampel-symbol { margin-left: auto; }
+.monitor-name { font-size: 1rem; color: var(--text-leise); }
+.monitor-zustand { display: flex; flex-direction: column; gap: 2px; }
+.monitor-zustand strong { font-size: 1.5rem; color: var(--zustand-farbe); }
+.monitor-zustand span { font-size: .9rem; }
+.monitor-wartung { margin-top: auto; align-self: flex-start; padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 600; background: var(--orange-bg); color: var(--orange); }
+.monitor-fuss { color: var(--text-leise); font-size: .8rem; text-align: center; }
+
+/* ---------- Export-Knopf (Diagramme, Statistik) ---------- */
+.diagramm { position: relative; }
+.diagramm .export-knopf { position: absolute; top: -46px; right: 0; }
+.export-knopf { position: relative; display: inline-block; }
+.export-knopf .rund-knopf { width: 32px; height: 32px; font-size: .85rem; color: var(--text-leise); }
+.export-knopf .rund-knopf:hover, .export-knopf .rund-knopf[aria-expanded="true"] { color: var(--akzent); }
+.export-menue {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 170px; padding: 6px;
+    border-radius: 12px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
+    display: flex; flex-direction: column; animation: aufklappen .15s var(--weich) backwards; transform-origin: top right;
+}
+.export-menue button { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font-size: .88rem; text-align: left; }
+.export-menue button:hover { background: var(--fuellung); }
+@media print { .export-knopf { display: none !important; } }
+/* Export-Knopf oben rechts in einer Statistik-Karte (Karte braucht position: relative) */
+.stat-ebene .karte { position: relative; }
+.karte-export { position: absolute; top: 22px; right: 22px; z-index: 2; }

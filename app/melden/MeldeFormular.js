@@ -12,12 +12,13 @@
  * auf Deutsch vom Server kommen.
  */
 import Link from 'next/link';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { meldungAnlegen } from '@/app/aktionen';
 import { URSACHEN_LISTE } from '@/lib/konstanten';
 import Feldfehler, { fehlerklasse } from '@/components/Feldfehler';
 import SpeichernKnopf from '@/components/SpeichernKnopf';
 import Auswahl from '@/components/Auswahl';
+import FotoAuswahl from '@/components/FotoAuswahl';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 
@@ -31,6 +32,7 @@ export default function MeldeFormular({ maschineId, startwerte, jetzt }) {
   const [zustand, aktion] = useActionState(meldungAnlegen, { fehler: {}, eingabe: startwerte });
   const { fehler, eingabe } = zustand;
   const hatFehler = Object.keys(fehler).length > 0;
+  const [fotos, setFotos] = useState([]);
   const t = useT();
 
   return (
@@ -86,6 +88,14 @@ export default function MeldeFormular({ maschineId, startwerte, jetzt }) {
                    ungueltig={Boolean(fehler.ursache_kategorie)} platzhalter={t('Bitte auswählen …')}
                    optionen={URSACHEN_LISTE.map((u) => ({ wert: u, text: t(u) }))} />
           <Feldfehler fehler={fehler} name="ursache_kategorie" />
+        </div>
+
+        {/* Fotos: Die Auswahl liegt hier oben im Zustand (fotos), damit sie erhalten bleibt,
+            wenn das Formular nach einer Fehlermeldung neu aufgebaut wird */}
+        <div className="mb-4">
+          <span className="form-label d-block">{t('Fotos (optional)')}</span>
+          <FotoAuswahl fotos={fotos} setFotos={setFotos} />
+          <Feldfehler fehler={fehler} name="fotos" />
         </div>
 
         {/* Priorität als große Auswahlfelder (gut mit dem Finger zu treffen) */}

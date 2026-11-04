@@ -11,10 +11,12 @@
  * abgerundetem Ende, zurückhaltendes Gitter. Die Farben kommen aus den
  * CSS-Variablen; beim Wechsel Hell/Dunkel wird neu gezeichnet.
  * Unter jedem Diagramm gibt es die Werte auch als Tabelle (Barrierefreiheit).
+ * Oben rechts: Export als CSV, Excel oder PDF (components/ExportKnopf.js) – Titel aus `titel` bzw. `beschreibung`.
  */
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { useT } from '@/components/SpracheKontext';
+import ExportKnopf from '@/components/ExportKnopf';
 
 /** Liest eine Farbe aus den CSS-Variablen (z. B. "--akzent") */
 function farbe(name) {
@@ -28,7 +30,7 @@ function mitDeckkraft(hex, deckkraft) {
   return `rgba(${r}, ${g}, ${b}, ${deckkraft})`;
 }
 
-export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '', nachkomma = 0, beschreibung, hoehe = 260, spalte = '', abNull = true }) {
+export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '', nachkomma = 0, beschreibung, titel, unterzeile, hoehe = 260, spalte = '', abNull = true }) {
   const t = useT();
   const leinwandRef = useRef(null);
   const formatiert = (wert) => (wert === null || wert === undefined ? '–'
@@ -110,6 +112,9 @@ export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '',
     <>
       <div className="diagramm" style={{ height: hoehe }}>
         <canvas ref={leinwandRef} role="img" aria-label={beschreibung} />
+        <ExportKnopf titel={titel ?? beschreibung} unterzeile={unterzeile}
+                     daten={() => ({ spalten: [spalte || t('Wert'), einheit || t('Wert')], zeilen: labels.map((l, i) => [l, werte[i] === null || werte[i] === undefined ? null : Math.round(werte[i] * 100) / 100]) })}
+                     bild={() => leinwandRef.current?.toDataURL('image/png')} />
       </div>
       <details className="mt-2">
         <summary className="klein">{t('Als Tabelle anzeigen')}</summary>
