@@ -674,6 +674,19 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     && (await p.textContent('.lager-detail')).includes('bestellt am'));
   await p.screenshot({ path: SHOTS + 'r-lager.png', fullPage: true });
 
+  // 19e2. Rundgang: startet auf der Übersicht, wechselt die Seite, hebt das Ziel hervor, Esc beendet
+  await p.goto(BASE + '/'); await p.waitForTimeout(1200);
+  await p.click('.rundgang-start');
+  await p.waitForSelector('.rundgang[data-schritt="1"] .rundgang-rahmen', { state: 'attached', timeout: 10000 }).catch(() => {});
+  pruefe('Rundgang: Schritt 1 hebt die Seitenleiste hervor', (await p.textContent('#rundgang-titel')) === 'Willkommen' && (await p.$('.rundgang-rahmen')) !== null);
+  await p.click('.rundgang-weiter'); await p.waitForTimeout(400);
+  await p.click('.rundgang-weiter');
+  await p.waitForURL(/[/]karte/, { timeout: 15000 }).catch(() => {});
+  await p.waitForSelector('.rundgang[data-schritt="3"] .rundgang-rahmen', { state: 'attached', timeout: 15000 }).catch(() => {});
+  pruefe('Rundgang: Schritt 3 öffnet die Störungskarte', p.url().includes('/karte') && (await p.textContent('#rundgang-titel')) === 'Störungskarte');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+  pruefe('Rundgang: Esc beendet', (await p.$('.rundgang')) === null && (await p.evaluate(() => sessionStorage.getItem('rundgang'))) === null);
+
   // 19f. Gabelstapler-Spiel: Start, Auftrag, Fahren und Abholen, Pause
   // (Ganze Lieferungen prüft ein Autopilot außerhalb der Tests – unter der Last des Testlaufs ist die Software-Grafik zu langsam.)
   await p.goto(BASE + '/spiel'); await p.waitForTimeout(2500);

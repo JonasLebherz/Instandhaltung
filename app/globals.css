@@ -2920,3 +2920,33 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     .spiel-auftrag { top: auto; bottom: 88px; right: 12px; }
     .spiel-ergebnis { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* =====================================================================
+ * Rundgang (components/Rundgang.js): Hervorhebung und Erklär-Karte
+ * ================================================================== */
+.rundgang-rahmen {
+    position: fixed; z-index: 1300; border-radius: 16px; pointer-events: none;
+    box-shadow: 0 0 0 3px var(--akzent), 0 0 0 9999px rgba(10, 14, 20, .45);
+    transition: left .25s var(--weich), top .25s var(--weich), width .25s var(--weich), height .25s var(--weich);
+}
+.rundgang-abdunkeln { position: fixed; inset: 0; z-index: 1300; background: rgba(10, 14, 20, .45); pointer-events: none; }
+.rundgang-karte {
+    position: fixed; z-index: 1310; width: min(380px, calc(100vw - 32px)); padding: 16px 18px; border-radius: 18px;
+    background: var(--karte-erhoeht); backdrop-filter: var(--glas-unschaerfe); -webkit-backdrop-filter: var(--glas-unschaerfe);
+    border: 1px solid var(--glas-rand); box-shadow: var(--glas-kante), var(--schatten-hover); color: var(--text);
+    animation: aufklappen .2s var(--weich);
+}
+.rundgang-karte:focus { outline: none; }
+.rundgang-karte.unten { left: 50%; bottom: 24px; transform: translateX(-50%); }
+.rundgang-kopf { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.rundgang-zaehler { font-size: .75rem; font-weight: 650; color: var(--text-leise); }
+.rundgang-zu { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: var(--fuellung); color: var(--text-leise); }
+.rundgang-zu:hover { background: var(--fuellung-hover); color: var(--text); }
+.rundgang-karte h2 { font-size: 1.1rem; font-weight: 700; margin: 0 0 6px; }
+.rundgang-karte p { font-size: .9rem; line-height: 1.45; margin: 0 0 12px; }
+.rundgang-fortschritt { display: flex; gap: 4px; margin-bottom: 12px; }
+.rundgang-fortschritt span { flex: 1; height: 4px; border-radius: 2px; background: var(--fuellung-hover); }
+.rundgang-fortschritt span.fertig { background: color-mix(in srgb, var(--akzent) 45%, transparent); }
+.rundgang-fortschritt span.aktiv { background: var(--akzent); }
+.rundgang-knoepfe { display: flex; justify-content: space-between; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .rundgang-rahmen { transition: none; } }

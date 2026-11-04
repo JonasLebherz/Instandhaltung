@@ -22,6 +22,7 @@ import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { RUNDGANG_START } from '@/components/Rundgang';
 import { abmelden } from '@/app/login/aktionen';
 import { SPRACHEN, T } from '@/lib/sprache';
 import { useSprache, useSpracheWechseln, useT } from './SpracheKontext';
@@ -403,6 +404,9 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                         onClick={() => { tonSetzen(!tonEin); if (!tonEin) setTimeout(() => ton('sanft'), 0); }}>
                   <i className={`bi ${tonEin ? 'bi-volume-up' : 'bi-volume-mute'}`} /> {t('Ton bei Kamerafahrten')}
                   <span className={`mini-schalter${tonEin ? ' an' : ''}`} aria-hidden="true" />
+                </button>
+                <button type="button" role="menuitem" onClick={() => { setFenster(null); window.dispatchEvent(new Event(RUNDGANG_START)); }}>
+                  <i className="bi bi-signpost-split" /> {t('Rundgang durch die App')}
                 </button>
                 <div className="menue-trenner" />
                 <form action={abmelden}>

@@ -10,6 +10,7 @@
 import './globals.css';
 
 import Seitenleiste from '@/components/Seitenleiste';
+import Rundgang from '@/components/Rundgang';
 import FlashMeldungen from '@/components/FlashMeldungen';
 import { SpracheProvider } from '@/components/SpracheKontext';
 import { aktuellerBenutzer } from '@/lib/auth';
@@ -84,6 +85,8 @@ export default async function RootLayout({ children }) {
         {benutzer ? (
           <>
             <Seitenleiste benutzer={benutzer} person={person} ansicht={ansicht} />
+            {/* Geführter Rundgang (startet über RundgangKnopf, siehe components/Rundgang.js) */}
+            <Rundgang />
             {/* Inhalt rechts neben der Seitenleiste (Abstand: siehe .app-rahmen in globals.css) */}
             <div className="app-rahmen">
               <main className="container app-main">
