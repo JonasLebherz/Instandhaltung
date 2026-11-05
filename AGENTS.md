@@ -7,7 +7,7 @@ Hier die wichtigsten Punkte in Kurzform:
 
 ## Projekt
 
-Instandhaltungsmanagement als Webanwendung für ein Hochschulprojekt.
+**„PitStop 01“** – Instandhaltungsmanagement als Webanwendung für ein Hochschulprojekt. Der Name steht als `PRODUKTNAME` in `components/Logo.js` (nicht übersetzen); Logo = Stoppuhr aus einer Sechskantmutter mit Tempo-Linien, gleiche Form in `app/icon.svg`.
 **Next.js 15** (App Router, React 19, JavaScript), Datenbank **Supabase (PostgreSQL)**, Hosting **Vercel**.
 Jeder Push nach GitHub wird von Vercel automatisch veröffentlicht. Deshalb vor jedem Push `npm run build` ausführen, er muss fehlerfrei durchlaufen.
 

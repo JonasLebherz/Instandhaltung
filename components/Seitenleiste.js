@@ -25,7 +25,7 @@ import { createPortal } from 'react-dom';
 import { abmelden } from '@/app/login/aktionen';
 import { SPRACHEN, T } from '@/lib/sprache';
 import { useSprache, useSpracheWechseln, useT } from './SpracheKontext';
-import Logo from './Logo';
+import Logo, { PRODUKTNAME } from './Logo';
 import PersonWahl, { RollenAbzeichen, PERSON_WAEHLEN } from './PersonWahl';
 import AnsichtWahl from './AnsichtWahl';
 import Favoriten from './Favoriten';
@@ -233,7 +233,7 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
     <>
       {/* Nur auf dem Smartphone: schmale Leiste oben mit Menü-Knopf */}
       <header className="mobil-kopf">
-        <Link href="/" className="leiste-marke"><Logo groesse={30} /> {t('Instandhaltung')}</Link>
+        <Link href="/" className="leiste-marke"><Logo groesse={30} /> {PRODUKTNAME}</Link>
         <button type="button" className="rund-knopf" aria-controls="seitenleiste" aria-expanded={mobilOffen}
                 aria-label={t('Menü öffnen')} onClick={() => setMobilOffen(true)}>
           <i className="bi bi-list" />
@@ -244,9 +244,9 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
       <aside id="seitenleiste" ref={leisteRef} className={`seitenleiste${mobilOffen ? ' mobil-offen' : ''}`}
              aria-label={t('Hauptnavigation')}>
         <div className="leiste-kopf">
-          <Link href="/" className="leiste-marke" aria-label={t('Instandhaltung – zur Übersicht')}>
+          <Link href="/" className="leiste-marke" aria-label={t('{name} – zur Übersicht', { name: PRODUKTNAME })}>
             <Logo groesse={36} />
-            <span className="leiste-text">{t('Instandhaltung')}</span>
+            <span className="leiste-text">{PRODUKTNAME}</span>
           </Link>
           <button type="button" className="rund-knopf leiste-schliessen" aria-label={t('Menü schließen')}
                   onClick={() => setMobilOffen(false)}>

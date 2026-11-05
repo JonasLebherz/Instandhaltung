@@ -18,6 +18,7 @@ import Kennzahl from '@/components/Kennzahl';
 import SpeichernKnopf from '@/components/SpeichernKnopf';
 import { lieferungBuchen } from '@/app/aktionen';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
+import { PRODUKTNAME } from '@/components/Logo';
 import { T } from '@/lib/sprache';
 import { standorteMitZahlen } from '@/lib/karten/daten';
 import FavoritKachel from '@/components/FavoritKachel';
@@ -27,7 +28,8 @@ import { PersonWaehlenKnopf, RollenAbzeichen } from '@/components/PersonWahl';
 
 // Immer aktuelle Daten aus der Datenbank (kein Zwischenspeichern der Seite)
 export const dynamic = 'force-dynamic';
-export const generateMetadata = () => seitentitel('Übersicht');
+// Die Vorlage „… · PitStop 01“ aus dem Layout gilt nur für Unterseiten – hier deshalb vollständig gesetzt
+export const generateMetadata = async () => ({ title: { absolute: `${(await seitentitel('Übersicht')).title} · ${PRODUKTNAME}` } });
 
 /**
  * Offene Aufträge, um die sich die gewählte Person kümmern sollte:

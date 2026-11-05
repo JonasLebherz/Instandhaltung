@@ -11,6 +11,7 @@ import './globals.css';
 
 import Seitenleiste from '@/components/Seitenleiste';
 import FlashMeldungen from '@/components/FlashMeldungen';
+import { PRODUKTNAME } from '@/components/Logo';
 import { SpracheProvider } from '@/components/SpracheKontext';
 import { aktuellerBenutzer } from '@/lib/auth';
 import { personAusCookie } from '@/lib/person';
@@ -31,7 +32,7 @@ async function flashLesen() {
 export async function generateMetadata() {
   const t = await uebersetzer();
   return {
-    title: { default: t('Instandhaltung'), template: `%s · ${t('Instandhaltung')}` },
+    title: { default: PRODUKTNAME, template: `%s · ${PRODUKTNAME}` },
     description: t('Instandhaltungsmanagement – Störungen melden, Aufträge bearbeiten, Kennzahlen auswerten'),
   };
 }
@@ -92,7 +93,7 @@ export default async function RootLayout({ children }) {
               </main>
               <footer className="app-footer">
                 <div className="container">
-                  {t('Instandhaltung · Hochschulprojekt „Company database“ · Digital Production')}
+                  {PRODUKTNAME} · {t('Hochschulprojekt „Company database“ · Digital Production')}
                 </div>
               </footer>
             </div>

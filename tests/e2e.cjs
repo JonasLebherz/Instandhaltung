@@ -613,6 +613,19 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.favorit-kachel-leer'); await p.waitForSelector('.favorit-wahl');
   pruefe('Übersicht: Favorit-Kachel, ohne Favoriten Hinweis', (await p.textContent('.favorit-wahl')).includes('Ansicht anpinnen'));
   await p.keyboard.press('Escape');
+  // Name der App: Seitenleiste und Browser-Tab
+  pruefe('Name „PitStop 01“ in Seitenleiste und Titel', (await p.textContent('.leiste-marke .leiste-text')).trim() === 'PitStop 01' && (await p.title()).includes('PitStop 01'));
+  // Favorit-Kachel beim Laden: kleiner Ring (früher füllte der Ring die ganze Kachel aus – ein großer drehender Kreis)
+  const favVorher = await p.evaluate(() => [localStorage.getItem('kartenfavoriten'), localStorage.getItem('uebersichtFavorit')]);
+  await p.evaluate(() => { const a = '/karte?land=de&ansicht=2d'; localStorage.setItem('kartenfavoriten', JSON.stringify([{ id: 'fx', name: 'Test', art: 'land', ansicht: '2d', adresse: a }])); localStorage.setItem('uebersichtFavorit', a); });
+  await p.route('**/api/kartendaten', async (r) => { await new Promise((ok) => setTimeout(ok, 2500)); await r.continue(); });
+  await p.reload(); await p.waitForSelector('.favorit-kachel-laden .leiste-laden', { timeout: 5000 }).catch(() => {});
+  const ring = await p.$eval('.favorit-kachel-laden .leiste-laden', (e) => e.getBoundingClientRect().width).catch(() => 999);
+  pruefe('Favorit-Kachel: kleiner Lade-Ring', ring > 10 && ring < 40, ring);
+  await p.waitForSelector('.favorit-kachel .explorer-kompakt', { timeout: 15000 }).catch(() => {});
+  pruefe('Favorit-Kachel: Karte erscheint nach dem Laden', (await p.$('.favorit-kachel .explorer-kompakt')) !== null);
+  await p.unroute('**/api/kartendaten');
+  await p.evaluate(([f, u]) => { for (const [k, w] of [['kartenfavoriten', f], ['uebersichtFavorit', u]]) { if (w === null) localStorage.removeItem(k); else localStorage.setItem(k, w); } }, favVorher);
 
   // 19c. Wartungsplan: Kennzahl gegen SQL, Kalender, „Erledigt“, neuen Plan anlegen (ohne Person: alles erlaubt)
   const faelligSql = "SELECT count(*) FROM (SELECT COALESCE(max(d.datum) + p.intervall_tage, p.start_datum) f FROM wartungsplan p LEFT JOIN wartung_durchfuehrung d ON d.plan_id = p.id WHERE p.aktiv GROUP BY p.id) x WHERE f < current_date";

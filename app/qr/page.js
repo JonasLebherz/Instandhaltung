@@ -13,7 +13,7 @@ import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import QrCode from '@/components/QrCode';
-import Logo from '@/components/Logo';
+import Logo, { PRODUKTNAME } from '@/components/Logo';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import DruckKnopf from './DruckKnopf';
 
@@ -62,7 +62,7 @@ export default async function QrSeite({ searchParams }) {
             <article key={m.id} className="qr-etikett">
               <header className="qr-band">
                 <Logo groesse={18} />
-                <span>{t('Instandhaltung')}</span>
+                <span>{PRODUKTNAME}</span>
                 <strong>{t('Störung melden')}</strong>
               </header>
               <div className="qr-inhalt">

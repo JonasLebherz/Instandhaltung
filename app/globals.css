@@ -262,7 +262,10 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     color: var(--text); white-space: nowrap;
 }
 .leiste-marke:hover { color: var(--text); text-decoration: none; }
-.leiste-marke:hover .logo svg { transform: rotate(60deg); }   /* die Mutter dreht sich wie beim Anziehen */
+/* Beim Darüberfahren läuft der Zeiger der Stoppuhr einmal herum (Mitte des Zeigers = Mitte der Uhr) */
+.logo-zeiger { transform-box: view-box; transform-origin: 13.2px 13.4px; transition: transform .8s var(--weich); }
+.leiste-marke:hover .logo-zeiger { transform: rotate(360deg); }
+@media (prefers-reduced-motion: reduce) { .logo-zeiger { transition: none; } }
 .leiste-kopf .leiste-schliessen { display: none; }   /* nur im Handy-Menü */
 
 /* Runder Knopf am rechten Rand: ein- und ausklappen */
@@ -592,7 +595,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     background: linear-gradient(180deg, var(--logo-oben), var(--logo-unten));
     box-shadow: inset 0 0 0 1px var(--logo-rand), inset 0 1px 0 rgba(255, 255, 255, .08), 0 2px 8px rgba(0, 0, 0, .18);
 }
-.logo svg { width: 70%; height: 70%; transition: transform .6s var(--weich); }
+.logo svg { width: 70%; height: 70%; }
 
 /* ---------- Runde Knöpfe und Aufklappmenüs ---------- */
 
@@ -2315,7 +2318,13 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .favorit-kachel-leer i { font-size: 1.6rem; }
 .favorit-kachel-leer strong { color: var(--text); }
 .favorit-kachel-leer span { font-size: .8rem; max-width: 240px; text-align: center; }
-.favorit-kachel-laden { height: 220px; display: grid; place-items: center; color: var(--text-leise); position: relative; }
+/* Platzhalter beim Laden: so hoch wie die Karte (kein Sprung), darin ein kleiner Ring.
+ * Der Ring der Seitenleiste (.leiste-laden) füllt sonst sein ganzes Elternelement aus – hier wurde er zu einem
+ * riesigen drehenden Kreis über der Kachel. */
+.favorit-kachel-laden { height: 240px; display: grid; place-items: center; color: var(--text-leise); position: relative; }
+.favorit-kachel-laden .leiste-laden { position: static; width: 26px; height: 26px; }
+/* Die fertige Karte blendet weich ein, statt aufzuspringen */
+.favorit-kachel .explorer-kompakt { animation: einblenden .32s ease backwards; }
 .favorit-wahl { width: min(460px, 100%); }
 .favorit-wahl .ort-liste { padding: 0 22px; overflow-y: auto; }
 .favorit-wahl > .btn { margin: 0 22px 22px; width: auto !important; }

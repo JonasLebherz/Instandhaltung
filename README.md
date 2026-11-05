@@ -1,4 +1,4 @@
-# Instandhaltungsmanagement
+# PitStop 01 – Instandhaltungsmanagement
 
 Webanwendung zur Erfassung und Bearbeitung von Maschinenstörungen.
 Entstanden im Hochschulprojekt **„Company database“** im Fach **Digital Production** (Hochschule Albstadt-Sigmaringen).

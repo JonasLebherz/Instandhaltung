@@ -2,7 +2,7 @@
   "name": "instandhaltung",
   "version": "2.0.0",
   "private": true,
-  "description": "Instandhaltungsmanagement – Hochschulprojekt Company database (Digital Production)",
+  "description": "PitStop 01 – Instandhaltungsmanagement – Hochschulprojekt Company database (Digital Production)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

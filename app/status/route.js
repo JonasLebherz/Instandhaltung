@@ -48,7 +48,7 @@ export async function GET() {
   zeilen.push(`Statistik-View v_stoerung_details: ${await messen(() => sql`SELECT COUNT(*)::int FROM v_stoerung_details`)}`);
   zeilen.push(`Ersatzteile/Bestellungen: ${await messen(() => sql`SELECT COUNT(*)::int FROM ersatzteil e LEFT JOIN bestellung b ON b.ersatzteil_id = e.id`)}`);
 
-  return new Response(`Verbindungstest Instandhaltung\n\n${zeilen.join('\n')}\n`, {
+  return new Response(`Verbindungstest PitStop 01\n\n${zeilen.join('\n')}\n`, {
     headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
   });
 }
