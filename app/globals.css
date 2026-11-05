@@ -296,6 +296,29 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text-leise) 35%, transparent) transparent;
     margin: 0 -6px; padding: 0 6px;
 }
+/* Eingeklappt: kein sichtbarer Scrollbalken. Er nahm auf Laptops (Windows) rechts ~10 px weg, dadurch
+   standen Symbole und der helle Streifen des gewählten Eintrags nicht mehr mittig. Gescrollt wird weiter mit
+   Mausrad/Touchpad. Als Hinweis, dass es weitergeht, läuft der Rand oben bzw. unten weich aus – nur wenn
+   dort wirklich noch Einträge sind (Scroll-Zeitleiste: ohne Überlauf ist sie inaktiv, dann gibt es keine
+   Maske; Browser ohne Unterstützung zeigen einfach keinen Verlauf). */
+@property --leiste-oben { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --leiste-unten { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@keyframes leiste-rand {
+    from { --leiste-oben: 0px;  --leiste-unten: 22px; }
+    6%   { --leiste-oben: 22px; }
+    94%  { --leiste-unten: 22px; }
+    to   { --leiste-oben: 22px; --leiste-unten: 0px; }
+}
+:root:not([data-leiste="auf"]) .leiste-nav { scrollbar-width: none; }
+:root:not([data-leiste="auf"]) .leiste-nav::-webkit-scrollbar { display: none; }
+@supports (animation-timeline: scroll()) {
+    :root:not([data-leiste="auf"]) .leiste-nav {
+        -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--leiste-oben), #000 calc(100% - var(--leiste-unten)), transparent);
+        mask-image: linear-gradient(to bottom, transparent, #000 var(--leiste-oben), #000 calc(100% - var(--leiste-unten)), transparent);
+        animation: leiste-rand linear both;
+        animation-timeline: scroll(self);
+    }
+}
 .leiste-fuss { flex: none; }
 /* Sprechblase der eingeklappten Leiste (siehe tippZeigen in Seitenleiste.js) */
 .leiste-tipp {

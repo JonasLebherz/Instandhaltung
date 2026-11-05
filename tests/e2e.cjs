@@ -272,6 +272,12 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Seitenleiste: einklappen (nur Symbole)', (await p.getAttribute('html', 'data-leiste')) === 'zu' && breiteZu < 90, breiteZu);
   await p.reload(); await p.waitForTimeout(600);
   pruefe('Seitenleiste: Zustand bleibt nach Neuladen', (await p.getAttribute('html', 'data-leiste')) === 'zu');
+  // Eingeklappt kein Scrollbalken (nahm auf Laptops Platz weg, die Auswahl stand dann nicht mittig)
+  pruefe('Seitenleiste: eingeklappt ohne Scrollbalken, gewählter Eintrag mittig', await p.evaluate(() => {
+    const n = document.querySelector('.leiste-nav'); const l = document.querySelector('.seitenleiste').getBoundingClientRect();
+    const a = document.querySelector('.leiste-nav .leiste-link.aktiv')?.getBoundingClientRect();
+    return getComputedStyle(n).scrollbarWidth === 'none' && (!a || Math.abs((a.left - l.left) - (l.right - a.right)) <= 2);
+  }));
   await p.hover('.leiste-link[href="/statistik"]'); await p.waitForTimeout(300);
   // Die Sprechblase liegt fest im Fenster (.leiste-tipp), weil der mittlere Teil der Leiste scrollen kann
   pruefe('Seitenleiste: Name erscheint beim Darüberfahren', await p.isVisible('.leiste-tipp') && (await p.textContent('.leiste-tipp')).includes('Statistik'));
