@@ -2195,6 +2195,13 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .explorer-ebene:has(> .ebene-welt), .explorer-ebene:has(> .ebene-land), .explorer-ebene:has(> .ebene-werk) { overflow: hidden; }
 .raum, .raum-laden { position: absolute; inset: 0; }
 .raum canvas { touch-action: none; outline: none; }
+/* Solange die 3D-Szene aufgebaut wird (direkter Start in 3D, z. B. über einen Favoriten): kleiner Ring in der Mitte */
+.raum:not(.fertig)::after {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px;
+    border-radius: 50%; border: 2px solid var(--akzent); border-right-color: transparent;
+    animation: drehen .7s linear infinite, einblenden .3s ease .4s backwards; pointer-events: none;
+}
+.ebene-vorschau .raum::after, .ebene-alt .raum::after { content: none; }
 /* 3D blendet erst ein, wenn die Grafik vorbereitet ist (kein Ruckeln beim Öffnen) */
 .raum > div:first-child { opacity: 0; transition: opacity .35s ease; }
 .raum.fertig > div:first-child { opacity: 1; }

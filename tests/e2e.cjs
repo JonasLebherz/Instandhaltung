@@ -631,6 +631,16 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.waitForSelector('.favorit-kachel .explorer-kompakt', { timeout: 15000 }).catch(() => {});
   pruefe('Favorit-Kachel: Karte erscheint nach dem Laden', (await p.$('.favorit-kachel .explorer-kompakt')) !== null);
   await p.unroute('**/api/kartendaten');
+  // 3D-Favorit aus der Seitenleiste: startet direkt in 3D, ohne vorher den 2D-Plan zu zeigen
+  await p.evaluate(() => localStorage.setItem('kartenfavoriten', JSON.stringify([{ id: 'f3', name: 'Albstadt 3D', art: 'werk', ansicht: '3d', adresse: '/karte?werk=alb&ansicht=3d' }])));
+  await p.goto(BASE + '/auftraege'); await p.waitForTimeout(800);
+  await p.click('.favorit-link[href="/karte?werk=alb&ansicht=3d"]');
+  let planGesehen = false; let raumDa = false;
+  for (let i = 0; i < 40 && !raumDa; i += 1) {
+    const z = await p.evaluate(() => [Boolean(document.querySelector('.ebene-neu .lageplan')), Boolean(document.querySelector('.ebene-neu .raum.fertig'))]).catch(() => [false, false]);
+    planGesehen ||= z[0]; raumDa = z[1]; await p.waitForTimeout(300);
+  }
+  pruefe('Favorit in 3D: direkt die 3D-Szene, kein 2D-Plan vorher', raumDa && !planGesehen, { raumDa, planGesehen });
   await p.evaluate(([f, u]) => { for (const [k, w] of [['kartenfavoriten', f], ['uebersichtFavorit', u]]) { if (w === null) localStorage.removeItem(k); else localStorage.setItem(k, w); } }, favVorher);
 
   // 19c. Wartungsplan: Kennzahl gegen SQL, Kalender, „Erledigt“, neuen Plan anlegen (ohne Person: alles erlaubt)

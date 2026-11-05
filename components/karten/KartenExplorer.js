@@ -195,13 +195,8 @@ export default function KartenExplorer({
     try { wahl ??= localStorage.getItem('kartenansicht'); } catch { /* z. B. privater Modus */ }
     const drei = kann && (wahl ? wahl === '3d' : window.innerWidth >= 768);
     if (drei) dreiDVorladen();
-    // Werk bzw. Halle in 3D: sofort den 2D-Plan zeigen und die 3D-Szene darüber einblenden, sobald sie fertig
-    // ist (wie beim Umschalten 2D → 3D) – statt einer leeren Fläche, solange die Szene aufgebaut wird
-    if (drei && ebene.standortId && !ruhig()) {
-      setAufbau(ebene);
-      setVorbereitung(ebene);
-      return;
-    }
+    // Werk bzw. Halle in 3D (z. B. ein Favorit): direkt die 3D-Szene, ohne erst den 2D-Plan zu zeigen.
+    // Bis sie fertig ist, dreht sich in der Bühne ein kleiner Ring (.raum:not(.fertig)), dann blendet sie ein.
     setDreiD(drei);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

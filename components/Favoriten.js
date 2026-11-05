@@ -20,6 +20,9 @@ import {
   FAVORITEN_WECHSEL, FAVORIT_OEFFNEN, FAVORIT_SYMBOLE, MAX_FAVORITEN, KARTEN_ADRESSE,
 } from '@/lib/favoriten';
 
+/** 3D-Teil der Karte im Voraus laden (der Browser merkt sich das Modul – mehrfacher Aufruf kostet nichts) */
+function vorladen3D() { import('./karten/raum/Werk3D'); }
+
 export default function Favoriten({ onOeffnen, person }) {
   const t = useT();
   const pfad = usePathname();
@@ -143,6 +146,8 @@ export default function Favoriten({ onOeffnen, person }) {
                 ) : (
                   <>
                     <Link href={f.adresse} className={`leiste-link favorit-link${aktiv ? ' aktiv' : ''}`} onClick={(e) => oeffnen(e, f)}
+                          // 3D-Favorit: three.js schon beim Darüberfahren laden (die Szene steht dann schneller)
+                          onPointerEnter={f.ansicht === '3d' ? vorladen3D : undefined}
                           aria-current={aktiv ? 'page' : undefined}
                           aria-label={`${titel} (${f.ansicht === '3d' ? '3D' : '2D'})`}>
                       <span className="leiste-symbol">
