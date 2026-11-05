@@ -693,13 +693,22 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     && (await p.textContent('.lager-detail')).includes('bestellt am'));
   await p.screenshot({ path: SHOTS + 'r-lager.png', fullPage: true });
 
-  // 19f. Hallen-Monitor: Kachel je Maschine, ohne Seitenleiste
-  await p.goto(BASE + '/monitor?werk=ham&halle=h2'); await p.waitForTimeout(1000);
-  pruefe('Hallen-Monitor: Kachel je Maschine, Seitenleiste ausgeblendet', (await p.$$eval('.monitor-kachel', (z) => z.length)) === Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE st.kuerzel = 'HAM' AND g.kuerzel = 'H2'"))
+  // 19f. Hallen-Monitor: Halle wie in der Karte (2D-Grundriss), rechts alle Maschinen, ohne Seitenleiste
+  await p.evaluate(() => { localStorage.removeItem('monitoransicht'); localStorage.removeItem('kartenansicht'); });
+  await p.goto(BASE + '/monitor?werk=ham&halle=h2'); await p.waitForSelector('.monitor-halle .grundriss', { timeout: 20000 }).catch(() => {});
+  pruefe('Hallen-Monitor: Grundriss wie in der Karte, Zeile je Maschine, Seitenleiste ausgeblendet', (await p.$('.monitor-halle .grundriss')) !== null
+    && (await p.$$eval('.monitor-zeile', (z) => z.length)) === Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE st.kuerzel = 'HAM' AND g.kuerzel = 'H2'"))
     && !(await p.isVisible('.seitenleiste')));
-  await p.click('.monitor-schalter button:has-text("3D")'); await p.waitForSelector('.monitor-3d .explorer-kompakt', { timeout: 30000 }).catch(() => {});
-  pruefe('Hallen-Monitor: Umschalter auf 3D zeigt die Halle', (await p.$('.monitor-3d .explorer-kompakt')) !== null && (await p.evaluate(() => localStorage.getItem('monitoransicht'))) === '3d');
-  await p.click('.monitor-schalter button:has-text("2D")'); await p.waitForTimeout(300);
+  pruefe('Hallen-Monitor: Liste nach Zustand sortiert (rot, orange, grün)', await p.$$eval('.monitor-zeile', (z) => {
+    const r = z.map((e) => ['rot', 'orange', 'gruen'].indexOf(e.dataset.zustand)); return r.every((x, i) => i === 0 || r[i - 1] <= x);
+  }));
+  await p.click('.monitor-schalter button:has-text("3D")');
+  await p.waitForSelector('.monitor-halle .ebene-neu .raum', { timeout: 30000 }).catch(() => {});
+  pruefe('Hallen-Monitor: Umschalter auf 3D zeigt die Halle in 3D (gleiche Bühne, ohne Neuaufbau)', (await p.$('.monitor-halle .ebene-neu .raum')) !== null
+    && (await p.evaluate(() => localStorage.getItem('monitoransicht'))) === '3d' && (await p.evaluate(() => localStorage.getItem('kartenansicht'))) === null);
+  await p.click('.monitor-schalter button:has-text("2D")');
+  await p.waitForSelector('.monitor-halle .ebene-neu .grundriss', { timeout: 20000 }).catch(() => {});
+  pruefe('Hallen-Monitor: zurück auf 2D zeigt wieder den Grundriss', (await p.$('.monitor-halle .ebene-neu .grundriss')) !== null);
   await p.goto(BASE + '/'); await p.waitForTimeout(500);
   pruefe('Hallen-Monitor: Seitenleiste danach wieder da', await p.isVisible('.seitenleiste'));
 

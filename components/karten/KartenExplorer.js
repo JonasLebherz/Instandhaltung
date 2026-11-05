@@ -160,6 +160,10 @@ export default function KartenExplorer({
   daten, modus = 'anzeige', start = {}, onMaschine, groesse = 'gross', adresseMitfuehren = false,
   eigenesWerk = null,   // Werk der gewählten Person (beim Melden: Hinweis, in den Listen zuerst)
   kompakt = false,      // kleines Kartenfenster (Übersicht): ohne Info-Spalte, Pfad, Legende und Werkzeuge
+  // Von außen gesteuerte Darstellung '2d' | '3d' (Hallen-Monitor: eigener Umschalter im Kopf). Ein Wechsel
+  // läuft über dieselben Übergänge wie der Umschalter der Karte (Gebäude sinken/wachsen, Überblenden)
+  // und wird nicht als Wahl der Karte gemerkt.
+  ansicht = null,
 }) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
   const melden = modus === 'auswahl';   // Störung melden: eigenes Aussehen, keine Störungszahlen
@@ -217,8 +221,8 @@ export default function KartenExplorer({
     const weg = setTimeout(() => setPinHinweis(null), 3000);
     return () => clearTimeout(weg);
   }, [pinHinweis]);
-  function ansichtWaehlen(drei) {
-    try { localStorage.setItem('kartenansicht', drei ? '3d' : '2d'); } catch { /* ignorieren */ }
+  function ansichtWaehlen(drei, merken = true) {
+    if (merken) { try { localStorage.setItem('kartenansicht', drei ? '3d' : '2d'); } catch { /* ignorieren */ } }
     // 3D → 2D: Kamera fährt senkrecht nach oben, die Gebäude werden flach (wie gezeichnet),
     // dann blendet die Zeichnung darüber ein
     if (!drei && istRaum(ebene) && !ruhig()) {
@@ -325,10 +329,19 @@ export default function KartenExplorer({
       wechsle(ziel, 'rein');
     }
   }
+  // Gesteuerte Darstellung (Prop „ansicht“): Änderungen von außen wie ein Klick auf den eigenen Umschalter
+  const ansichtVorher = useRef(ansicht);
+  useEffect(() => {
+    if (!ansicht || ansicht === ansichtVorher.current) return;
+    ansichtVorher.current = ansicht;
+    ansichtWaehlen(ansicht === '3d', false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ansicht]);
   // Vorwärmen: Steht man in 2D in einem Werk bzw. einer Halle, wird die 3D-Szene nach kurzer Ruhe unsichtbar
   // (flach, Kamera von oben, danach angehalten) vorbereitet. Der Wechsel auf 3D beginnt dann sofort.
+  // Nicht in kleinen Kartenfenstern (Favorit-Kachel) – wohl aber im Hallen-Monitor (gesteuerte Ansicht).
   useEffect(() => {
-    if (!webgl || dreiD || !ebene.standortId || uebergang || aufbau || kompakt || ruhig() || window.innerWidth < 768) return undefined;
+    if (!webgl || dreiD || !ebene.standortId || uebergang || aufbau || (kompakt && !ansicht) || ruhig() || window.innerWidth < 768) return undefined;
     let abbruch = null;
     const warten = setTimeout(() => {
       const los = () => { dreiDVorladen(); setVorbereitung({ ...ebene }); };
@@ -336,7 +349,7 @@ export default function KartenExplorer({
     }, 1200);
     return () => { clearTimeout(warten); abbruch?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webgl, dreiD, ebene.standortId, ebene.gebaeudeId, uebergang, aufbau, kompakt]);
+  }, [webgl, dreiD, ebene.standortId, ebene.gebaeudeId, uebergang, aufbau, kompakt, ansicht]);
 
   // Sicherheitsnetz: nach 2,5 s ohne fertige Szene trotzdem losfliegen
   useEffect(() => {

@@ -2783,24 +2783,6 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .monitor-summen .ampel-rot strong { color: var(--rot); }
 .monitor-uhr { font-size: clamp(1.6rem, 2.4vw, 2.4rem); font-weight: 700; font-variant-numeric: tabular-nums; }
 .monitor-knoepfe { display: flex; gap: 8px; }
-.monitor-raster { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; align-content: start; }
-.monitor-kachel {
-    --zustand-farbe: var(--gruen);
-    position: relative; display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 20px; overflow: hidden;
-    background: var(--karte-solid); border: 1px solid var(--linie); border-top: 8px solid var(--zustand-farbe);
-    box-shadow: var(--schatten);
-}
-.monitor-kachel.ampel-orange { --zustand-farbe: var(--orange); background: color-mix(in srgb, var(--orange) 8%, var(--karte-solid)); }
-.monitor-kachel.ampel-rot { --zustand-farbe: var(--rot); background: color-mix(in srgb, var(--rot) 10%, var(--karte-solid)); }
-.monitor-kachel-kopf { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; }
-.monitor-kachel-kopf > .bi { color: var(--zustand-farbe); }
-.monitor-nummer { font-weight: 700; font-size: 1.15rem; letter-spacing: .02em; }
-.monitor-kachel .ampel-symbol { margin-left: auto; }
-.monitor-name { font-size: 1rem; color: var(--text-leise); }
-.monitor-zustand { display: flex; flex-direction: column; gap: 2px; }
-.monitor-zustand strong { font-size: 1.5rem; color: var(--zustand-farbe); }
-.monitor-zustand span { font-size: .9rem; }
-.monitor-wartung { margin-top: auto; align-self: flex-start; padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 600; background: var(--orange-bg); color: var(--orange); }
 .monitor-fuss { color: var(--text-leise); font-size: .8rem; text-align: center; }
 
 /* ---------- Export-Knopf (Diagramme, Statistik) ---------- */
@@ -2820,22 +2802,27 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* Export-Knopf oben rechts in einer Statistik-Karte (Karte braucht position: relative) */
 .stat-ebene .karte { position: relative; }
 .karte-export { position: absolute; top: 22px; right: 22px; z-index: 2; }
-/* Hallen-Monitor in 3D: Halle groß, rechts die gestörten Maschinen */
+/* Hallen-Monitor: links die Halle wie in der Störungskarte (2D-Grundriss bzw. 3D), rechts alle Maschinen */
 .monitor-schalter { position: static; }
-.monitor-3d { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; min-height: 0; }
-.monitor-3d-buehne { min-width: 0; }
+.monitor-halle { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; min-height: 0; }
+.monitor-halle-buehne { min-width: 0; }
 /* Höhe der Bühne kommt aus groesse="monitor" (--buehne-h) */
 .explorer-kompakt .explorer-buehne.buehne-monitor, .explorer-buehne.buehne-monitor { --buehne-h: max(420px, calc(100dvh - 190px)); }
-.monitor-3d-laden { height: max(420px, calc(100dvh - 190px)); border-radius: 20px; background: var(--fuellung); animation: pulsieren 1.4s ease-in-out infinite; }
-.monitor-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: calc(100dvh - 190px); }
-.monitor-zeile { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--karte-solid); border: 1px solid var(--linie); }
-.monitor-zeile.ampel-rot { border-left: 5px solid var(--rot); }
-.monitor-zeile.ampel-orange { border-left: 5px solid var(--orange); }
+.monitor-halle-laden { height: max(420px, calc(100dvh - 190px)); border-radius: 20px; background: var(--fuellung); animation: pulsieren 1.4s ease-in-out infinite; }
+.monitor-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: max(420px, calc(100dvh - 190px)); }
+.monitor-zeile { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; border-radius: 14px; background: var(--karte-solid); border: 1px solid var(--linie); }
+.monitor-zeile .ampel-symbol { margin-top: 3px; }
+.monitor-zeile.ampel-rot { border-left: 5px solid var(--rot); background: color-mix(in srgb, var(--rot) 8%, var(--karte-solid)); }
+.monitor-zeile.ampel-orange { border-left: 5px solid var(--orange); background: color-mix(in srgb, var(--orange) 7%, var(--karte-solid)); }
 .monitor-zeile.ampel-gruen { border-left: 5px solid var(--gruen); }
-.monitor-zeile-text { display: flex; flex-direction: column; min-width: 0; font-size: .95rem; }
+.monitor-zeile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: .95rem; }
 .monitor-zeile-text small { color: var(--text-leise); font-size: .8rem; }
-.monitor-alles-gut { padding: 16px; border-radius: 14px; background: var(--gruen-bg); color: var(--gruen); font-weight: 600; }
-@media (max-width: 991.98px) { .monitor-3d { grid-template-columns: 1fr; } .monitor-liste { max-height: none; } }
+.monitor-zeile-text small b { font-weight: 600; }
+.monitor-zeile.ampel-rot small b { color: var(--rot); }
+.monitor-zeile.ampel-orange small b { color: var(--orange); }
+.monitor-zeile.ampel-gruen small b { color: var(--gruen); }
+.monitor-wartung { align-self: flex-start; margin-top: 4px; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--orange-bg); color: var(--orange); }
+@media (max-width: 991.98px) { .monitor-halle { grid-template-columns: 1fr; } .monitor-liste { max-height: none; } }
 /* ---------- Wartungsplan: Umschalter und Zeitachse ---------- */
 .wartung-schalter { position: static; }
 .wartung-schalter button { display: inline-flex; align-items: center; gap: 6px; }
