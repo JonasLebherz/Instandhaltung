@@ -8,7 +8,6 @@
  *  - eine kleine Deutschlandkarte; Klick auf ein Werk öffnet die Störungskarte
  *  - Ersatzteile unter Mindestbestand inkl. offener Bestellungen (mit Wareneingang)
  */
-import { RundgangKnopf } from '@/components/Rundgang';
 import Link from 'next/link';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
@@ -157,12 +156,9 @@ export default async function Uebersicht() {
             )}
           </p>
         </div>
-        <div className="d-flex gap-2 flex-wrap">
-          <RundgangKnopf className="btn btn-sekundaer rundgang-start"><i className="bi bi-signpost-split" aria-hidden="true" /> {t('Rundgang')}</RundgangKnopf>
-          <Link className="btn btn-primary" href="/melden">
-            <i className="bi bi-plus-lg" aria-hidden="true" /> {t('Neue Störung melden')}
-          </Link>
-        </div>
+        <Link className="btn btn-primary" href="/melden">
+          <i className="bi bi-plus-lg" aria-hidden="true" /> {t('Neue Störung melden')}
+        </Link>
       </div>
 
       {/* Kennzahlen */}

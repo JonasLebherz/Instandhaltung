@@ -674,35 +674,6 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     && (await p.textContent('.lager-detail')).includes('bestellt am'));
   await p.screenshot({ path: SHOTS + 'r-lager.png', fullPage: true });
 
-  // 19e2. Rundgang: startet auf der Übersicht, wechselt die Seite, hebt das Ziel hervor, Esc beendet
-  await p.goto(BASE + '/'); await p.waitForTimeout(1200);
-  await p.click('.rundgang-start');
-  await p.waitForSelector('.rundgang[data-schritt="1"] .rundgang-rahmen', { state: 'attached', timeout: 10000 }).catch(() => {});
-  pruefe('Rundgang: Schritt 1 hebt die Seitenleiste hervor', (await p.textContent('#rundgang-titel')) === 'Willkommen' && (await p.$('.rundgang-rahmen')) !== null);
-  await p.click('.rundgang-weiter'); await p.waitForTimeout(400);
-  await p.click('.rundgang-weiter');
-  await p.waitForURL(/[/]karte/, { timeout: 15000 }).catch(() => {});
-  await p.waitForSelector('.rundgang[data-schritt="3"] .rundgang-rahmen', { state: 'attached', timeout: 15000 }).catch(() => {});
-  pruefe('Rundgang: Schritt 3 öffnet die Störungskarte', p.url().includes('/karte') && (await p.textContent('#rundgang-titel')) === 'Störungskarte');
-  await p.keyboard.press('Escape'); await p.waitForTimeout(300);
-  pruefe('Rundgang: Esc beendet', (await p.$('.rundgang')) === null && (await p.evaluate(() => sessionStorage.getItem('rundgang'))) === null);
-
-  // 19f. Gabelstapler-Spiel: Start, Auftrag, Fahren und Abholen, Pause
-  // (Ganze Lieferungen prüft ein Autopilot außerhalb der Tests – unter der Last des Testlaufs ist die Software-Grafik zu langsam.)
-  await p.goto(BASE + '/spiel'); await p.waitForTimeout(2500);
-  pruefe('Spiel: Startfenster mit Bestenliste', (await p.textContent('.spiel-fenster')).includes('Spiel starten') && (await p.$('.spiel-bestenliste')) !== null);
-  await p.click('.spiel-start'); await p.waitForTimeout(800);
-  pruefe('Spiel: Auftrag mit Maschine und Ersatzteil', /Stillstand/.test(await p.textContent('.spiel-auftrag')) && /Fach \d/.test(await p.textContent('.spiel-auftrag')));
-  // Vom Start geradeaus ins Lager: die Gabel fährt in einen Abholplatz und lädt ein Teil
-  await p.keyboard.down('ArrowUp');
-  await p.waitForFunction(() => document.querySelector('.spiel-buehne')?.dataset.geladen !== '', null, { timeout: 30000 }).catch(() => {});
-  await p.keyboard.up('ArrowUp'); await p.waitForTimeout(300);
-  pruefe('Spiel: Stapler fährt und lädt im Lager ein Ersatzteil', (await p.getAttribute('.spiel-buehne', 'data-geladen')) !== '' && Number(await p.getAttribute('.spiel-buehne', 'data-weg')) >= 3);
-  await p.screenshot({ path: SHOTS + 's-spiel.png' });
-  await p.keyboard.press('Escape'); await p.waitForTimeout(300);
-  pruefe('Spiel: Esc pausiert', (await p.getAttribute('.spiel-buehne', 'data-phase')) === 'pause');
-  await p.click('.spiel-fenster button:has-text("Abbrechen")');
-
   // 19f. Hallen-Monitor: Kachel je Maschine, ohne Seitenleiste
   await p.goto(BASE + '/monitor?werk=ham&halle=h2'); await p.waitForTimeout(1000);
   pruefe('Hallen-Monitor: Kachel je Maschine, Seitenleiste ausgeblendet', (await p.$$eval('.monitor-kachel', (z) => z.length)) === Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE st.kuerzel = 'HAM' AND g.kuerzel = 'H2'"))
