@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LUPE, WELT, WELT_KERNE, WELT_MITTEN, WELT_PFADE, weltPunkt } from '@/lib/karten/welt';
 import { inLupe, markenPositionen } from '@/lib/karten/laender';
-import { stufe, PrioZahlen, geteiltKlasse, prioText } from './stufe';
+import { stufe, TortenZahl, tortenVerlauf, prioText } from './stufe';
 import { useT } from '@/components/SpracheKontext';
 
 const KARTE = { breite: WELT.breite, hoehe: WELT.hoehe, mitten: WELT_MITTEN };
@@ -75,9 +75,10 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
               style={{ left: `${(p.x / breite) * 100}%`, top: `${(p.y / hoehe) * 100}%`, '--i': i }}
               aria-label={neutral ? `${t(land.name)}: ${werke}` : `${t(land.name)}: ${werke}, ${prioText(land, t)}`}
               data-ort={`land-${land.kuerzel}`}>
-        {/* Zahl offener Störungen; bei mehreren Prioritäten aufgeteilt (z. B. 1 rot | 4 blau) */}
-        <span className={`punkt-blase${neutral ? '' : geteiltKlasse(land)}`}>
-          {neutral ? <i className="bi bi-geo-alt-fill" /> : land.offen > 0 ? <PrioZahlen o={land} /> : <i className="bi bi-check-lg" />}
+        {/* Zahl offener Störungen, darum ein Ring als Tortendiagramm der Prioritäten (rot/orange/blau) */}
+        <span className={`punkt-blase${!neutral && land.offen > 0 ? ' torte' : ''}`}
+              style={!neutral && land.offen > 0 ? { '--torte': tortenVerlauf(land) } : undefined}>
+          {neutral ? <i className="bi bi-geo-alt-fill" /> : land.offen > 0 ? <TortenZahl o={land} /> : <i className="bi bi-check-lg" />}
         </span>
         {!klein && (
           <span className="punkt-name">

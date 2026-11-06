@@ -39,6 +39,34 @@ export function PrioZahlen({ o }) {
 }
 export const geteiltKlasse = (o) => (prioTeile(o).length > 1 ? ' geteilt' : '');
 
+/**
+ * Für Welt- und Länderkarte: eine Zahl (alle offenen Störungen) und darum ein Ring als Tortendiagramm, der die
+ * Verteilung auf die Prioritäten zeigt (rot hoch, orange mittel, blau niedrig). Es geht um den Eindruck
+ * („viel Rot oder nur ein bisschen?“), nicht um genaue Zahlen – die stehen erst an Hallen und Maschinen.
+ * Rückgabe: CSS-Verlauf für die Eigenschaft --torte (conic-gradient), bei mehreren Farben mit feinen Fugen.
+ */
+const TORTEN_FARBE = { rot: 'var(--rot)', orange: 'var(--orange)', blau: 'var(--blau)', ruhig: 'var(--gruen)' };
+export function tortenVerlauf(o) {
+  const teile = prioTeile(o);
+  if (teile.length === 0) return null;
+  if (teile.length === 1) return TORTEN_FARBE[teile[0][0]];
+  const summe = teile.reduce((a, [, n]) => a + n, 0);
+  const fuge = 2.5;   // Grad zwischen zwei Stücken (Farbe der Karte)
+  let start = 0;
+  const stuecke = teile.map(([farbe, n]) => {
+    const ende = start + (n / summe) * 360;
+    const teil = `var(--karte-solid) ${start}deg ${start + fuge}deg, ${TORTEN_FARBE[farbe]} ${start + fuge}deg ${ende}deg`;
+    start = ende;
+    return teil;
+  });
+  return `conic-gradient(${stuecke.join(', ')})`;
+}
+
+/** Inhalt eines Kartenpunkts mit Tortenring: Zahl in der Mitte auf heller Fläche (Ring kommt aus --torte) */
+export function TortenZahl({ o }) {
+  return <span className="torte-zahl">{o.offen}</span>;
+}
+
 /** Text für Bildschirmleser und Tooltips: „3 offene Störungen (1 hoch, 2 niedrig)“ */
 export function prioText(o, t) {
   const teile = prioTeile(o);

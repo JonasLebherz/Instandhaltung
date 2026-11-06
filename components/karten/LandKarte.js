@@ -12,7 +12,7 @@
  *
  * Die Punkte werden prozentual über die SVG-Karte gelegt – so passt alles zu jeder Größe.
  */
-import { stufe, PrioZahlen, geteiltKlasse, prioText } from './stufe';
+import { stufe, TortenZahl, tortenVerlauf, prioText } from './stufe';
 import { useT } from '@/components/SpracheKontext';
 
 /**
@@ -71,8 +71,9 @@ export default function LandKarte({ karte, standorte, auswahlId = null, onWaehle
                   aria-label={neutral ? st.name : `${st.name}: ${prioText(st, t)}`}
                   // data-ort: Daran findet die Zoom-Karte den Punkt, von dem aus sie zoomt
                   data-ort={`st-${st.id}`}>
-            <span className={`punkt-blase${neutral ? '' : geteiltKlasse(st)}`}>
-              {neutral ? <i className="bi bi-geo-alt-fill" /> : st.offen > 0 ? <PrioZahlen o={st} /> : <i className="bi bi-check-lg" />}
+            <span className={`punkt-blase${!neutral && st.offen > 0 ? ' torte' : ''}`}
+              style={!neutral && st.offen > 0 ? { '--torte': tortenVerlauf(st) } : undefined}>
+              {neutral ? <i className="bi bi-geo-alt-fill" /> : st.offen > 0 ? <TortenZahl o={st} /> : <i className="bi bi-check-lg" />}
             </span>
             <span className="punkt-name">{st.stadt}</span>
             <span className="punkt-info" role="tooltip">

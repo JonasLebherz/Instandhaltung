@@ -925,7 +925,8 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
     if (gewaehlt) {
       const h = gs.hallen[gewaehlt.id];
       const mitte = [X(h.x + h.b / 2), 0, Z(h.y + h.t / 2)];
-      const abstand = (Math.max(h.b * 1.35, h.t * 1.8) + 8) * schmal ** 0.6;   // Halle: Maschinen sollen groß bleiben
+      // Halle: Maschinen sollen groß bleiben, rundherum aber noch etwas Rand zu sehen sein (Wunsch: etwas weiter weg)
+      const abstand = (Math.max(h.b * 1.6, h.t * 2.1) + 12) * schmal ** 0.6;
       return { schluessel: `g${gewaehlt.id}`, target: mitte, position: mitte.map((w, i) => w + richtung.getComponent(i) * abstand), dauer: 1.2 };
     }
     // Werk füllt das Bild, die Landschaft drumherum läuft bis zum Horizont

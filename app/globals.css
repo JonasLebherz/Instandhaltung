@@ -1276,6 +1276,19 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .prio-chip .prio-zahl + .prio-zahl { box-shadow: inset 1px 0 0 var(--karte-solid); }
 .monitor-zeile .prio-chip { height: 28px; font-size: .9rem; align-self: center; }
 
+/* Kartenpunkt mit Tortenring (Welt- und Länderkarte, TortenZahl/tortenVerlauf in stufe.js): Der Ring zeigt die
+   Verteilung der offenen Störungen auf die Prioritäten, in der Mitte steht die Summe auf heller Fläche. */
+.punkt-blase.torte { background: var(--torte); padding: 0; width: 36px; min-width: 36px; height: 36px; }
+.torte-zahl {
+    position: absolute; inset: 5px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--karte-solid); color: var(--text); font-size: .8rem; font-weight: 700;   /* deckend, sonst scheint die Torte durch */
+}
+.wkarte-klein .punkt-blase.torte { width: 30px; min-width: 30px; height: 30px; }
+.wkarte-klein .torte-zahl, .karten-punkt.in-lupe .torte-zahl { inset: 4px; font-size: .6875rem; }
+.karten-punkt.in-lupe .punkt-blase.torte { width: 30px; min-width: 30px; height: 30px; }
+.wkarte-klein .karten-punkt.in-lupe .punkt-blase.torte { width: 26px; min-width: 26px; height: 26px; }
+.wkarte-klein .karten-punkt.in-lupe .torte-zahl { inset: 3px; font-size: .6875rem; letter-spacing: -.02em; }
+
 /* ---------- Deutschlandkarte ---------- */
 
 .dkarte { position: relative; width: 100%; max-width: 560px; margin: 0 auto; }
