@@ -30,6 +30,9 @@ export default async function MonitorSeite({ searchParams }) {
     sql`
       SELECT m.id, m.anlagennummer, m.bezeichnung, m.typ::text AS typ,
              COUNT(w.id) FILTER (WHERE w.status <> 'erledigt')::int AS offen,
+             COUNT(w.id) FILTER (WHERE w.status <> 'erledigt' AND s.prioritaet = 'hoch')::int AS hoch,
+             COUNT(w.id) FILTER (WHERE w.status <> 'erledigt' AND s.prioritaet = 'mittel')::int AS mittel,
+             COUNT(w.id) FILTER (WHERE w.status <> 'erledigt' AND s.prioritaet = 'niedrig')::int AS niedrig,
              MAX(s.prioritaet) FILTER (WHERE w.status <> 'erledigt')::text AS hoechste_prioritaet,
              MIN(s.zeitpunkt) FILTER (WHERE w.status <> 'erledigt') AS seit,
              (SELECT w2.status::text FROM stoermeldung s2 JOIN wartungsauftrag w2 ON w2.stoermeldung_id = s2.id

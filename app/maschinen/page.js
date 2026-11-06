@@ -22,6 +22,9 @@ export default async function MaschinenUebersicht() {
     SELECT m.id, m.anlagennummer, m.bezeichnung, m.typ::text AS typ, m.baujahr,
            g.kuerzel AS gebaeude_kuerzel, st.id AS standort_id, st.name AS standort, st.land_kuerzel AS land, l.name AS land_name,
            COUNT(w.id) FILTER (WHERE w.status <> 'erledigt')::int AS offen,
+           COUNT(w.id) FILTER (WHERE w.status <> 'erledigt' AND s.prioritaet = 'hoch')::int AS hoch,
+           COUNT(w.id) FILTER (WHERE w.status <> 'erledigt' AND s.prioritaet = 'mittel')::int AS mittel,
+           COUNT(w.id) FILTER (WHERE w.status <> 'erledigt' AND s.prioritaet = 'niedrig')::int AS niedrig,
            MAX(s.prioritaet) FILTER (WHERE w.status <> 'erledigt')::text AS hoechste_prioritaet,
            COUNT(s.id) FILTER (WHERE s.zeitpunkt >= now() - interval '12 months')::int AS stoerungen_12m
     FROM maschine m

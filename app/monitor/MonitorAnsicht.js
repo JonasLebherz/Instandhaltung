@@ -20,6 +20,7 @@ import { startAusAdresse } from '@/lib/karten/adresse';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/components/SpracheKontext';
 import { ampelZustand, AMPEL_TEXT, AMPEL_REIHENFOLGE, AmpelSymbol } from '@/lib/karten/ampel';
+import { stufe, PrioZahlen, geteiltKlasse, prioText } from '@/components/karten/stufe';
 import { gross } from '@/lib/sprache';
 
 const TAKT = 30000;
@@ -121,11 +122,13 @@ export default function MonitorAnsicht({ ort, maschinen, stand }) {
                     <span><strong>{m.anlagennummer}</strong> {m.bezeichnung}</span>
                     <small>
                       <b>{t(AMPEL_TEXT[z])}</b>
-                      {m.offen > 0 && <> · {m.offen === 1 ? t('1 offene Störung') : t('{n} offene Störungen', { n: m.offen })} · {seitText(m.seit, jetzt, t)}</>}
+                      {m.offen > 0 && <> · {prioText(m, t)} · {seitText(m.seit, jetzt, t)}</>}
                       {m.offen > 0 && m.status && <> · {gross(t(m.status))}</>}
                     </small>
                     {m.wartung_faellig > 0 && <span className="monitor-wartung"><i className="bi bi-calendar-check" aria-hidden="true" /> {t('Wartung fällig')}</span>}
                   </span>
+                  {/* offene Störungen je Priorität (z. B. 1 rot | 2 blau) */}
+                  {m.offen > 0 && <span className={`prio-chip ms-auto stufe-${stufe(m.offen, m.hoechste_prioritaet)}${geteiltKlasse(m)}`}><PrioZahlen o={m} /></span>}
                 </li>
               );
             })}

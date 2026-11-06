@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LUPE, WELT, WELT_KERNE, WELT_MITTEN, WELT_PFADE, weltPunkt } from '@/lib/karten/welt';
 import { inLupe, markenPositionen } from '@/lib/karten/laender';
-import { stufe, offenText } from './stufe';
+import { stufe, PrioZahlen, geteiltKlasse, prioText } from './stufe';
 import { useT } from '@/components/SpracheKontext';
 
 const KARTE = { breite: WELT.breite, hoehe: WELT.hoehe, mitten: WELT_MITTEN };
@@ -73,10 +73,11 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
       <button key={land.kuerzel} type="button" onClick={(e) => onWaehle?.(land, e)}
               className={`karten-punkt stufe-${farbe(land)}${zusatz}${p.x > breite * 0.7 ? ' info-links' : ''}${p.x < breite * 0.3 ? ' info-rechts' : ''}`}
               style={{ left: `${(p.x / breite) * 100}%`, top: `${(p.y / hoehe) * 100}%`, '--i': i }}
-              aria-label={neutral ? `${t(land.name)}: ${werke}` : `${t(land.name)}: ${werke}, ${offenText(land.offen, t)}`}
+              aria-label={neutral ? `${t(land.name)}: ${werke}` : `${t(land.name)}: ${werke}, ${prioText(land, t)}`}
               data-ort={`land-${land.kuerzel}`}>
-        <span className="punkt-blase">
-          {neutral ? <i className="bi bi-geo-alt-fill" /> : land.offen > 0 ? land.offen : <i className="bi bi-check-lg" />}
+        {/* Zahl offener Störungen; bei mehreren Prioritäten aufgeteilt (z. B. 1 rot | 4 blau) */}
+        <span className={`punkt-blase${neutral ? '' : geteiltKlasse(land)}`}>
+          {neutral ? <i className="bi bi-geo-alt-fill" /> : land.offen > 0 ? <PrioZahlen o={land} /> : <i className="bi bi-check-lg" />}
         </span>
         {!klein && (
           <span className="punkt-name">
@@ -85,7 +86,7 @@ export default function WeltKarte({ laender, onWaehle, neutral = false, klein: k
         )}
         <span className="punkt-info" role="tooltip">
           <strong>{t(land.name)}{land.hauptsitz ? ` · ${t('Hauptsitz')}` : ''}</strong>
-          {werke}{neutral ? '' : ` · ${offenText(land.offen, t)}`}
+          {werke}{neutral ? '' : ` · ${prioText(land, t)}`}
         </span>
       </button>
     );

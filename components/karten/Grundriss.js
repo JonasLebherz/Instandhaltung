@@ -11,7 +11,7 @@
  * neutral: beim Melden – ohne Zahlen und Farben offener Störungen.
  */
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
-import { stufe, offenText } from './stufe';
+import { stufe, PrioZahlen, geteiltKlasse, prioText } from './stufe';
 import { useT } from '@/components/SpracheKontext';
 
 /**
@@ -98,11 +98,11 @@ export default function Grundriss({ gebaeude, maschinen, auswahlId = null, onWae
                     onClick={(e) => onWaehle?.(m, e)}
                     data-ort={`m-${m.id}`}
                     aria-pressed={auswahlId === m.id}
-                    aria-label={neutral ? `${m.bezeichnung} (${m.anlagennummer})` : `${m.bezeichnung} (${m.anlagennummer}): ${offenText(m.offen, t)}`}
+                    aria-label={neutral ? `${m.bezeichnung} (${m.anlagennummer})` : `${m.bezeichnung} (${m.anlagennummer}): ${prioText(m, t)}`}
                     title={`${m.bezeichnung} · ${m.anlagennummer}`}>
               <i className={`bi ${MASCHINEN_SYMBOLE[m.typ] ?? 'bi-gear'}`} aria-hidden="true" />
               <span className="maschine-modell">{modell}</span>
-              {!neutral && m.offen > 0 && <span className={`zaehl-marke stufe-${farbe}`}>{m.offen}</span>}
+              {!neutral && m.offen > 0 && <span className={`zaehl-marke stufe-${farbe}${geteiltKlasse(m)}`}><PrioZahlen o={m} /></span>}
             </button>
           );
         })}

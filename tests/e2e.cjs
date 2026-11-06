@@ -230,13 +230,18 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Suche mit % ohne Fehler', (await p.content()).includes('Keine Meldungen gefunden'));
   // 14b. Störungskarte: Werte stimmen, Klickpfad funktioniert
   await p.goto(BASE + '/karte');
-  const offenKarte = await p.$$eval('.dkarte .punkt-blase', (z) => z.reduce((s, e) => s + (Number(e.textContent) || 0), 0));
+  const offenKarte = await p.$$eval('.dkarte .punkt-blase', (z) => z.reduce((s, e) => { const teile = [...e.querySelectorAll('.prio-zahl')]; return s + (teile.length ? teile.reduce((a, x) => a + Number(x.textContent), 0) : Number(e.textContent) || 0); }, 0));
   pruefe('Karte: Summe der Punkte = offene Aufträge', offenKarte === Number(sql("SELECT count(*) FROM wartungsauftrag WHERE status <> 'erledigt'")), offenKarte);
+  // Aufteilung nach Priorität: Der Punkt Deutschlands zeigt je Priorität eine Zahl in ihrer Farbe (rot hoch, orange mittel, blau niedrig)
+  const deTeile = await p.$$eval('.wkarte [data-ort="land-DE"] .prio-zahl', (z) => z.map((e) => `${e.className.match(/stufe-(\w+)/)[1]}:${e.textContent}`).join(' '));
+  const deSql = ['hoch:rot', 'mittel:orange', 'niedrig:blau'].map((x) => [x.split(':')[1], Number(sql(`SELECT count(*) FROM wartungsauftrag w JOIN stoermeldung s ON s.id = w.stoermeldung_id JOIN maschine m ON m.id = s.maschine_id JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE w.status <> 'erledigt' AND st.land_kuerzel = 'DE' AND s.prioritaet = '${x.split(':')[0]}'`))])
+    .filter(([, n]) => n > 0).map(([f, n]) => `${f}:${n}`).join(' ');
+  pruefe('Karte: offene Störungen je Priorität aufgeteilt (Deutschland wie Datenbank)', deTeile === deSql, `${deTeile} / ${deSql}`);
   pruefe('Karte: Weltebene ohne Scrollbalken', (await p.$eval('.ebene-neu', (e) => getComputedStyle(e).overflowY)) === 'hidden');
   pruefe('Karte: Welt- und Europakarte mit 8 Ländern', (await p.$$eval('.wkarte .karten-punkt', (z) => z.length)) === Number(sql('SELECT count(DISTINCT land_kuerzel) FROM standort')) && (await p.$$eval('.wkarte .karten-punkt', (z) => z.length)) === 8);
   await p.evaluate(() => { window.__ohneNeuladen = true; });
   await p.click('.ebene-neu [data-ort="land-US"]'); await p.waitForTimeout(800);
-  const offenUS = await p.$$eval('.ebene-neu .dkarte .punkt-blase', (z) => z.reduce((s, e) => s + (Number(e.textContent) || 0), 0));
+  const offenUS = await p.$$eval('.ebene-neu .dkarte .punkt-blase', (z) => z.reduce((s, e) => { const teile = [...e.querySelectorAll('.prio-zahl')]; return s + (teile.length ? teile.reduce((a, x) => a + Number(x.textContent), 0) : Number(e.textContent) || 0); }, 0));
   pruefe('Karte: Zoom auf USA (2 Werke, Adresse ?land=us, offene = Datenbank)', p.url().endsWith('/karte?land=us') && (await p.$$eval('.ebene-neu .karten-punkt', (z) => z.length)) === 2
     && offenUS === Number(sql("SELECT count(*) FROM wartungsauftrag w JOIN stoermeldung s ON s.id=w.stoermeldung_id JOIN maschine m ON m.id=s.maschine_id JOIN gebaeude g ON g.id=m.gebaeude_id JOIN standort st ON st.id=g.standort_id WHERE st.land_kuerzel='US' AND w.status <> 'erledigt'")), `${p.url()} ${offenUS}`);
   await p.click('.ebene-neu button[aria-label^="Werk Detroit"]'); await p.waitForTimeout(800);

@@ -28,7 +28,7 @@ import WeltKarte from './WeltKarte';
 import LandKarte from './LandKarte';
 import Lageplan from './Lageplan';
 import Grundriss from './Grundriss';
-import { Legende, stufe, offenText } from './stufe';
+import { Legende, stufe, offenText, PrioZahlen, geteiltKlasse, prioText } from './stufe';
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeSchritte from './MeldeSchritte';
@@ -832,7 +832,7 @@ function InfoSpalte({
                 </span>
                 {modus === 'auswahl'
                   ? <i className="bi bi-chevron-right ms-auto text-leise" aria-hidden="true" />
-                  : <span className="ort-zahl" aria-label={offenText(l.offen, t)}>{l.offen}</span>}
+                  : <span className={`ort-zahl${geteiltKlasse(l)}`} aria-label={prioText(l, t)}><PrioZahlen o={l} /></span>}
               </button>
             </li>
           ))}
@@ -865,7 +865,7 @@ function InfoSpalte({
                 </span>
                 {modus === 'auswahl'
                   ? <i className="bi bi-chevron-right ms-auto text-leise" aria-hidden="true" />
-                  : <span className="ort-zahl" aria-label={offenText(st.offen, t)}>{st.offen}</span>}
+                  : <span className={`ort-zahl${geteiltKlasse(st)}`} aria-label={prioText(st, t)}><PrioZahlen o={st} /></span>}
               </button>
             </li>
           ))}
@@ -894,7 +894,7 @@ function InfoSpalte({
                   </span>
                   {modus === 'auswahl'
                     ? <i className="bi bi-chevron-right ms-auto text-leise" aria-hidden="true" />
-                    : <span className="ort-zahl" aria-label={offenText(g.offen, t)}>{g.offen}</span>}
+                    : <span className={`ort-zahl${geteiltKlasse(g)}`} aria-label={prioText(g, t)}><PrioZahlen o={g} /></span>}
                 </button>
               </li>
             ))}
@@ -1003,7 +1003,7 @@ function InfoSpalte({
               <button type="button" onClick={() => onMaschine(m)} className={`stufe-${stufe(m.offen, m.hoechste_prioritaet)}`}>
                 <i className={`bi ${MASCHINEN_SYMBOLE[m.typ] ?? 'bi-gear'} text-leise`} aria-hidden="true" />
                 <span><span className="ort-titel">{m.bezeichnung}</span><span className="ort-unter">{m.anlagennummer}</span></span>
-                <span className="ort-zahl">{m.offen}</span>
+                <span className={`ort-zahl${geteiltKlasse(m)}`} aria-label={prioText(m, t)}><PrioZahlen o={m} /></span>
               </button>
             </li>
           ))}

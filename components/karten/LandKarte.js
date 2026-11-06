@@ -12,7 +12,7 @@
  *
  * Die Punkte werden prozentual über die SVG-Karte gelegt – so passt alles zu jeder Größe.
  */
-import { stufe, offenText } from './stufe';
+import { stufe, PrioZahlen, geteiltKlasse, prioText } from './stufe';
 import { useT } from '@/components/SpracheKontext';
 
 /**
@@ -68,16 +68,16 @@ export default function LandKarte({ karte, standorte, auswahlId = null, onWaehle
                   className={`karten-punkt stufe-${farbe}${oben ? ' name-oben' : ''}${x > breite * 0.68 ? ' info-links' : ''}`
                     + `${x < breite * 0.32 ? ' info-rechts' : ''}${auswahlId === st.id ? ' gewaehlt' : ''}`}
                   style={{ left: `${(x / breite) * 100}%`, top: `${(y / hoehe) * 100}%`, '--i': i }}
-                  aria-label={neutral ? st.name : `${st.name}: ${offenText(st.offen, t)}`}
+                  aria-label={neutral ? st.name : `${st.name}: ${prioText(st, t)}`}
                   // data-ort: Daran findet die Zoom-Karte den Punkt, von dem aus sie zoomt
                   data-ort={`st-${st.id}`}>
-            <span className="punkt-blase">
-              {neutral ? <i className="bi bi-geo-alt-fill" /> : st.offen > 0 ? st.offen : <i className="bi bi-check-lg" />}
+            <span className={`punkt-blase${neutral ? '' : geteiltKlasse(st)}`}>
+              {neutral ? <i className="bi bi-geo-alt-fill" /> : st.offen > 0 ? <PrioZahlen o={st} /> : <i className="bi bi-check-lg" />}
             </span>
             <span className="punkt-name">{st.stadt}</span>
             <span className="punkt-info" role="tooltip">
               <strong>{st.name}</strong>
-              {neutral ? t(st.schwerpunkt) : `${offenText(st.offen, t)}${st.hoch > 0 ? t(', davon {n} hoch', { n: st.hoch }) : ''}`}
+              {neutral ? t(st.schwerpunkt) : prioText(st, t)}
             </span>
           </button>
         );

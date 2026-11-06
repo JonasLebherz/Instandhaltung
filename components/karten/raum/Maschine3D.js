@@ -17,6 +17,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { ampelZustand } from '@/lib/karten/ampel';
+import { prioTeile } from '../stufe';
 import { Gehaeuse, Viele, useCanvasTextur, canvasTextur } from './Bausteine';
 import { useT } from '@/components/SpracheKontext';
 
@@ -127,19 +128,29 @@ function Roboter({ p, groesse, f, aktiv }) {
  * Die Anzeige dreht sich zur Kamera (nur um die senkrechte Achse) – so ist sie von überall lesbar.
  */
 const ledTexturen = new Map();
-function ledTextur(zahl, farbe) {
-  const schluessel = `${zahl}-${farbe}`;
+/**
+ * Leuchtende Ziffern als Textur. teile: [[zahl, farbe], …] – eine Zahl je Priorität (rot/orange/blau),
+ * nebeneinander in ihrer Farbe (z. B. „1“ rot und „4“ blau statt „5“ rot). Je Kombination einmal erzeugt.
+ */
+function ledTextur(teile) {
+  const schluessel = teile.map(([z, f]) => `${z}-${f}`).join('|');
   if (!ledTexturen.has(schluessel)) {
-    const textur = canvasTextur(128, 80, (g, w, h) => {
+    const n = teile.length;
+    const textur = canvasTextur(128 + (n - 1) * 80, 80, (g, w, h) => {
       g.fillStyle = '#0b0d10'; g.fillRect(0, 0, w, h);
       // Raster wie bei echten LED-Punkten
       g.fillStyle = 'rgba(255,255,255,0.04)';
       for (let x = 2; x < w; x += 4) for (let y = 2; y < h; y += 4) g.fillRect(x, y, 2, 2);
-      g.font = '700 64px ui-monospace, Menlo, Consolas, monospace';
+      g.font = `700 ${n > 1 ? 56 : 64}px ui-monospace, Menlo, Consolas, monospace`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.shadowColor = farbe; g.shadowBlur = 14;
-      g.fillStyle = farbe;
-      g.fillText(zahl > 99 ? '99+' : String(zahl), w / 2, h / 2 + 3);
+      teile.forEach(([zahl, farbe], k) => {
+        g.shadowColor = farbe; g.shadowBlur = 14;
+        g.fillStyle = farbe;
+        g.fillText(zahl > 99 ? '99+' : String(zahl), n > 1 ? 24 + 40 + k * 80 : w / 2, h / 2 + 3);
+      });
+      // Trennstriche zwischen den Zahlen
+      g.shadowBlur = 0; g.fillStyle = 'rgba(255,255,255,0.18)';
+      for (let k = 1; k < n; k += 1) g.fillRect(24 + k * 80 - 1, 14, 2, h - 28);
     });
     textur.wrapS = textur.wrapT = THREE.ClampToEdgeWrapping;
     ledTexturen.set(schluessel, textur);
@@ -147,7 +158,7 @@ function ledTextur(zahl, farbe) {
   return ledTexturen.get(schluessel);
 }
 const blickHilfe = new THREE.Vector3();
-function LedAnzeige({ y, zahl, farbe, f }) {
+function LedAnzeige({ y, teile, f }) {
   const ref = useRef(null);
   const letzte = useRef({ x: NaN, z: NaN });
   useFrame(({ camera }) => {
@@ -158,15 +169,17 @@ function LedAnzeige({ y, zahl, farbe, f }) {
     g.getWorldPosition(blickHilfe);
     g.lookAt(camera.position.x, blickHilfe.y, camera.position.z);
   });
-  const textur = ledTextur(zahl, farbe);
+  const textur = ledTextur(teile);
+  // Breiter, wenn mehrere Zahlen (je Priorität eine) nebeneinander stehen
+  const breite = 1 + (teile.length - 1) * 0.625;
   return (
     <group ref={ref} position={[0, y, 0]}>
       {/* Gehäuse mit Halter */}
       <mesh position={[0, -0.16, 0]}><cylinderGeometry args={[0.03, 0.03, 0.14, 8]} /><meshStandardMaterial color={f['maschine-dunkel']} /></mesh>
-      <mesh><boxGeometry args={[0.56, 0.36, 0.08]} /><meshStandardMaterial color="#1b1e22" roughness={0.5} metalness={0.3} /></mesh>
+      <mesh><boxGeometry args={[0.56 * breite, 0.36, 0.08]} /><meshStandardMaterial color="#1b1e22" roughness={0.5} metalness={0.3} /></mesh>
       {/* Leuchtende Ziffern vorn und hinten (unbeleuchtetes Material – leuchtet auch im Dunkeln) */}
-      <mesh position={[0, 0, 0.042]}><planeGeometry args={[0.5, 0.31]} /><meshBasicMaterial map={textur} toneMapped={false} /></mesh>
-      <mesh position={[0, 0, -0.042]} rotation-y={Math.PI}><planeGeometry args={[0.5, 0.31]} /><meshBasicMaterial map={textur} toneMapped={false} /></mesh>
+      <mesh position={[0, 0, 0.042]}><planeGeometry args={[0.5 * breite, 0.31]} /><meshBasicMaterial map={textur} toneMapped={false} /></mesh>
+      <mesh position={[0, 0, -0.042]} rotation-y={Math.PI}><planeGeometry args={[0.5 * breite, 0.31]} /><meshBasicMaterial map={textur} toneMapped={false} /></mesh>
     </group>
   );
 }
@@ -181,7 +194,7 @@ function LedAnzeige({ y, zahl, farbe, f }) {
 const LEUCHTEN = [['rot', 0.56], ['orange', 0.38], ['blau', 0.2], ['gruen', 0.02]];
 const LEUCHTEN_Y = Object.fromEntries(LEUCHTEN);
 const SAEULE_OBEN = 0.23;   // Kappe über der obersten Leuchte
-export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null, blinken = false }) {
+export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null, teile = null, blinken = false }) {
   const leuchten = LEUCHTEN;
   // Stillstand: das rote Licht blinkt (an 0,6 s, aus 0,4 s) – so fällt es sofort auf
   const rotRef = useRef(null);
@@ -215,7 +228,9 @@ export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null,
       )}
       <Rolle p={[0, hoehe + SAEULE_OBEN, 0]} r={0.1} l={0.06} farbe={f['maschine-dunkel']} />
       {anzeige !== null && zustand && (
-        <LedAnzeige y={hoehe + SAEULE_OBEN + 0.28} zahl={anzeige} farbe={f[`ampel-${anzeige > 0 ? zustand : 'gruen'}`]} f={f} />
+        <LedAnzeige y={hoehe + SAEULE_OBEN + 0.28} f={f}
+                    // Je Priorität eine Zahl in ihrer Farbe; ohne Aufteilung eine Zahl in der Ampelfarbe, „0“ grün
+                    teile={anzeige > 0 && teile?.length ? teile.map(([farbe, n]) => [n, f[`ampel-${farbe}`]]) : [[anzeige, f[`ampel-${anzeige > 0 ? zustand : 'gruen'}`]]]} />
       )}
     </group>
   );
@@ -805,7 +820,7 @@ export function MaschineMitAmpel({ m, L, W, f, bewegt, detail = null, ampelGroes
       <MaschinenForm typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} />
       <Namensschild m={m} L={L} W={W} f={f} />
       {detail && <Details m={m} zustand={zustand} typ={m.typ} L={L} W={W} f={f} laeuft={laeuft} voll={detail === 'voll'} />}
-      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} hoehe={ampelHoehe} anzeige={anzeige} blinken={bewegt && zustand === 'rot'} />
+      <Ampel p={[L / 2 - 0.15, 0, -W / 2 + 0.15]} zustand={zustand} f={f} groesse={ampelGroesse} hoehe={ampelHoehe} anzeige={anzeige} teile={prioTeile(m)} blinken={bewegt && zustand === 'rot'} />
     </>
   );
 }

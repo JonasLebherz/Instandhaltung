@@ -8,6 +8,7 @@ import { useT } from '@/components/SpracheKontext';
 import Auswahl from '@/components/Auswahl';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
+import { stufe, PrioZahlen, geteiltKlasse, prioText } from '@/components/karten/stufe';
 import { T } from '@/lib/sprache';
 
 const SORTIERUNGEN = [
@@ -89,7 +90,9 @@ export default function MaschinenListe({ maschinen }) {
                   </td>
                   <td className="d-none d-md-table-cell">{m.standort} · {m.gebaeude_kuerzel}</td>
                   <td className="d-none d-lg-table-cell">{m.baujahr}</td>
-                  <td className="text-nowrap"><span className={`ampel-punkt ampel-${z}`} title={t(AMPEL_TEXT[z])} /> <span className="zustand-text">{t(AMPEL_TEXT[z])}</span>{m.offen > 0 && ` (${m.offen})`}</td>
+                  <td className="text-nowrap"><span className={`ampel-punkt ampel-${z}`} title={t(AMPEL_TEXT[z])} /> <span className="zustand-text">{t(AMPEL_TEXT[z])}</span>
+                    {/* offene Störungen je Priorität, z. B. 1 rot | 2 blau */}
+                    {m.offen > 0 && <span className={`prio-chip stufe-${stufe(m.offen, m.hoechste_prioritaet)}${geteiltKlasse(m)}`} title={prioText(m, t)}><PrioZahlen o={m} /></span>}</td>
                   <td className="zahl">{m.stoerungen_12m}</td>
                 </tr>
               );

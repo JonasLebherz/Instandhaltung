@@ -9,7 +9,7 @@
  * anders aus (Straßenführung, Anbauten, gespiegelt, Bürogebäude, Tanks, Dachfarbe), genau wie in der 3D-Ansicht.
  * neutral: beim Melden – ohne Zahlen und Farben offener Störungen.
  */
-import { stufe, offenText } from './stufe';
+import { stufe, offenText, PrioZahlen, geteiltKlasse, prioText } from './stufe';
 import { useT } from '@/components/SpracheKontext';
 import { werkGestaltung } from '@/lib/karten/werkGestaltung';
 
@@ -79,12 +79,12 @@ export default function Lageplan({ standort, gebaeude, auswahlId = null, onWaehl
                       left: prozent(g3.hallen[g.id].x, B), top: prozent(g3.hallen[g.id].y, T),
                       width: prozent(g.breite_m, B), height: prozent(g.tiefe_m, T), '--i': i,
                     }}
-                    aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen, t)}`}
+                    aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${prioText(g, t)}`}
                     data-ort={`g-${g.id}`}>
               <span className="gebaeude-kuerzel">{g.kuerzel}</span>
               <span className="gebaeude-name">{g.bezeichnung.split('–').pop().trim()}</span>
               <span className="gebaeude-info">{t('{n} Maschinen', { n: g.maschinen })}</span>
-              {!neutral && <span className={`zaehl-marke stufe-${farbe}`}>{g.offen > 0 ? g.offen : <i className="bi bi-check-lg" />}</span>}
+              {!neutral && <span className={`zaehl-marke stufe-${farbe}${geteiltKlasse(g)}`}>{g.offen > 0 ? <PrioZahlen o={g} /> : <i className="bi bi-check-lg" />}</span>}
             </button>
           );
         })}

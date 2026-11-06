@@ -29,7 +29,7 @@ import * as THREE from 'three';
 import { werkGestaltung, zufall } from '@/lib/karten/werkGestaltung';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import { ortszeit } from '@/lib/karten/ortszeit';
-import { stufe, offenText } from '../stufe';
+import { stufe, offenText, PrioZahlen, geteiltKlasse, prioText } from '../stufe';
 import { useT } from '@/components/SpracheKontext';
 import { MaschineMitAmpel, MASCHINEN_HOEHE } from './Maschine3D';
 import { useRaum, useSichtbar } from './farben';
@@ -1257,11 +1257,11 @@ function Szene({ standort, gebaeude, maschinen, gebaeudeId, maschineId, onGebaeu
             {!offen && bereit && (
               <Html position={[0, Math.max(h.hoehe + (h.dach === 'flach' ? 2.5 : Math.min(h.b, h.t) * 0.12 + 2.5), ...h.anbauten.map((a) => a.hoehe + 2.5)), 0]} center zIndexRange={[4, 1]}>
                 <button type="button" className={`raum-halle stufe-${neutral ? 'neutral' : stufe(g.offen, g.hoechste_prioritaet)}${gewaehlt ? ' klein' : ''}`}
-                        data-ort={`g-${g.id}`} aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${offenText(g.offen, t)}`}
+                        data-ort={`g-${g.id}`} aria-label={neutral ? g.bezeichnung : `${g.bezeichnung}: ${prioText(g, t)}`}
                         onClick={() => onGebaeude(g)} onMouseEnter={() => setHover(`g${g.id}`)} onMouseLeave={() => setHover(null)}>
                   <strong>{g.kuerzel}</strong>
                   {!gewaehlt && <span className="raum-halle-name">{g.bezeichnung.split('–').pop().trim()}</span>}
-                  {!neutral && <span className="zaehl-marke">{g.offen > 0 ? g.offen : <i className="bi bi-check-lg" />}</span>}
+                  {!neutral && <span className={`zaehl-marke${geteiltKlasse(g)}`}>{g.offen > 0 ? <PrioZahlen o={g} /> : <i className="bi bi-check-lg" />}</span>}
                 </button>
               </Html>
             )}
