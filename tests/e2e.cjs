@@ -106,6 +106,10 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.fill('#beschreibung', 'Testmeldung: Presse schlägt nach <script>alert(1)</script>');
   await waehle(p, 'ursache_kategorie', 'Verschleiß');
   await p.click('label[for=prio-hoch]');
+  // Priorität wird über die Ampel gewählt: die rote Leuchte strahlt (nach dem kurzen Einblenden)
+  await p.waitForTimeout(500);
+  pruefe('Melden: Priorität per Ampel – rote Leuchte gewählt', await p.$eval('label[for=prio-hoch] .prio-lampe', (e) => getComputedStyle(e).opacity === '1')
+    && (await p.$$('.prio-ampel label .prio-lampe')).length === 3);
   await p.click('button[type=submit]');
   await p.waitForURL(BASE + '/');
   await p.waitForSelector('.hinweis-erfolg');
@@ -417,6 +421,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   // Die Zahl steht jetzt als LED-Anzeige auf der Ampel (3D); geprüft wird die Zahl der Maschinen mit Anzeige > 0
   pruefe('3D: Halle – Adresse und LED-Anzeigen an den Maschinen mit Störung', /halle=h1/.test(p.url())
     && Number(await p.getAttribute('.raum', 'data-stoerungsanzeigen')) === offenH1 && (await p.$$('.raum-marke .zaehl-marke')).length === 0, `${p.url()} ${offenH1}`);
+  // Legende der vier Ampelfarben in der 3D-Ansicht
+  pruefe('3D: Legende mit vier Ampelfarben', (await p.$$eval('.raum-legende > span', (z) => z.map((e) => e.className).join(' '))) === 'ampel-rot ampel-orange ampel-blau ampel-gruen');
   await p.waitForTimeout(1500);
   await p.screenshot({ path: SHOTS + 'r-halle-3d.png' });
   if (offenH1 > 0) {
@@ -424,7 +430,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     pruefe('3D: Klick auf Maschine zeigt Details', (await p.textContent('main')).includes('Störung an dieser Maschine melden') && /maschine=\d+/.test(p.url()));
     await p.waitForSelector('.maschine-detail-3d canvas', { timeout: 60000 }).catch(() => {});
     const ampel = await p.getAttribute('.ampel-zeile', 'class');
-    pruefe('3D: Detail mit drehendem Modell und Ampel (orange/rot bei Störung)', (await p.$('.maschine-detail-3d canvas')) !== null && /ampel-(orange|rot)/.test(ampel ?? ''), ampel);
+    pruefe('3D: Detail mit drehendem Modell und Ampel (rot/orange/blau bei Störung)', (await p.$('.maschine-detail-3d canvas')) !== null && /ampel-(orange|rot|blau)/.test(ampel ?? ''), ampel);
   }
   await p.click('.buehne-kopf button[aria-label="Herauszoomen"]'); await p.waitForTimeout(1500);
   pruefe('3D: zurück zum Werk ohne Neuladen der Szene', p.url().endsWith('/karte?werk=alb') && (await p.$$eval('.raum canvas', (z) => z.length)) === 1, p.url());
@@ -665,6 +671,10 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.screenshot({ path: SHOTS + 'r-wartung.png', fullPage: true });
   await p.click('.wartung-schalter button:has-text("Zeitachse")'); await p.waitForTimeout(500);
   pruefe('Wartung: Zeitachse mit Heute und Terminen', (await p.$('.achse-tag.heute')) !== null && (await p.$$eval('.achse-balken', (z) => z.length)) > 5);
+  // Mehrtägige Wartungen (Generalüberholung …): Balken über so viele Tage wie Arbeitstage (480 Min. je Tag)
+  const mehrtaegig = await p.$$eval('.achse-balken.mehrtaegig', (z) => z.map((e) => { const [a, b] = getComputedStyle(e).gridColumn.split('/').map((x) => Number(x.trim())); return b - a; }));
+  pruefe('Wartung: mehrtägige Wartungen als Balken über mehrere Tage', mehrtaegig.length > 0 && mehrtaegig.some((n) => n >= 3)
+    && Number(sql("SELECT count(*) FROM wartungsplan WHERE dauer_min > 480 AND aufgabe LIKE 'Generalüberholung%'")) > 0, mehrtaegig.slice(0, 5));
   await p.click('.achse-balken >> nth=0'); await p.waitForTimeout(300);
   pruefe('Wartung: Klick in der Zeitachse zeigt die Termine des Tages', (await p.textContent('.wartung-liste h2')) !== 'Anstehend');
   await p.click('.wartung-schalter button:has-text("Kalender")'); await p.waitForTimeout(300);
@@ -709,8 +719,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Hallen-Monitor: Grundriss wie in der Karte, Zeile je Maschine, Seitenleiste ausgeblendet', (await p.$('.monitor-halle .grundriss')) !== null
     && (await p.$$eval('.monitor-zeile', (z) => z.length)) === Number(sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id = m.gebaeude_id JOIN standort st ON st.id = g.standort_id WHERE st.kuerzel = 'HAM' AND g.kuerzel = 'H2'"))
     && !(await p.isVisible('.seitenleiste')));
-  pruefe('Hallen-Monitor: Liste nach Zustand sortiert (rot, orange, grün)', await p.$$eval('.monitor-zeile', (z) => {
-    const r = z.map((e) => ['rot', 'orange', 'gruen'].indexOf(e.dataset.zustand)); return r.every((x, i) => i === 0 || r[i - 1] <= x);
+  pruefe('Hallen-Monitor: Liste nach Zustand sortiert (rot, orange, blau, grün)', await p.$$eval('.monitor-zeile', (z) => {
+    const r = z.map((e) => ['rot', 'orange', 'blau', 'gruen'].indexOf(e.dataset.zustand)); return r.every((x, i) => x >= 0 && (i === 0 || r[i - 1] <= x));
   }));
   await p.click('.monitor-schalter button:has-text("3D")');
   await p.waitForSelector('.monitor-halle .ebene-neu .raum', { timeout: 30000 }).catch(() => {});

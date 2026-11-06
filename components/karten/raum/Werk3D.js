@@ -1392,7 +1392,7 @@ function HallenInneres({ halle, h, f, bewegt, aktiv, maschinen, maschineId, onMa
             {/* Maschine etwas größer als ihre Stellfläche in der Datenbank, damit sie gut zu erkennen ist */}
             <group position-y={0.12} rotation-y={m.tiefe_m > m.breite_m ? Math.PI / 2 : 0} scale={hervor || gewaehlt ? 1.18 : 1.12}>
               {/* Große Ampel mit LED-Anzeige (Zahl offener Störungen) – ragt deutlich über die Maschine */}
-              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} detail="mittel" ampelGroesse={3} anzeige={neutral ? null : m.offen} />
+              <MaschineMitAmpel m={m} L={L} W={W} f={f} bewegt={bewegt} detail="mittel" ampelGroesse={3.6} anzeige={neutral ? null : m.offen} />
             </group>
             {/* Kurzname als Bodenmarkierung vorn auf dem Sockel – nichts schwebt über der Maschine */}
             <BodenSchild text={m.bezeichnung.split(' ').pop()} b={Math.min(m.breite_m * 1.12 + 0.6, 3.2)} z={m.tiefe_m * 0.56 + 0.95} f={f} />

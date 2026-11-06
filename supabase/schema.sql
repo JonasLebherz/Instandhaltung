@@ -256,7 +256,7 @@ CREATE TABLE wartungsplan (
     maschine_id     INTEGER NOT NULL REFERENCES maschine (id) ON UPDATE CASCADE ON DELETE CASCADE,
     aufgabe         VARCHAR(150) NOT NULL,
     intervall_tage  INTEGER NOT NULL CHECK (intervall_tage BETWEEN 1 AND 1095),
-    dauer_min       INTEGER NOT NULL DEFAULT 60 CHECK (dauer_min BETWEEN 5 AND 1440),
+    dauer_min       INTEGER NOT NULL DEFAULT 60 CHECK (dauer_min BETWEEN 5 AND 4800),   -- 480 = ein Arbeitstag; mehr = mehrtägig
     -- Erste Fälligkeit; danach: letzte Durchführung + Intervall
     start_datum     DATE NOT NULL DEFAULT current_date,
     aktiv           BOOLEAN NOT NULL DEFAULT true

@@ -23,7 +23,7 @@ import { aktuellePerson, darfBearbeiten } from '@/lib/person';
 import { wartungsplaene } from '@/lib/wartung';
 import QrCode from '@/components/QrCode';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
-import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
+import { ampelZustand, AMPEL_TEXT, AmpelSymbol } from '@/lib/karten/ampel';
 import Kennzahl from '@/components/Kennzahl';
 import MaschinenHistorie from './MaschinenHistorie';
 import MaschinenModell from './MaschinenModell';
@@ -134,7 +134,7 @@ export default async function MaschinenSeite({ params }) {
         <div className="col-lg-4">
           <section className="karte h-100" style={{ '--i': 0 }}>
             <div className={`ampel-zeile ampel-${zustand}`}>
-              <span className="ampel-symbol" aria-hidden="true"><i /><i /><i /></span>
+              <AmpelSymbol />
               {t(AMPEL_TEXT[zustand])}
               {maschine.offen > 0 && <span className="ms-auto klein">{t('{n} offen', { n: maschine.offen })}</span>}
             </div>

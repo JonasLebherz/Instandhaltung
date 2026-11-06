@@ -22,10 +22,12 @@ import FotoAuswahl from '@/components/FotoAuswahl';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 
+// Priorität = Leuchte der Signalampel an der Maschine (lib/karten/ampel.js), von oben nach unten:
+// rot = hoch (Maschine steht), orange = mittel, blau = niedrig. Grün (läuft) ist unten nur angedeutet.
 const PRIORITAETEN = [
-  { wert: 'niedrig', text: T('Niedrig'), symbol: 'bi-arrow-down' },
-  { wert: 'mittel', text: T('Mittel'), symbol: 'bi-dash' },
-  { wert: 'hoch', text: T('Hoch – Maschine steht'), symbol: 'bi-lightning-charge' },
+  { wert: 'hoch', farbe: 'rot', text: T('Hoch – Maschine steht'), hinweis: T('Ampel rot: Stillstand, sofort reagieren') },
+  { wert: 'mittel', farbe: 'orange', text: T('Mittel'), hinweis: T('Ampel orange: Maschine läuft eingeschränkt') },
+  { wert: 'niedrig', farbe: 'blau', text: T('Niedrig'), hinweis: T('Ampel blau: kleiner Mangel, Maschine läuft weiter') },
 ];
 
 export default function MeldeFormular({ maschineId, startwerte, jetzt }) {
@@ -98,17 +100,27 @@ export default function MeldeFormular({ maschineId, startwerte, jetzt }) {
           <Feldfehler fehler={fehler} name="fotos" />
         </div>
 
-        {/* Priorität als große Auswahlfelder (gut mit dem Finger zu treffen) */}
+        {/* Priorität über die Ampel: Man klickt die Leuchte an, die an der Maschine leuchten soll. Jede Zeile ist
+            ein großes Auswahlfeld (gut mit dem Finger zu treffen); links steht die Signalsäule mit den Leuchten. */}
         <fieldset className="mb-4">
-          <legend className="form-label fs-6">{t('Priorität')}</legend>
-          <div className={`segmente${fehlerklasse(fehler, 'prioritaet')}`}>
+          <legend className="form-label fs-6">{t('Priorität – welche Ampel soll an der Maschine leuchten?')}</legend>
+          <div className={`prio-ampel${fehlerklasse(fehler, 'prioritaet')}`}>
+            <span className="prio-saeule" aria-hidden="true" />
             {PRIORITAETEN.map((p) => (
               <span key={p.wert} className="d-contents">
                 <input type="radio" name="prioritaet" id={`prio-${p.wert}`} value={p.wert}
                        defaultChecked={eingabe.prioritaet === p.wert} />
-                <label htmlFor={`prio-${p.wert}`}><i className={`bi ${p.symbol}`} aria-hidden="true" />{t(p.text)}</label>
+                <label htmlFor={`prio-${p.wert}`} className={`ampel-${p.farbe}`}>
+                  <span className="prio-lampe" aria-hidden="true" />
+                  <span className="prio-text"><strong>{t(p.text)}</strong><small>{t(p.hinweis)}</small></span>
+                </label>
               </span>
             ))}
+            {/* Grün nur angedeutet: so sieht die Ampel aus, wenn alles läuft (nicht wählbar) */}
+            <span className="prio-zeile-gruen ampel-gruen" aria-hidden="true">
+              <span className="prio-lampe" />
+              <span className="prio-text"><small>{t('Grün = Maschine läuft (nach der Reparatur)')}</small></span>
+            </span>
           </div>
           <Feldfehler fehler={fehler} name="prioritaet" />
         </fieldset>

@@ -36,7 +36,7 @@ export default function MaschinenListe({ maschinen }) {
     }))];
   }, [maschinen, t]);
   const typen = [{ wert: '', text: t('Alle Typen') }, ...[...new Set(maschinen.map((m) => m.typ))].sort().map((x) => ({ wert: x, text: t(x) }))];
-  const zustaende = [{ wert: '', text: t('Alle Zustände') }, ...['gruen', 'orange', 'rot'].map((z) => ({ wert: z, text: t(AMPEL_TEXT[z]) }))];
+  const zustaende = [{ wert: '', text: t('Alle Zustände') }, ...['gruen', 'blau', 'orange', 'rot'].map((z) => ({ wert: z, text: t(AMPEL_TEXT[z]) }))];
 
   const liste = maschinen
     .filter((m) => !suche || `${m.bezeichnung} ${m.anlagennummer} ${m.standort}`.toLowerCase().includes(suche.toLowerCase()))

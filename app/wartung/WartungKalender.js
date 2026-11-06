@@ -25,6 +25,17 @@ const TAG = 86400000;
 const zuDatum = (text) => new Date(`${text}T00:00:00Z`);
 const zuText = (datum) => datum.toISOString().slice(0, 10);
 const plusTage = (text, n) => zuText(new Date(zuDatum(text).getTime() + n * TAG));
+// Dauer einer Wartung: Ein Arbeitstag hat 8 h (480 Min.). Längere Wartungen (z. B. Generalüberholung über
+// drei Arbeitstage = 1440 Min.) belegen in der Zeitachse mehrere Tage.
+const ARBEITSTAG_MIN = 480;
+const arbeitsTage = (min) => Math.max(1, Math.ceil(min / ARBEITSTAG_MIN));
+/** „45 Min.“, „4 h“, „3 Arbeitstage“ */
+function dauerText(min, t) {
+  if (min < 60) return t('{n} Min.', { n: min });
+  if (min <= ARBEITSTAG_MIN) return t('{n} h', { n: Math.round((min / 60) * 10) / 10 });
+  const tage = arbeitsTage(min);
+  return tage === 1 ? t('1 Arbeitstag') : t('{n} Arbeitstage', { n: tage });
+}
 function heuteText() {
   // heutiges Datum in deutscher Zeit
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
@@ -153,6 +164,7 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
             <span><i className="kal-punkt ueberfaellig" />{t('überfällig')}</span>
             <span><i className="kal-punkt faellig" />{t('fällig bzw. geplant')}</span>
             <span><i className="kal-punkt erledigt" />{t('erledigt')}</span>
+            {ansicht === 'zeitachse' && <span><i className="kal-punkt mehrtaegig" />{t('schraffiert = mehrere Tage (z. B. Generalüberholung)')}</span>}
           </div>
 
           {ansicht === 'zeitachse' ? (
@@ -201,7 +213,7 @@ export default function WartungKalender({ plaene, erledigt, maschinen, darf }) {
                   <span className="wartung-text">
                     <strong>{p.aufgabe}</strong>
                     <Link href={`/maschinen/${p.maschine_id}`} className="klein wartung-maschine">{p.anlagennummer} · {p.maschine}</Link>
-                    <span className="klein">{p.standort} · {t('alle {n} Tage', { n: p.intervall_tage })}</span>
+                    <span className="klein">{p.standort} · {t('alle {n} Tage', { n: p.intervall_tage })} · {t('Dauer {d}', { d: dauerText(p.dauer_min, t) })}</span>
                     <span className={`wartung-status ${art}`}>
                       {art === 'erledigt' ? `${t('erledigt')}${person ? ` · ${person}` : ''}` : art === 'geplant' ? t('geplant') : faelligText(p)}
                     </span>
@@ -240,7 +252,11 @@ function Zeitachse({ start, heute, termineZwischen, gewaehlt, onTag }) {
   const t = useT();
   const tage = Array.from({ length: ACHSE_TAGE }, (_, i) => plusTage(start, i));
   const ende = tage[tage.length - 1];
-  const termine = termineZwischen(start, ende);
+  // Etwas früher anfangen: Eine mehrtägige Wartung (z. B. Generalüberholung), die vor dem sichtbaren Zeitraum
+  // begonnen hat, ragt noch hinein und muss angezeigt werden (Balken beginnt dann am linken Rand)
+  const termine = Object.fromEntries(Object.entries(termineZwischen(plusTage(start, -14), ende))
+    .map(([datum, liste]) => [datum, datum >= start ? liste : liste.filter((e) => plusTage(datum, arbeitsTage(e.plan.dauer_min) - 1) >= start)])
+    .filter(([, liste]) => liste.length > 0));
   // Zeilen: je Maschine alle Termine, sortiert nach dem ersten Termin
   const zeilen = new Map();
   for (const [datum, liste] of Object.entries(termine)) {
@@ -250,8 +266,11 @@ function Zeitachse({ start, heute, termineZwischen, gewaehlt, onTag }) {
       zeilen.set(e.plan.maschine_id, z);
     }
   }
+  // Maschinen mit mehrtägiger Wartung (Generalüberholung …) zuerst – sie sind für die Planung am wichtigsten
+  // und sollen nicht hinter der Zeilengrenze verschwinden; sonst nach dem ersten Termin
+  const gross = (z) => (z.termine.some((e) => arbeitsTage(e.plan.dauer_min) > 1) ? 0 : 1);
   const sortiert = [...zeilen.values()].map((z) => ({ ...z, termine: z.termine.sort((a, b) => a.datum.localeCompare(b.datum)) }))
-    .sort((a, b) => a.termine[0].datum.localeCompare(b.termine[0].datum) || a.plan.anlagennummer.localeCompare(b.plan.anlagennummer));
+    .sort((a, b) => gross(a) - gross(b) || a.termine[0].datum.localeCompare(b.termine[0].datum) || a.plan.anlagennummer.localeCompare(b.plan.anlagennummer));
   const tagFormat = new Intl.DateTimeFormat(t.locale, { weekday: 'narrow', timeZone: 'UTC' });
   const monatFormat = new Intl.DateTimeFormat(t.locale, { month: 'short', timeZone: 'UTC' });
   const spalte = (datum) => Math.round((zuDatum(datum) - zuDatum(start)) / TAG) + 2;   // Spalte 1 = Beschriftung
@@ -276,7 +295,7 @@ function Zeitachse({ start, heute, termineZwischen, gewaehlt, onTag }) {
           // Stapel je Tag: zweiter Termin am selben Tag eine Ebene tiefer
           const belegt = {};
           const balken = liste.map((e) => {
-            const tageDauer = Math.max(1, Math.ceil(e.plan.dauer_min / 480));
+            const tageDauer = arbeitsTage(e.plan.dauer_min);
             let ebene = 0;
             while (Array.from({ length: tageDauer }, (_, k) => belegt[`${plusTage(e.datum, k)}-${ebene}`]).some(Boolean)) ebene += 1;
             for (let k = 0; k < tageDauer; k += 1) belegt[`${plusTage(e.datum, k)}-${ebene}`] = true;
@@ -292,10 +311,12 @@ function Zeitachse({ start, heute, termineZwischen, gewaehlt, onTag }) {
               </Link>
               {heuteSpalte && <span className="achse-heute" style={{ gridColumn: heuteSpalte, gridRow: `1 / span ${ebenen}` }} aria-hidden="true" />}
               {balken.map((b) => (
-                <button key={`${b.plan.id}-${b.datum}-${b.art}`} type="button" className={`achse-balken art-${b.art}${b.datum === gewaehlt ? ' gewaehlt' : ''}`}
+                <button key={`${b.plan.id}-${b.datum}-${b.art}`} type="button"
+                        className={`achse-balken art-${b.art}${b.datum === gewaehlt ? ' gewaehlt' : ''}${arbeitsTage(b.plan.dauer_min) > 1 ? ' mehrtaegig' : ''}`}
                         style={{ gridColumn: `${b.von} / ${b.bis}`, gridRow: b.ebene + 1 }} onClick={() => onTag(b.datum)}
-                        title={`${b.plan.aufgabe} · ${b.datum}`} aria-label={`${b.plan.anlagennummer}: ${b.plan.aufgabe}, ${b.datum}`}>
-                  <span>{b.plan.aufgabe}</span>
+                        title={`${b.plan.aufgabe} · ${b.datum} · ${dauerText(b.plan.dauer_min, t)}`}
+                        aria-label={`${b.plan.anlagennummer}: ${b.plan.aufgabe}, ${b.datum}, ${dauerText(b.plan.dauer_min, t)}`}>
+                  <span>{b.plan.aufgabe}{arbeitsTage(b.plan.dauer_min) > 1 && <small> · {dauerText(b.plan.dauer_min, t)}</small>}</span>
                 </button>
               ))}
             </div>
@@ -350,8 +371,9 @@ function PlanenDialog({ maschinen, heute, onSchliessen, onGeplant }) {
             </div>
             <div className="col-sm-4">
               <label className="form-label" htmlFor="dauer_min">{t('Dauer (Min.)')}</label>
-              <input id="dauer_min" name="dauer_min" type="number" min={5} max={1440} inputMode="numeric"
+              <input id="dauer_min" name="dauer_min" type="number" min={5} max={4800} inputMode="numeric"
                      className={`form-control${fehlerklasse(fehler, 'dauer_min')}`} defaultValue={eingabe.dauer_min} />
+              <small className="form-text">{t('1 Arbeitstag = 480 Min. – längere Wartungen gehen über mehrere Tage')}</small>
               <Feldfehler fehler={fehler} name="dauer_min" />
             </div>
             <div className="col-sm-4">

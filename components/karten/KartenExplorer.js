@@ -36,7 +36,7 @@ import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 import { startAusAdresse } from '@/lib/karten/adresse';
 import { laenderAus, landKarte, weltVerhaeltnis } from '@/lib/karten/laender';
-import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
+import { ampelZustand, AMPEL_TEXT, AMPEL_REIHENFOLGE, AMPEL_PRIORITAET, AmpelSymbol } from '@/lib/karten/ampel';
 import { ton } from '@/lib/ton';
 import {
   favoritenLesen, favoritHinzufuegen, favoritEntfernen, personFavorit, personAusBrowser,
@@ -758,6 +758,17 @@ export default function KartenExplorer({
           )}
         </div>}
         {pinHinweis && <div className="karten-hinweis" role="status">{pinHinweis}</div>}
+        {/* 3D: Legende der Ampelfarben unten rechts (nicht im kleinen Kartenfenster der Übersicht) */}
+        {raum && (!kompakt || groesse === 'monitor') && (
+          <div className="raum-legende" aria-label={t('Bedeutung der Ampelfarben')}>
+            {AMPEL_REIHENFOLGE.map((z) => (
+              <span key={z} className={`ampel-${z}`}>
+                <i className={`ampel-punkt ampel-${z}`} aria-hidden="true" />
+                <b>{t(AMPEL_TEXT[z])}</b>{AMPEL_PRIORITAET[z] && <small> · {t('Priorität {p}', { p: t(AMPEL_PRIORITAET[z]) })}</small>}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       {!melden && !kompakt && <Legende />}
     </div>
@@ -956,7 +967,7 @@ function InfoSpalte({
         </div>
         {/* Signalampel der Maschine und – wenn der Browser 3D kann – das animierte Modell */}
         <div className={`ampel-zeile ampel-${ampelZustand(auswahl)}`}>
-          <span className="ampel-symbol" aria-hidden="true"><i /><i /><i /></span>
+          <AmpelSymbol />
           {t(AMPEL_TEXT[ampelZustand(auswahl)])}
         </div>
         {webgl && <MaschineDetail3D key={auswahl.id} maschine={auswahl} />}

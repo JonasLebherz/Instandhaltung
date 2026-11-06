@@ -563,7 +563,8 @@ export async function wartungPlanen(vorherigerZustand, formular) {
   const intervall = ganzzahl(eingabe.intervall_tage);
   if (intervall === null || intervall < 1 || intervall > 1095) fehler.intervall_tage = t('Bitte ein Intervall zwischen 1 und 1095 Tagen angeben.');
   const dauer = ganzzahl(eingabe.dauer_min);
-  if (dauer === null || dauer < 5 || dauer > 1440) fehler.dauer_min = t('Bitte eine Dauer zwischen 5 und 1440 Minuten angeben.');
+  // Bis 4800 Min. = 10 Arbeitstage à 8 h (z. B. Generalüberholung über mehrere Tage)
+  if (dauer === null || dauer < 5 || dauer > 4800) fehler.dauer_min = t('Bitte eine Dauer zwischen 5 und 4800 Minuten (10 Arbeitstage) angeben.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.start_datum) || Number.isNaN(Date.parse(eingabe.start_datum))) {
     fehler.start_datum = t('Bitte ein gültiges Datum angeben.');
   }

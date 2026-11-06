@@ -172,12 +172,17 @@ function LedAnzeige({ y, zahl, farbe, f }) {
 }
 
 /**
- * Signalampel (Signalsäule) wie an echten Maschinen: rot oben, orange, grün unten.
- * Die passende Leuchte strahlt, die anderen sind dunkel. zustand = null: alle aus (beim Melden).
+ * Signalampel (Signalsäule) wie an echten Maschinen, vier Leuchten: rot oben (Stillstand), orange (Störung),
+ * blau (kleine Störung, Priorität niedrig), grün unten (läuft) – siehe lib/karten/ampel.js.
+ * Die passende Leuchte strahlt, die anderen sind dunkel. zustand = null: alle aus.
  * anzeige: Zahl offener Störungen für die LED-Anzeige obendrauf (null = keine Anzeige, z. B. beim Melden)
  */
+// Höhe jeder Leuchte über dem Mast (von unten nach oben grün, blau, orange, rot) und Platz für Kappe/Anzeige
+const LEUCHTEN = [['rot', 0.56], ['orange', 0.38], ['blau', 0.2], ['gruen', 0.02]];
+const LEUCHTEN_Y = Object.fromEntries(LEUCHTEN);
+const SAEULE_OBEN = 0.23;   // Kappe über der obersten Leuchte
 export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null, blinken = false }) {
-  const leuchten = [['rot', 0.38], ['orange', 0.2], ['gruen', 0.02]];
+  const leuchten = LEUCHTEN;
   // Stillstand: das rote Licht blinkt (an 0,6 s, aus 0,4 s) – so fällt es sofort auf
   const rotRef = useRef(null);
   const scheinRef = useRef(null);
@@ -203,14 +208,14 @@ export function Ampel({ p, zustand, f, hoehe = 2.4, groesse = 1, anzeige = null,
       })}
       {/* Leuchtschein um die aktive Leuchte – so erkennt man den Zustand auch von weitem */}
       {zustand && (
-        <mesh ref={scheinRef} position={[0, hoehe - 0.55 + { rot: 0.38, orange: 0.2, gruen: 0.02 }[zustand] + 0.09, 0]}>
+        <mesh ref={scheinRef} position={[0, hoehe - 0.55 + LEUCHTEN_Y[zustand] + 0.09, 0]}>
           <sphereGeometry args={[0.3, 16, 12]} />
           <meshBasicMaterial color={f[`ampel-${zustand}`]} transparent opacity={0.3} depthWrite={false} />
         </mesh>
       )}
-      <Rolle p={[0, hoehe + 0.05, 0]} r={0.1} l={0.06} farbe={f['maschine-dunkel']} />
+      <Rolle p={[0, hoehe + SAEULE_OBEN, 0]} r={0.1} l={0.06} farbe={f['maschine-dunkel']} />
       {anzeige !== null && zustand && (
-        <LedAnzeige y={hoehe + 0.33} zahl={anzeige} farbe={f[`ampel-${anzeige > 0 ? zustand : 'gruen'}`]} f={f} />
+        <LedAnzeige y={hoehe + SAEULE_OBEN + 0.28} zahl={anzeige} farbe={f[`ampel-${anzeige > 0 ? zustand : 'gruen'}`]} f={f} />
       )}
     </group>
   );
@@ -647,7 +652,8 @@ function Details({ m, zustand, typ, L, W, f, laeuft, voll }) {
   return (
     <>
       {/* Bedienpult mit Bildschirm (Statusanzeige), Tastatur und Not-Halt */}
-      <Bedienpult m={m} f={f} zustand={zustand} laeuft={laeuft} p={[L * 0.38, 0, W / 2 + 0.45]} />
+      {/* In der Halle (nicht im Infofenster) ist das Pult anderthalbmal so groß – der Bildschirm ist sonst kaum lesbar */}
+      <Bedienpult m={m} f={f} zustand={zustand} laeuft={laeuft} p={[L * 0.38, 0, W / 2 + (voll ? 0.45 : 0.6)]} groesse={voll ? 1 : 1.5} />
       {/* Warnstreifen gelb/schwarz am Sockel (nur in der Detailansicht – viele kleine Teile) */}
       {voll && Array.from({ length: streifen }, (_, i) => (
         <Kiste key={i} p={[-L * 0.425 + (i + 0.5) * ((L * 0.85) / streifen), 0.07, W * 0.44]} g={[(L * 0.85) / streifen, 0.14, 0.02]}
@@ -724,10 +730,10 @@ function tastaturTextur() {
  * Bedienpult auf Standfuß vor der Maschine: Gehäuse mit Bildschirm (Kurzname, Anlagennummer,
  * Zustand in Ampelfarbe, Auslastung als Balken und Verlauf), Tastatur, Not-Halt und zwei Taster.
  */
-function Bedienpult({ m, f, zustand, laeuft, p }) {
+function Bedienpult({ m, f, zustand, laeuft, p, groesse = 1 }) {
   const t = useT();
   const [statusText, statusFarbe] = {
-    gruen: [t('Läuft'), f['ampel-gruen']], orange: [t('Störung'), f['ampel-orange']], rot: [t('Stillstand'), f['ampel-rot']],
+    gruen: [t('Läuft'), f['ampel-gruen']], blau: [t('Kleine Störung'), f['ampel-blau']], orange: [t('Störung'), f['ampel-orange']], rot: [t('Stillstand'), f['ampel-rot']],
   }[zustand] ?? [t('Läuft'), f['ampel-gruen']];
   const schirm = useCanvasTextur(320, 200, (g, w, h) => {
     g.fillStyle = '#0e151d'; g.fillRect(0, 0, w, h);
@@ -739,7 +745,7 @@ function Bedienpult({ m, f, zustand, laeuft, p }) {
     g.fillStyle = statusFarbe; g.fillRect(10, 46, 120, 28);
     g.fillStyle = '#ffffff'; g.font = '700 15px system-ui, sans-serif'; g.textAlign = 'center'; g.fillText(statusText, 70, 60);
     // Auslastung als drei Balken
-    const werte = zustand === 'rot' ? [0.05, 0.1, 0.02] : zustand === 'orange' ? [0.45, 0.8, 0.3] : [0.72, 0.55, 0.85];
+    const werte = zustand === 'rot' ? [0.05, 0.1, 0.02] : zustand === 'orange' ? [0.45, 0.8, 0.3] : zustand === 'blau' ? [0.65, 0.7, 0.6] : [0.72, 0.55, 0.85];
     werte.forEach((v, i) => {
       g.fillStyle = '#26323f'; g.fillRect(150, 48 + i * 10, 160, 6);
       g.fillStyle = i === 1 && zustand === 'orange' ? statusFarbe : '#4fb3ff'; g.fillRect(150, 48 + i * 10, 160 * v, 6);
@@ -757,7 +763,7 @@ function Bedienpult({ m, f, zustand, laeuft, p }) {
   const tasten = tastaturTextur();
   const dunkel = f['maschine-dunkel'];
   return (
-    <group position={p}>
+    <group position={p} scale={groesse}>
       <Kiste p={[0, 0.02, 0]} g={[0.42, 0.04, 0.42]} farbe={dunkel} />
       <Rolle p={[0, 0.6, 0]} r={0.045} l={1.12} farbe={dunkel} />
       <group position={[0, 1.38, 0]} rotation-x={-0.3}>

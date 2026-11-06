@@ -92,7 +92,7 @@
     --raum-maschine: #d8dde4; --raum-maschine-dunkel: #5f6672; --raum-signal: #f2b632; --raum-glas: #a9c7e6;
     --raum-baum: #86b583; --raum-stamm: #8b6b4e; --raum-buero: #e7e1d6; --raum-tank: #cfd6de;
     --raum-person-0: #ff9f0a; --raum-person-1: #0071e3; --raum-person-2: #2e9b4a; --raum-haut: #e8c2a2;
-    --raum-ampel-rot: #ff3b30; --raum-ampel-orange: #ff9500; --raum-ampel-gruen: #34c759; --raum-licht: #ffd58a;
+    --raum-ampel-rot: #ff3b30; --raum-ampel-orange: #ff9500; --raum-ampel-blau: #0a84ff; --raum-ampel-gruen: #34c759; --raum-licht: #ffd58a;
     --raum-himmel-tag: #dfe8f0; --raum-himmel-daemmerung: #f0cfae; --raum-himmel-nacht: #1a2232;
     /* Lagerregal (LagerRegal3D): blaue Pfosten, orange Träger, verzinkte Böden, Hallenwand dahinter */
     --raum-regal-stuetze: #2f5d8a; --raum-regal-traeger: #e0782a; --raum-regal-boden: #c4c9cf; --raum-regal-wand: #e9ebee;
@@ -154,7 +154,7 @@
     --raum-maschine: #adb1b6; --raum-maschine-dunkel: #4c525b; --raum-signal: #e6ad2e; --raum-glas: #879fb8;
     --raum-baum: #6b9169; --raum-stamm: #6f563e; --raum-buero: #b9b4ab; --raum-tank: #a6abb2;
     --raum-person-0: #ff9f0a; --raum-person-1: #2997ff; --raum-person-2: #30d158; --raum-haut: #ba9b82;
-    --raum-ampel-rot: #ff453a; --raum-ampel-orange: #ff9f0a; --raum-ampel-gruen: #30d158; --raum-licht: #ffcf7a;
+    --raum-ampel-rot: #ff453a; --raum-ampel-orange: #ff9f0a; --raum-ampel-blau: #409cff; --raum-ampel-gruen: #30d158; --raum-licht: #ffcf7a;
     --raum-himmel-tag: #4a5868; --raum-himmel-daemmerung: #5a4a4a; --raum-himmel-nacht: #121826;
     --raum-regal-stuetze: #264b6f; --raum-regal-traeger: #b46022; --raum-regal-boden: #9da1a6; --raum-regal-wand: #babcbf;
     color-scheme: dark;
@@ -962,6 +962,39 @@ a.karte:hover {
 .form-control.is-invalid:focus, .form-select.is-invalid:focus { box-shadow: 0 0 0 4px var(--rot-bg); }
 .invalid-feedback { color: var(--rot); font-size: .875rem; animation: einblenden .3s var(--weich); }
 .form-text { color: var(--text-leise); }
+
+/* Priorität beim Melden als Signalampel (MeldeFormular.js): links eine dunkle Säule mit vier Leuchten,
+   rechts je Leuchte Text. Die gewählte Leuchte strahlt in ihrer Farbe, die anderen sind gedämpft. */
+.prio-ampel { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 6px 0; }
+.prio-ampel input { position: absolute; opacity: 0; pointer-events: none; }
+.prio-saeule {
+    position: absolute; left: 8px; top: 0; bottom: 0; width: 60px; border-radius: 18px;
+    background: var(--raum-maschine-dunkel); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.prio-ampel label, .prio-zeile-gruen {
+    position: relative; display: flex; align-items: center; gap: 18px; min-height: 58px;
+    padding: 6px 14px 6px 14px; border-radius: var(--radius-feld); border: 1px solid transparent;
+}
+.prio-ampel label { cursor: pointer; transition: background-color var(--uebergang), border-color var(--uebergang); }
+.prio-ampel label:hover { background: var(--fuellung); }
+.prio-lampe {
+    flex: none; width: 46px; height: 46px; border-radius: 50%; background: currentColor; opacity: .28;
+    box-shadow: inset 0 -4px 8px rgba(0, 0, 0, .25); transition: opacity var(--uebergang), box-shadow var(--uebergang), transform var(--uebergang);
+}
+.prio-ampel label.ampel-rot .prio-lampe { color: var(--raum-ampel-rot); }
+.prio-ampel label.ampel-orange .prio-lampe { color: var(--raum-ampel-orange); }
+.prio-ampel label.ampel-blau .prio-lampe { color: var(--raum-ampel-blau); }
+.prio-zeile-gruen .prio-lampe { color: var(--raum-ampel-gruen); opacity: .18; width: 46px; height: 46px; }
+.prio-text { display: flex; flex-direction: column; gap: 1px; color: var(--text); }
+.prio-text strong { font-weight: 600; }
+.prio-text small { color: var(--text-leise); font-size: .8rem; }
+.prio-zeile-gruen { min-height: 52px; }
+.prio-ampel label:hover .prio-lampe { opacity: .55; }
+.prio-ampel input:checked + label { border-color: currentColor; background: color-mix(in srgb, currentColor 8%, transparent); }
+.prio-ampel input:checked + label .prio-lampe { opacity: 1; transform: scale(1.06); box-shadow: 0 0 18px 2px currentColor, inset 0 -4px 8px rgba(0, 0, 0, .15); }
+.prio-ampel input:focus-visible + label { outline: 3px solid var(--akzent-ring); outline-offset: 2px; }
+.prio-ampel.ist-ungueltig .prio-saeule, .prio-ampel.is-invalid .prio-saeule { box-shadow: 0 0 0 2px var(--rot); }
+@media (prefers-reduced-motion: reduce) { .prio-lampe { transition: none; } }
 
 /* Prioritätsauswahl als große, gut antippbare Segmente */
 .segmente { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -2195,6 +2228,19 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .explorer-ebene:has(> .ebene-welt), .explorer-ebene:has(> .ebene-land), .explorer-ebene:has(> .ebene-werk) { overflow: hidden; }
 .raum, .raum-laden { position: absolute; inset: 0; }
 .raum canvas { touch-action: none; outline: none; }
+/* Legende der Ampelfarben in der 3D-Ansicht (unten rechts; unten links steht die Ortszeit) */
+.raum-legende {
+    position: absolute; right: 12px; bottom: 12px; z-index: 3; display: flex; flex-direction: column; gap: 3px;
+    padding: 8px 12px; border-radius: 12px; font-size: .75rem; line-height: 1.3; color: var(--text);
+    background: var(--karte-erhoeht); border: 1px solid var(--glas-rand); box-shadow: 0 4px 14px rgba(31, 38, 64, .14);
+    pointer-events: none;
+}
+.raum-legende span { display: flex; align-items: center; white-space: nowrap; }
+.raum-legende b { font-weight: 600; color: var(--text); }
+.raum-legende small { color: var(--text-leise); font-size: .6875rem; margin-left: 4px; }
+.raum-legende i.ampel-punkt { width: 10px; height: 10px; margin-right: 7px; animation: none; }
+.im-flug .raum-legende { opacity: 0; }
+@media (max-width: 767.98px) { .raum-legende small { display: none; } .raum-legende { padding: 6px 9px; } }
 /* Solange die 3D-Szene aufgebaut wird (direkter Start in 3D, z. B. über einen Favoriten): kleiner Ring in der Mitte */
 .raum:not(.fertig)::after {
     content: ''; position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px;
@@ -2315,7 +2361,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 }
 .raum-halle.stufe-neutral { border-color: color-mix(in srgb, var(--orange) 40%, var(--glas-rand)); }
 
-/* Signalampel im Infofenster: drei Leuchten, die aktive strahlt */
+/* Signalampel (HTML, AmpelSymbol in lib/karten/ampel.js): vier Leuchten wie die Säule in 3D, die aktive strahlt */
 .ampel-zeile { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; font-weight: 600; font-size: .9rem; }
 .ampel-symbol {
     display: inline-flex; flex-direction: column; gap: 3px; padding: 4px; border-radius: 8px;
@@ -2324,11 +2370,12 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .ampel-symbol i { width: 10px; height: 10px; border-radius: 50%; opacity: .25; }
 .ampel-symbol i:nth-child(1) { background: var(--raum-ampel-rot); }
 .ampel-symbol i:nth-child(2) { background: var(--raum-ampel-orange); }
-.ampel-symbol i:nth-child(3) { background: var(--raum-ampel-gruen); }
-.ampel-rot .ampel-symbol i:nth-child(1), .ampel-orange .ampel-symbol i:nth-child(2), .ampel-gruen .ampel-symbol i:nth-child(3) {
+.ampel-symbol i:nth-child(3) { background: var(--raum-ampel-blau); }
+.ampel-symbol i:nth-child(4) { background: var(--raum-ampel-gruen); }
+.ampel-rot .ampel-symbol i:nth-child(1), .ampel-orange .ampel-symbol i:nth-child(2), .ampel-blau .ampel-symbol i:nth-child(3), .ampel-gruen .ampel-symbol i:nth-child(4) {
     opacity: 1; box-shadow: 0 0 8px currentColor;
 }
-.ampel-rot { color: var(--rot); } .ampel-orange { color: var(--orange); } .ampel-gruen { color: var(--gruen); }
+.ampel-rot { color: var(--rot); } .ampel-orange { color: var(--orange); } .ampel-blau { color: var(--blau); } .ampel-gruen { color: var(--gruen); }
 /* 3D-Modell der Maschine im Infofenster */
 .maschine-detail-3d {
     position: relative; height: 230px; margin: 0 0 14px; border-radius: 14px; overflow: hidden;
@@ -2382,6 +2429,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .ampel-punkt.ampel-gruen { background: var(--gruen); }
 .ampel-punkt.ampel-orange { background: var(--orange); }
 .ampel-punkt.ampel-rot { background: var(--rot); }
+.ampel-punkt.ampel-blau { background: var(--blau); }
 /* Maschinenhistorie als Zeitstrahl: Punkt je Eintrag, offene Störungen farbig */
 .historie { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--linie); display: grid; gap: 2px; }
 .historie-eintrag { position: relative; }
@@ -2788,6 +2836,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .monitor-summen .ampel-gruen strong { color: var(--gruen); }
 .monitor-summen .ampel-orange strong { color: var(--orange); }
 .monitor-summen .ampel-rot strong { color: var(--rot); }
+.monitor-summen .ampel-blau strong { color: var(--blau); }
 .monitor-uhr { font-size: clamp(1.6rem, 2.4vw, 2.4rem); font-weight: 700; font-variant-numeric: tabular-nums; }
 .monitor-knoepfe { display: flex; gap: 8px; }
 .monitor-fuss { color: var(--text-leise); font-size: .8rem; text-align: center; }
@@ -2821,12 +2870,14 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .monitor-zeile .ampel-symbol { margin-top: 3px; }
 .monitor-zeile.ampel-rot { border-left: 5px solid var(--rot); background: color-mix(in srgb, var(--rot) 8%, var(--karte-solid)); }
 .monitor-zeile.ampel-orange { border-left: 5px solid var(--orange); background: color-mix(in srgb, var(--orange) 7%, var(--karte-solid)); }
+.monitor-zeile.ampel-blau { border-left: 5px solid var(--blau); }
 .monitor-zeile.ampel-gruen { border-left: 5px solid var(--gruen); }
 .monitor-zeile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: .95rem; }
 .monitor-zeile-text small { color: var(--text-leise); font-size: .8rem; }
 .monitor-zeile-text small b { font-weight: 600; }
 .monitor-zeile.ampel-rot small b { color: var(--rot); }
 .monitor-zeile.ampel-orange small b { color: var(--orange); }
+.monitor-zeile.ampel-blau small b { color: var(--blau); }
 .monitor-zeile.ampel-gruen small b { color: var(--gruen); }
 .monitor-wartung { align-self: flex-start; margin-top: 4px; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--orange-bg); color: var(--orange); }
 @media (max-width: 991.98px) { .monitor-halle { grid-template-columns: 1fr; } .monitor-liste { max-height: none; } }
@@ -2859,5 +2910,10 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .achse-balken.art-ueberfaellig { background: var(--rot); }
 .achse-balken.art-erledigt { background: var(--gruen); }
 .achse-balken.art-geplant { background: color-mix(in srgb, var(--orange) 55%, var(--karte-solid)); color: var(--text); }
+/* Mehrtägige Wartung (Generalüberholung …): Schraffur, damit man große Stillstände sofort erkennt */
+.achse-balken.mehrtaegig { background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, .28) 0 5px, transparent 5px 10px); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
+.achse-balken.mehrtaegig span { font-weight: 600; }
+.kal-punkt.mehrtaegig { width: 18px; border-radius: 4px; background: var(--orange) repeating-linear-gradient(135deg, rgba(255, 255, 255, .35) 0 3px, transparent 3px 6px); }
+.achse-balken span small { font-weight: 500; color: var(--text-leise); font-size: .6875rem; }
 .achse-balken:hover { transform: translateY(-1px); box-shadow: var(--schatten-hover); }
 .achse-balken.gewaehlt { box-shadow: 0 0 0 2px var(--akzent); }

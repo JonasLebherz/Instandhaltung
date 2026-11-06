@@ -7,7 +7,7 @@
  *  - Links die Halle wie in der Störungskarte (KartenExplorer kompakt, groesse="monitor"): in 2D der
  *    Grundriss mit Ampeln und Störungszahlen, in 3D die Halle mit Ampeln und LED-Zahl.
  *  - Rechts alle Maschinen der Halle als Liste, sortiert nach Zustand: rot Stillstand (blinkt), orange
- *    Störung, grün läuft – mit „seit …“, Bearbeitungsstand und fälliger Wartung.
+ *    Störung, blau kleine Störung, grün läuft – mit „seit …“, Bearbeitungsstand und fälliger Wartung.
  *  - „Vollbild“ nutzt die Vollbild-Funktion des Browsers (z. B. für einen Fernseher in der Halle).
  *  - Umschalter 2D/3D im Kopf: steuert die Darstellung des KartenExplorers (Prop „ansicht“). Dadurch läuft
  *    derselbe saubere Übergang wie in der Karte (Gebäude wachsen bzw. sinken, kein Sprung). Wahl in
@@ -19,13 +19,12 @@ import dynamic from 'next/dynamic';
 import { startAusAdresse } from '@/lib/karten/adresse';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/components/SpracheKontext';
-import { ampelZustand, AMPEL_TEXT } from '@/lib/karten/ampel';
+import { ampelZustand, AMPEL_TEXT, AMPEL_REIHENFOLGE, AmpelSymbol } from '@/lib/karten/ampel';
 import { gross } from '@/lib/sprache';
 
 const TAKT = 30000;
 // 3D-Halle nur bei Bedarf laden (three.js ist groß)
 const KartenExplorer = dynamic(() => import('@/components/karten/KartenExplorer'), { ssr: false, loading: () => <div className="monitor-halle-laden" /> });
-const REIHENFOLGE = ['rot', 'orange', 'gruen'];
 
 /** „seit 2 h 15 min“ */
 function seitText(iso, jetzt, t) {
@@ -86,9 +85,10 @@ export default function MonitorAnsicht({ ort, maschinen, stand }) {
           <h1>{ort.kuerzel} – {ort.bezeichnung}</h1>
         </div>
         <div className="monitor-summen" aria-label={t('Zusammenfassung')}>
-          <span className="ampel-gruen"><strong>{zaehle('gruen')}</strong>{t(AMPEL_TEXT.gruen)}</span>
-          <span className="ampel-orange"><strong>{zaehle('orange')}</strong>{t(AMPEL_TEXT.orange)}</span>
-          <span className="ampel-rot"><strong>{zaehle('rot')}</strong>{t(AMPEL_TEXT.rot)}</span>
+          {/* Je Ampelfarbe die Zahl der Maschinen (grün zuerst, dann nach Dringlichkeit) */}
+          {['gruen', 'blau', 'orange', 'rot'].map((z) => (
+            <span key={z} className={`ampel-${z}`}><strong>{zaehle(z)}</strong>{t(AMPEL_TEXT[z])}</span>
+          ))}
         </div>
         <div className="monitor-uhr" aria-label={t('Uhrzeit')}>{uhrzeit}</div>
         <div className="sprach-schalter raum-schalter monitor-schalter" role="group" aria-label={t('Ansicht')}>
@@ -111,12 +111,12 @@ export default function MonitorAnsicht({ ort, maschinen, stand }) {
         {/* Alle Maschinen der Halle, die dringendsten oben */}
         <ul className="monitor-liste" aria-label={t('Maschinen')}>
           {[...maschinen]
-            .sort((a, b) => REIHENFOLGE.indexOf(ampelZustand(a)) - REIHENFOLGE.indexOf(ampelZustand(b)))
+            .sort((a, b) => AMPEL_REIHENFOLGE.indexOf(ampelZustand(a)) - AMPEL_REIHENFOLGE.indexOf(ampelZustand(b)))
             .map((m) => {
               const z = ampelZustand(m);
               return (
                 <li key={m.id} className={`monitor-zeile ampel-${z}`} data-zustand={z}>
-                  <span className="ampel-symbol" aria-hidden="true"><i /><i /><i /></span>
+                  <AmpelSymbol />
                   <span className="monitor-zeile-text">
                     <span><strong>{m.anlagennummer}</strong> {m.bezeichnung}</span>
                     <small>
