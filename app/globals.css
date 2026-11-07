@@ -1256,8 +1256,12 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 /* Offene Störungen nach Priorität aufgeteilt (PrioZahlen in components/karten/stufe.js): Statt einer Zahl in der
    Farbe der höchsten Priorität eine Kapsel mit farbigen Abschnitten, z. B. „1“ rot | „4“ blau. Die Marke selbst
    (Kartenpunkt, Zahl-Marke, Listen-Zahl) wird dann durchsichtig, die Abschnitte färben sich selbst. */
-.geteilt { background: none !important; padding: 0 !important; }
-.prio-zahlen { display: inline-flex; align-self: stretch; justify-self: stretch; height: 100%; border-radius: 999px; overflow: hidden; }
+.geteilt { background: none !important; padding: 0 !important; flex-shrink: 0; width: max-content; }
+/* In Schildern mit Namen (3D-Halle) darf nur der Name kürzer werden, nie die Zahl – sonst wurde die Kapsel
+   zusammengedrückt und der zweite Abschnitt abgeschnitten */
+.raum-halle .zaehl-marke { flex-shrink: 0; }
+.raum-halle-name { min-width: 0; }
+.prio-zahlen { flex: none; display: inline-flex; align-self: stretch; justify-self: stretch; height: 100%; border-radius: 999px; overflow: hidden; }
 .prio-zahl {
     display: grid; place-items: center; min-width: 1.7em; padding: 0 .4em; font-weight: 700;
     color: #fff; background: var(--stufe); font-variant-numeric: tabular-nums;
