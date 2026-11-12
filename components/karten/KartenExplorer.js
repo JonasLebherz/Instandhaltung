@@ -32,6 +32,7 @@ import { Legende, stufe, offenText, PrioZahlen, geteiltKlasse, prioText } from '
 import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeSchritte from './MeldeSchritte';
+import VollbildAuftraege from './VollbildAuftraege';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 import { startAusAdresse } from '@/lib/karten/adresse';
@@ -164,9 +165,8 @@ export default function KartenExplorer({
   // läuft über dieselben Übergänge wie der Umschalter der Karte (Gebäude sinken/wachsen, Überblenden)
   // und wird nicht als Wahl der Karte gemerkt.
   ansicht = null,
-  // Wird aufgerufen, sobald eine Halle geöffnet ist (Kürzel von Werk und Halle) – z. B. Hallen-Monitor:
-  // Halle auf der Karte suchen, dann öffnet sich der Monitor dieser Halle
-  onHalle = null,
+  // Vollbildmodus (app/vollbild): rechts statt der Info-Spalte die offenen Aufträge der aktuellen Ebene
+  vollbild = false,
 }) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
   const melden = modus === 'auswahl';   // Störung melden: eigenes Aussehen, keine Störungszahlen
@@ -546,13 +546,6 @@ export default function KartenExplorer({
     return () => clearTimeout(timer);
   }, [uebergang]);
 
-  // Halle geöffnet → onHalle melden, aber erst nach der Kamerafahrt (man soll das Hineinzoomen noch sehen)
-  useEffect(() => {
-    if (!onHalle || !standort || !aktuellesGebaeude || uebergang) return undefined;
-    const zeit = setTimeout(() => onHalle({ werk: standort.kuerzel.toLowerCase(), halle: aktuellesGebaeude.kuerzel.toLowerCase() }), 700);
-    return () => clearTimeout(zeit);
-  }, [onHalle, standort, aktuellesGebaeude, uebergang]);
-
   // Adresse mitführen (z. B. /karte?werk=ham&halle=h2&maschine=12), ohne die Seite neu zu laden.
   // Beim ersten Anzeigen bleibt die Adresse, wie sie ist – geändert wird erst nach einem Klick.
   const ersteAnzeige = useRef(true);
@@ -794,11 +787,13 @@ export default function KartenExplorer({
       </div>
       <div className="col-xl-4 explorer-info-spalte">
         <div className="explorer-info">
-          <InfoSpalte key={`${schluessel}-${maschineId ?? ''}`} stufe={stufeName} modus={modus} daten={daten}
+          {vollbild ? (
+            <VollbildAuftraege offene={daten.offene} standorte={standorte} land={land} standort={standort} gebaeude={aktuellesGebaeude} />
+          ) : <InfoSpalte key={`${schluessel}-${maschineId ?? ''}`} stufe={stufeName} modus={modus} daten={daten}
                       laender={laender} land={land} webgl={webgl}
                       standort={standort} gebaeudeAktuell={aktuellesGebaeude} maschineId={maschineId}
                       onLand={zuLand} onWerk={zuWerk} onGebaeude={zuGebaeude} onMaschine={maschineGeklickt}
-                      onAuswahlAufheben={() => setMaschineId(null)} eigenesWerk={eigenesWerk} />
+                      onAuswahlAufheben={() => setMaschineId(null)} eigenesWerk={eigenesWerk} />}
         </div>
       </div>
     </div>

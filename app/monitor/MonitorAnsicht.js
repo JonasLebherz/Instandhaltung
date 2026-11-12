@@ -98,8 +98,8 @@ export default function MonitorAnsicht({ ort, maschinen, stand }) {
         </div>
         <div className="monitor-knoepfe">
           <button type="button" className="rund-knopf" onClick={vollbild} title={t('Vollbild')} aria-label={t('Vollbild')}><i className="bi bi-arrows-fullscreen" /></button>
-          {/* Andere Halle: zurück zur Weltkarte des Hallen-Monitors (/monitor ohne Angaben) */}
-          <Link href="/monitor" className="rund-knopf monitor-andere-halle" title={t('Andere Halle wählen')} aria-label={t('Andere Halle wählen')}><i className="bi bi-globe-europe-africa" /></Link>
+          {/* Andere Halle: Vollbildmodus der Karte, beginnend in diesem Werk */}
+          <Link href={`/vollbild?werk=${ort.werk.toLowerCase()}`} className="rund-knopf monitor-andere-halle" title={t('Andere Halle wählen')} aria-label={t('Andere Halle wählen')}><i className="bi bi-globe-europe-africa" /></Link>
           <Link href={`/karte?werk=${ort.werk.toLowerCase()}&halle=${ort.kuerzel.toLowerCase()}`} className="rund-knopf" title={t('Zurück zur Karte')} aria-label={t('Zurück zur Karte')}><i className="bi bi-x-lg" /></Link>
         </div>
       </header>

@@ -882,17 +882,22 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click('#fv-person-speichern')]); await p.waitForTimeout(1200);
   pruefe('Version 3: Person wieder abwählen', (await p.textContent('.fv-person')).includes('Keine Person'));
 
-  // 23. Hallen-Monitor über das Konto-Menü: Weltkarte → Land → Werk → Halle → Monitor
+  // 23. Vollbildmodus über das Konto-Menü: Karte ohne Seitenleiste, rechts die offenen Aufträge der Ebene
   await p.goto(BASE + '/'); await p.waitForSelector('aside');
-  await p.click('.leiste-konto'); await p.click('.menue-monitor'); await p.waitForURL(/\/monitor$/); await p.waitForSelector('.ebene-neu .wkarte');
-  pruefe('Hallen-Monitor im Konto-Menü: zuerst die Weltkarte', (await p.textContent('h1')).includes('Hallen-Monitor'));
+  await p.click('.leiste-konto'); await p.click('.menue-vollbild'); await p.waitForURL(/\/vollbild/); await p.waitForSelector('.ebene-neu .wkarte');
+  const vbAlle = Number(sql("SELECT count(*) FROM wartungsauftrag WHERE status <> 'erledigt'"));
+  pruefe('Vollbildmodus: ohne Seitenleiste, weltweit alle offenen Aufträge', !(await p.isVisible('.seitenleiste'))
+    && (await p.$$eval('.vollbild-zeile', (z) => z.length)) === vbAlle, vbAlle);
   await p.click('.ebene-neu [data-ort="land-DE"]'); await p.waitForTimeout(1500);
+  const vbDe = Number(sql("SELECT count(*) FROM wartungsauftrag w JOIN stoermeldung s ON s.id=w.stoermeldung_id JOIN maschine m ON m.id=s.maschine_id JOIN gebaeude g ON g.id=m.gebaeude_id JOIN standort st ON st.id=g.standort_id WHERE w.status <> 'erledigt' AND st.land_kuerzel='DE'"));
+  pruefe('Vollbildmodus: im Land die Aufträge des Landes', (await p.$$eval('.vollbild-zeile', (z) => z.length)) === vbDe, vbDe);
   await p.click(`.ebene-neu [data-ort="st-${v2Werk}"]`); await p.waitForTimeout(2500);
-  await p.click('.ebene-neu [data-ort^="g-"] >> nth=0');
-  await p.waitForURL(/\/monitor\?werk=alb&halle=/, { timeout: 15000 }).catch(() => {});
-  pruefe('Hallen-Monitor: Halle angeklickt → Monitor dieser Halle', /\/monitor\?werk=alb&halle=h\d/.test(p.url()) && (await p.waitForSelector('.monitor-zeile').catch(() => null)) !== null, p.url());
-  await p.click('.monitor-andere-halle'); await p.waitForURL(/\/monitor$/);
-  pruefe('Hallen-Monitor: „Andere Halle“ führt zurück zur Weltkarte', (await p.waitForSelector('.ebene-neu .wkarte').catch(() => null)) !== null);
+  const vbWerk = Number(sql(`SELECT count(*) FROM wartungsauftrag w JOIN stoermeldung s ON s.id=w.stoermeldung_id JOIN maschine m ON m.id=s.maschine_id JOIN gebaeude g ON g.id=m.gebaeude_id WHERE w.status <> 'erledigt' AND g.standort_id=${v2Werk}`));
+  pruefe('Vollbildmodus: im Werk die Aufträge des Werks', (await p.$$eval('.vollbild-zeile', (z) => z.length)) === vbWerk && p.url().includes('werk=alb'), vbWerk);
+  await p.click('.vollbild-schliessen'); await p.waitForURL(/\/karte$/); await p.waitForTimeout(500);
+  pruefe('Vollbildmodus: Schließen zeigt die Seitenleiste wieder', await p.isVisible('.seitenleiste'));
+  await p.goto(BASE + '/monitor');
+  pruefe('Hallen-Monitor ohne Halle führt zum Vollbildmodus', /\/vollbild$/.test(p.url()));
 
   pruefe('Keine JavaScript-Fehler in der Konsole', konsole.length === 0, konsole.slice(0, 3).join(' | '));
   console.log('\nERGEBNIS:', fehler.length === 0 ? 'alles OK' : `${fehler.length} Fehler: ${fehler.join(', ')}`);

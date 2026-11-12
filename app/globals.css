@@ -2945,6 +2945,15 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .monitor-zeile.ampel-gruen small b { color: var(--gruen); }
 .monitor-wartung { align-self: flex-start; margin-top: 4px; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--orange-bg); color: var(--orange); }
 @media (max-width: 991.98px) { .monitor-halle { grid-template-columns: 1fr; } .monitor-liste { max-height: none; } }
+/* Vollbildmodus (app/vollbild): Karte so hoch wie der Bildschirm, rechts die Aufträge mit eigenem Scrollen */
+.vollbild { display: flex; flex-direction: column; gap: 14px; }
+.vollbild .explorer-buehne, .vollbild .explorer-buehne.buehne-mittel { --buehne-h: max(420px, calc(100dvh - 210px)); }
+.vollbild-auftraege .monitor-liste { max-height: calc(100dvh - 190px); }
+.vollbild-zeile { padding: 0; }
+.vollbild-zeile .monitor-zeile-text { padding: 10px 14px; text-decoration: none; width: 100%; }
+.vollbild-zeile.prio-hoch { border-left: 5px solid var(--rot); }
+.vollbild-zeile.prio-mittel { border-left: 5px solid var(--orange); }
+.vollbild-zeile.prio-niedrig { border-left: 5px solid var(--blau); }
 /* Handy: Summen als Raster unter dem Titel, damit die Seite nicht breiter als der Bildschirm wird */
 @media (max-width: 600px) {
     :root[data-vollbild="an"] .app-main { padding: 14px 12px; }
