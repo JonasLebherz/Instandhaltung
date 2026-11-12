@@ -328,12 +328,6 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     animation: tipp-ein .15s var(--weich) backwards;
 }
 @keyframes tipp-ein { from { opacity: 0; transform: translate(-6px, -50%); } }
-/* Niedrige Fenster: Einträge etwas enger */
-@media (max-height: 780px) and (min-width: 768px) {
-    .leiste-link { min-height: 38px; }
-    .leiste-titel { padding: 10px 12px 4px; }
-    .leiste-kopf { min-height: 38px; }
-}
 .leiste-bereich ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .leiste-titel {
     font-size: .75rem; font-weight: 650; letter-spacing: 0;
@@ -370,6 +364,17 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 :root[data-theme="dark"] .leiste-link.aktiv { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12); }
 .leiste-link.aktiv .leiste-symbol i { color: var(--akzent); }
+/* Niedrige Fenster (Laptop, Browser-Zoom): Einträge enger, damit alle Bereiche ohne Scrollen passen.
+   Steht bewusst NACH den Grundregeln oben – davor wurde der Block von ihnen überschrieben und wirkte nie. */
+@media (max-height: 980px) and (min-width: 768px) {
+    .leiste-link { min-height: 40px; }
+    .leiste-titel { padding: 10px 12px 4px; }
+}
+@media (max-height: 780px) and (min-width: 768px) {
+    .leiste-link { min-height: 36px; }
+    .leiste-titel { padding: 8px 12px 3px; }
+    .leiste-kopf { min-height: 38px; }
+}
 .leiste-symbol {
     position: relative;
     flex: 0 0 30px;
@@ -747,6 +752,8 @@ a.karte:hover {
     margin-bottom: 16px;
 }
 .karte-kopf .abschnitt-titel { margin-bottom: 0; }
+/* Handy: Titel und Zusatz (Link, Knöpfe) untereinander statt zusammengedrückt nebeneinander */
+@media (max-width: 575.98px) { .karte-kopf { flex-wrap: wrap; gap: 8px 16px; } }
 
 /* ---------- Große Kennzahlen ---------- */
 
@@ -1568,7 +1575,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     top: calc(100% + 3px);
     left: 50%;
     transform: translateX(-50%);
-    font-size: .66rem;
+    font-size: .6875rem;   /* mindestens 11 px (Design-Regel) */
     font-weight: 600;
     color: var(--text-leise);
     background: var(--karte-erhoeht);
@@ -1790,6 +1797,8 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 }
 .melde-schritte li > button:hover { background: var(--karte-erhoeht); }
 .melde-schritte .schritt-aktiv > div { background: var(--karte-solid); color: var(--text); box-shadow: 0 2px 8px rgba(31, 38, 64, .1); }
+/* Langer Name (z. B. „Beschreibung“) in schmalen Spalten: mit … kürzen statt über den Rand zu laufen */
+.melde-schritte .schritt-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .schritt-nr {
     width: 28px; height: 28px; flex: 0 0 28px;
     border-radius: 50%;
@@ -1914,6 +1923,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .stapel-rot { background: var(--rot); }
 .stapel-orange { background: var(--orange); }
 .stapel-grau { background: var(--grau); opacity: .55; }
+.stapel-blau { background: var(--blau); }
 .stat-legende { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .stat-legende li { display: grid; grid-template-columns: 1fr auto 52px; align-items: center; gap: 12px; }
 .stat-legende .pill { justify-self: start; }
@@ -1999,7 +2009,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .verbund-leitung.status-unbekannt .linie, .verbund-leitung.status-pruefe .linie { opacity: .5; }
 .leitung-text {
     position: absolute; left: 50%; transform: translateX(-50%);
-    font-size: .68rem; color: var(--text-leise); text-align: center; line-height: 1.25;
+    font-size: .6875rem; color: var(--text-leise); text-align: center; line-height: 1.25;
     width: 100%; padding: 0 4px;
 }
 .leitung-l1 .leitung-text, .leitung-l3 .leitung-text { top: calc(50% - 26px); }
@@ -2095,7 +2105,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .er-gruppe-farbe { width: 12px; height: 12px; border-radius: 4px; background: var(--gruppe); }
 .er-weitere { padding: 2px 12px 0 34px; font-size: .7rem; color: var(--text-leise); }
 .er-spaltenname { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.er-typ { color: var(--text-leise); font-size: .68rem; white-space: nowrap; }
+.er-typ { color: var(--text-leise); font-size: .6875rem; white-space: nowrap; }
 .er-ziel { display: none; }
 .er-symbol { display: inline-grid; place-items: center; font-size: .8rem; }
 .er-text { padding: 6px 12px 10px; font-size: .74rem; color: var(--text-leise); border-top: 1px solid var(--linie); }
@@ -2122,7 +2132,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     .er-diagramm { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; padding: 0; }
     .er-tabelle { grid-column: auto !important; grid-row: auto !important; }
     .er-linien { display: none; }
-    .er-ziel { display: inline; font-size: .66rem; color: var(--akzent); }
+    .er-ziel { display: inline; font-size: .6875rem; color: var(--akzent); }
     .er-spalte { grid-template-columns: 16px 1fr auto auto; }
 }
 
@@ -2525,9 +2535,13 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     .explorer-ebene .gebaeude-name { font-size: .6875rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .explorer-ebene .plan-beschriftung { display: none; }   /* zu klein zum Lesen */
     /* 3D: kleinere Beschriftungen und Uhr */
-    .raum-halle { font-size: .68rem; padding: 2px 4px 2px 8px; gap: 4px; }
+    .raum-halle { font-size: .6875rem; padding: 2px 4px 2px 8px; gap: 4px; }
     .raum-halle .zaehl-marke { transform: scale(.85); }
-    .raum-uhr { left: 8px; bottom: 8px; font-size: .68rem; padding: 3px 8px; }
+    /* Hallenschilder überlappten sich: nur Kürzel und Zahl, Name beim Darüberfahren bzw. in der Liste */
+    .raum-halle-name { display: none; }
+    /* Legende in der Bühne verdeckte zu viel – auf dem Handy steht sie unter der Karte */
+    .explorer-buehne .raum-legende { display: none; }
+    .raum-uhr { left: 8px; bottom: 8px; font-size: .6875rem; padding: 3px 8px; }
     .buehne-hinweis { display: none; }
     /* Maschinen: Filter der Historie umbrechen, Zustand nur als Punkt */
     .historie-kopf { flex-wrap: wrap; gap: 8px; }
@@ -2538,7 +2552,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .explorer-kompakt .raum-halle-name, .explorer-kompakt .gebaeude-name, .explorer-kompakt .gebaeude-info,
 .explorer-kompakt .buehne-hinweis, .explorer-kompakt .plan-beschriftung { display: none; }
 .explorer-kompakt .raum-halle { font-size: .7rem; padding: 2px 3px 2px 7px; gap: 4px; }
-.explorer-kompakt .raum-uhr { font-size: .66rem; padding: 2px 7px; left: 8px; bottom: 8px; }
+.explorer-kompakt .raum-uhr { font-size: .6875rem; padding: 2px 7px; left: 8px; bottom: 8px; }
 .explorer-kompakt .buehne-kopf { padding-top: 3px; padding-bottom: 3px; }
 
 /* 2D → 3D: „3D“ ist sofort gewählt und pulsiert leicht, bis die Szene bereit ist */
@@ -2640,7 +2654,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .kalender-tag.gewaehlt { border-color: var(--akzent); box-shadow: 0 0 0 3px var(--akzent-ring); }
 .kalender-zahl { align-self: flex-start; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; font-size: .82rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .kalender-marken { display: flex; gap: 4px; flex-wrap: wrap; }
-.kal-marke { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 999px; color: #fff; font-size: .68rem; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.kal-marke { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 999px; color: #fff; font-size: .6875rem; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
 .wartung-eintraege { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .wartung-eintrag { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 12px; background: var(--fuellung); border-left: 3px solid var(--orange); }
 .wartung-eintrag.art-ueberfaellig { border-left-color: var(--rot); }
@@ -2922,7 +2936,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .monitor-zeile.ampel-orange { border-left: 5px solid var(--orange); background: color-mix(in srgb, var(--orange) 7%, var(--karte-solid)); }
 .monitor-zeile.ampel-blau { border-left: 5px solid var(--blau); }
 .monitor-zeile.ampel-gruen { border-left: 5px solid var(--gruen); }
-.monitor-zeile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: .95rem; }
+.monitor-zeile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: .95rem; color: var(--text); }   /* sonst erbt der Name die Ampelfarbe der Zeile */
 .monitor-zeile-text small { color: var(--text-leise); font-size: .8rem; }
 .monitor-zeile-text small b { font-weight: 600; }
 .monitor-zeile.ampel-rot small b { color: var(--rot); }
@@ -2931,6 +2945,16 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .monitor-zeile.ampel-gruen small b { color: var(--gruen); }
 .monitor-wartung { align-self: flex-start; margin-top: 4px; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--orange-bg); color: var(--orange); }
 @media (max-width: 991.98px) { .monitor-halle { grid-template-columns: 1fr; } .monitor-liste { max-height: none; } }
+/* Handy: Summen als Raster unter dem Titel, damit die Seite nicht breiter als der Bildschirm wird */
+@media (max-width: 600px) {
+    :root[data-vollbild="an"] .app-main { padding: 14px 12px; }
+    .monitor-kopf { gap: 12px; }
+    .monitor-summen { margin-left: 0; width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; }
+    .monitor-summen span { min-width: 0; padding: 6px 8px; }
+    .monitor-summen strong { font-size: 1.4rem; }
+    .monitor-halle-laden, .explorer-buehne.buehne-monitor, .explorer-kompakt .explorer-buehne.buehne-monitor { --buehne-h: 360px; }
+    .monitor-halle-laden { height: 360px; }
+}
 /* ---------- Wartungsplan: Umschalter und Zeitachse ---------- */
 .wartung-schalter { position: static; }
 .wartung-schalter button { display: inline-flex; align-items: center; gap: 6px; }

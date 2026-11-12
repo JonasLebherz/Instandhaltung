@@ -74,7 +74,8 @@ export default function MaschinenListe({ maschinen }) {
               <th className="d-none d-md-table-cell">{t('Werk')}</th>
               <th className="d-none d-lg-table-cell">{t('Baujahr')}</th>
               <th>{t('Zustand')}</th>
-              <th className="zahl">{t('Störungen 12 Mon.')}</th>
+              {/* Auf dem Handy kurze Überschrift, sonst wird die Spalte zu breit */}
+              <th className="zahl"><span className="d-none d-sm-inline">{t('Störungen 12 Mon.')}</span><span className="d-sm-none" title={t('Störungen 12 Mon.')}>{t('Stör.')}</span></th>
             </tr>
           </thead>
           <tbody>

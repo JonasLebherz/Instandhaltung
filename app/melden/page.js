@@ -53,7 +53,7 @@ export default async function MeldenSeite({ searchParams }) {
         <span className="melde-symbol" aria-hidden="true"><i className="bi bi-exclamation-triangle-fill" /></span>
         <div>
           <h1>{t('Störung melden')}</h1>
-          <p>{t('In vier Schritten: Werk, Gebäude und Maschine antippen – dann kurz beschreiben, was passiert ist.')}</p>
+          <p>{t('Land, Werk, Gebäude und Maschine antippen – dann kurz beschreiben, was passiert ist.')}</p>
         </div>
       </div>
       <MeldeAssistent daten={daten} startwerte={startwerte}

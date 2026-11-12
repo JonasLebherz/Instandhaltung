@@ -549,7 +549,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             <div className="col-lg-7">
               <section className="karte" style={{ '--i': 13 }}>
                 <h2 className="abschnitt-titel">{t('Verfügbarkeit pro Monat')}{info('verfuegbarkeitMonat', t('Verfügbarkeit pro Monat'))}</h2>
-                <Diagramm titel={t('Verfügbarkeit pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.verfuegbarkeit} einheit="%" nachkomma={2} abNull={false}
+                <Diagramm titel={t('Verfügbarkeit pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.verfuegbarkeit} einheit="%" nachkomma={2} abNull={false} max={100}
                           spalte={t('Monat')} beschreibung={t('Liniendiagramm: Anteil der Zeit ohne Ausfall pro Monat in Prozent')} />
               </section>
             </div>

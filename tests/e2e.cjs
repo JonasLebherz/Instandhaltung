@@ -33,7 +33,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.evaluate(() => localStorage.setItem('kartenansicht', '2d'));
   const konsole = [];
   p.on('console', (m) => { if (m.type() === 'error') konsole.push(m.text()); });
-  p.on('pageerror', (e) => konsole.push('PAGEERROR ' + e.message));
+  p.on('pageerror', (e) => konsole.push('PAGEERROR ' + p.url().replace(BASE, '') + ' ' + e.message));
 
   // 1. Alle Seiten laden
   for (const url of ['/', '/melden', '/melden?maschine=3', '/auftraege', '/auftraege?status=offen', '/auftraege?status=wartet%20auf%20Teil&maschine=6&prioritaet=hoch',

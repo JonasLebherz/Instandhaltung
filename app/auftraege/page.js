@@ -157,10 +157,11 @@ export default async function AuftraegeSeite({ searchParams }) {
             <table className="tabelle">
               <thead>
                 <tr>
-                  <th className="zahl">{t('Nr.')}</th>
+                  {/* Handy: Nr. und Priorität ausgeblendet (Priorität steht dann unter dem Status) */}
+                  <th className="zahl d-none d-sm-table-cell">{t('Nr.')}</th>
                   <th>{t('Maschine / Ort')}</th>
                   <th className="d-none d-lg-table-cell">{t('Ursache')}</th>
-                  <th>{t('Priorität')}</th>
+                  <th className="d-none d-sm-table-cell">{t('Priorität')}</th>
                   <th>{t('Status')}</th>
                   <th className="d-none d-lg-table-cell">{t('Techniker')}</th>
                   <th className="d-none d-md-table-cell">{t('Gemeldet')}</th>
@@ -170,15 +171,16 @@ export default async function AuftraegeSeite({ searchParams }) {
               <tbody>
                 {auftraege.map((a) => (
                   <tr key={a.auftrag_id} className="klickbar">
-                    <td className="zahl klein">{a.meldung_id}</td>
+                    <td className="zahl klein d-none d-sm-table-cell">{a.meldung_id}</td>
                     <td>
                       <Link className="zeilen-link" prefetch={false} href={`/auftraege/${a.auftrag_id}`}>{a.maschine}</Link>
                       <div className="klein">{a.stadt} · {a.gebaeude} · {a.anlagennummer}</div>
                       <div className="klein text-truncate beschreibung-kurz">{a.beschreibung}</div>
                     </td>
                     <td className="d-none d-lg-table-cell klein">{t(a.ursache_kategorie)}</td>
-                    <td><PrioritaetPill prioritaet={a.prioritaet} /></td>
+                    <td className="d-none d-sm-table-cell"><PrioritaetPill prioritaet={a.prioritaet} /></td>
                     <td>
+                      <div className="d-sm-none mb-1"><PrioritaetPill prioritaet={a.prioritaet} /></div>
                       <StatusPill status={a.status} />
                       {/* Auf Tablets steht der Techniker unter dem Status statt in eigener Spalte */}
                       {a.techniker && <div className="klein mt-1 d-lg-none">{a.techniker}</div>}

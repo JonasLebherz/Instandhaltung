@@ -30,7 +30,7 @@ function mitDeckkraft(hex, deckkraft) {
   return `rgba(${r}, ${g}, ${b}, ${deckkraft})`;
 }
 
-export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '', nachkomma = 0, beschreibung, titel, unterzeile, hoehe = 260, spalte = '', abNull = true }) {
+export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '', nachkomma = 0, beschreibung, titel, unterzeile, hoehe = 260, spalte = '', abNull = true, max }) {
   const t = useT();
   const leinwandRef = useRef(null);
   const formatiert = (wert) => (wert === null || wert === undefined ? '–'
@@ -54,6 +54,8 @@ export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '',
       };
       // abNull = false: Achse beginnt knapp unter dem kleinsten Wert (z. B. Verfügbarkeit 99,x %)
       const wertAchse = { beginAtZero: abNull, grace: abNull ? 0 : '5%', grid: gitter, border: { display: false }, ticks: { precision: nachkomma ? undefined : 0, font: schrift } };
+      // max: Obergrenze der Achse (z. B. 100 bei Prozent – sonst zeigte „grace“ unsinnige 100,1 %)
+      if (max !== undefined) wertAchse.max = max;
       const textAchse = { grid: { display: false }, border: { color: gitter.color }, ticks: { font: schrift, maxRotation: 0, autoSkipPadding: 10, color: waagerecht ? farbe('--text') : undefined } };
 
       diagramm = new Chart(leinwandRef.current, {
@@ -106,7 +108,7 @@ export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '',
       diagramm?.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [art, JSON.stringify(labels), JSON.stringify(werte), einheit, nachkomma, t.locale]);
+  }, [art, JSON.stringify(labels), JSON.stringify(werte), einheit, nachkomma, abNull, max, t.locale]);
 
   return (
     <>
