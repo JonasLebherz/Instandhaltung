@@ -17,7 +17,7 @@ import { aktuellerBenutzer } from '@/lib/auth';
 import { personAusCookie } from '@/lib/person';
 import { ansichtAusCookie } from '@/lib/ansicht';
 import { aktuelleSprache, uebersetzer } from '@/lib/sprache/server';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 /** Hinweise aus dem Cookie "flash" lesen (siehe lib/flash.js) */
 async function flashLesen() {
@@ -65,6 +65,19 @@ const startSkript = `
 })();`;
 
 export default async function RootLayout({ children }) {
+  // „Version 1“ (app/v1): der frühe, schlichte Stand der Anwendung – ohne Seitenleiste, ohne Design.
+  // Den Pfad liefert die Middleware in der Kopfzeile „x-pfad“. Das Attribut data-v1 schaltet in
+  // globals.css alle Gestaltung ab (Abschnitt „Version 1“). Zwischen V1 und der App führen normale
+  // Links (<a href>) mit ganzem Seitenwechsel – nur so wird dieses Layout neu ausgewählt.
+  const pfad = (await headers()).get('x-pfad') ?? '';
+  if (pfad === '/v1' || pfad.startsWith('/v1/')) {
+    return (
+      <html lang="de" data-v1="an">
+        <body>{children}</body>
+      </html>
+    );
+  }
+
   const benutzer = await aktuellerBenutzer();
   const flashMeldungen = await flashLesen();
   const sprache = await aktuelleSprache();

@@ -11,6 +11,7 @@
  * 3 Abfragen gleichzeitig.
  */
 import { sql } from '@/lib/db';
+import { idAus } from '@/lib/eingabe';
 import { benutzerPflicht } from '@/lib/auth';
 import { seitentitel } from '@/lib/sprache/server';
 import { aktuellePerson, darfBearbeiten } from '@/lib/person';
@@ -27,7 +28,7 @@ export default async function LagerSeite({ searchParams }) {
   const person = await aktuellePerson();
 
   // Welches Werk? Adresse → Person → Ansicht → alle
-  const werkId = /^\d+$/.test(q.werk ?? '') ? Number(q.werk)
+  const werkId = idAus(q.werk) ? idAus(q.werk)
     : q.werk === 'alle' ? null
       : person?.standort_id ?? ansicht.standortId ?? null;
 
@@ -74,6 +75,6 @@ export default async function LagerSeite({ searchParams }) {
   const werk = werke.find((w) => w.id === werkId) ?? null;
   return (
     <LagerAnsicht werke={werke} werk={werk} teile={teile} verteilung={verteilung}
-                  start={/^\d+$/.test(q.teil ?? '') ? Number(q.teil) : null} darf={darfBearbeiten(person)} />
+                  start={idAus(q.teil)} darf={darfBearbeiten(person)} />
   );
 }

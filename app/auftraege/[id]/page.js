@@ -13,6 +13,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { sql } from '@/lib/db';
+import { idAus } from '@/lib/eingabe';
 import { benutzerPflicht } from '@/lib/auth';
 import { STATUS_WERTE, checklisteFuer } from '@/lib/konstanten';
 import { datumZeit, dauer, fuerDatetimeInput } from '@/lib/format';
@@ -54,8 +55,9 @@ export default async function AuftragSeite({ params }) {
   await benutzerPflicht();
   const t = await uebersetzer();
   const { id } = await params;
-  if (!/^\d+$/.test(id)) notFound();
-  const auftragId = Number(id);
+  // Nur echte Nummern (siehe lib/eingabe.js) – alles andere ist „Nicht gefunden“
+  const auftragId = idAus(id);
+  if (!auftragId) notFound();
 
   const [auftrag] = await sql`
     SELECT w.id, w.stoermeldung_id, w.techniker_id, w.status, w.start_zeit, w.ende_zeit, w.massnahme,

@@ -404,6 +404,9 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                   <span className={`mini-schalter${tonEin ? ' an' : ''}`} aria-hidden="true" />
                 </button>
                 <div className="menue-trenner" />
+                {/* Version 1: früher, schlichter Stand der App (app/v1). Bewusst <a> statt <Link>:
+                    die Seite wird ganz neu geladen, weil /v1 ein eigenes, leeres Layout hat. */}
+                <a href="/v1" role="menuitem" className="menue-v1"><i className="bi bi-clock-history" /> {t('Version 1 (früher Stand)')}</a>
                 <form action={abmelden}>
                   <button type="submit" role="menuitem"><i className="bi bi-box-arrow-right" /> {t('Abmelden')}</button>
                 </form>

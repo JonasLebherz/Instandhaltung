@@ -10,6 +10,7 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { sql } from '@/lib/db';
+import { idAus } from '@/lib/eingabe';
 import { benutzerPflicht } from '@/lib/auth';
 import { uebersetzer, seitentitel } from '@/lib/sprache/server';
 import QrCode from '@/components/QrCode';
@@ -24,7 +25,7 @@ export default async function QrSeite({ searchParams }) {
   await benutzerPflicht();
   const t = await uebersetzer();
   const q = await searchParams;
-  const maschineId = /^\d+$/.test(q.maschine ?? '') ? Number(q.maschine) : null;
+  const maschineId = idAus(q.maschine);
   const werk = typeof q.werk === 'string' ? q.werk.toUpperCase().slice(0, 10) : null;
   const halle = typeof q.halle === 'string' ? q.halle.toUpperCase().slice(0, 10) : null;
 

@@ -660,7 +660,9 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     text-transform: uppercase;
     letter-spacing: .05em;
 }
-.aufklapp-menue button {
+/* .menue-v1: der Link „Version 1“ im Konto-Menü sieht aus wie die Knöpfe daneben */
+.aufklapp-menue button,
+.aufklapp-menue .menue-v1 {
     width: 100%;
     display: flex;
     align-items: center;
@@ -674,7 +676,8 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     text-align: left;
     transition: background-color var(--uebergang);
 }
-.aufklapp-menue button:hover { background: var(--fuellung); }
+.aufklapp-menue button:hover, .aufklapp-menue .menue-v1:hover { background: var(--fuellung); }
+.aufklapp-menue .menue-v1 { text-decoration: none; box-sizing: border-box; }
 .aufklapp-menue button .haken { margin-left: auto; color: var(--akzent); }
 /* Kleiner Ein/Aus-Schalter im Menü (z. B. Ton bei Kamerafahrten) */
 .mini-schalter { margin-left: auto; position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--fuellung-stark, var(--linie)); transition: background-color var(--uebergang); flex: none; }
@@ -2964,3 +2967,58 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .achse-balken span small { font-weight: 500; color: var(--text-leise); font-size: .6875rem; }
 .achse-balken:hover { transform: translateY(-1px); box-shadow: var(--schatten-hover); }
 .achse-balken.gewaehlt { box-shadow: 0 0 0 2px var(--akzent); }
+
+/* =====================================================================
+   Version 1 (/v1) – der frühe, schlichte Stand der Anwendung
+   ---------------------------------------------------------------------
+   Das Layout liefert für /v1 nur <html data-v1="an"><body> (app/layout.js). Hier wird ALLES
+   zurückgenommen, was diese Datei und Bootstrap gestalten: `all: revert` stellt für jedes Element
+   das Aussehen des Browsers wieder her (Schrift Times, blaue unterstrichene Links, graue Knöpfe).
+   Danach nur das Nötigste: Rahmen für Tabellen, Farben für Meldungen. Feste Farben sind hier
+   Absicht (Ausnahme von „nur CSS-Variablen“): Version 1 kennt weder Design noch Dunkelmodus.
+   ===================================================================== */
+html[data-v1],
+html[data-v1] body,
+html[data-v1] body * { all: revert; }
+html[data-v1] body::before,
+html[data-v1] body::after { content: none; }
+html[data-v1] { color-scheme: light; background: #fff; }
+html[data-v1] body { margin: 8px; color: #000; background: #fff; }
+/* Skripte, Vorlagen und Stile bleiben unsichtbar (revert gilt auch für sie, zur Sicherheit) */
+html[data-v1] body script,
+html[data-v1] body style,
+html[data-v1] body template,
+html[data-v1] body [hidden] { display: none; }
+
+/* Tabellen mit sichtbarem Gitter, wie früher mit border="1" */
+html[data-v1] .v1-tabelle { border-collapse: collapse; margin: 0 0 12px; }
+html[data-v1] .v1-tabelle th,
+html[data-v1] .v1-tabelle td { border: 1px solid #808080; padding: 3px 6px; vertical-align: top; }
+html[data-v1] .v1-tabelle th { background: #e0e0e0; text-align: left; }
+html[data-v1] .v1-tabelle td[align="right"] { text-align: right; }
+html[data-v1] .v1-tabelle .v1-neu td { background: #ffffc0; }
+/* Breite Tabellen: auf dem Handy seitlich scrollen statt die Seite zu verbreitern */
+html[data-v1] .v1-breit { overflow-x: auto; }
+
+/* Formular: Beschriftung links, Feld rechts */
+html[data-v1] .v1-formular td { padding: 4px 8px 4px 0; vertical-align: top; }
+html[data-v1] .v1-formular select,
+html[data-v1] .v1-formular textarea,
+html[data-v1] .v1-formular input[type="text"] { max-width: 100%; box-sizing: border-box; }
+html[data-v1] .v1-radio { margin-right: 12px; }
+
+/* Meldungen und Farben */
+html[data-v1] .v1-gruen { color: #008000; }
+html[data-v1] .v1-rot { color: #c00000; }
+html[data-v1] .v1-fehler { border: 1px solid #c00000; background: #ffe8e8; color: #800000; padding: 6px 10px; margin: 0 0 12px; }
+html[data-v1] .v1-hinweis { border: 1px solid #008000; background: #e8ffe8; padding: 6px 10px; }
+/* Handy: Beschriftung über dem Feld, Felder so breit wie der Bildschirm (sonst wird die Seite breiter) */
+@media (max-width: 600px) {
+    html[data-v1] .v1-formular,
+    html[data-v1] .v1-formular tbody,
+    html[data-v1] .v1-formular tr,
+    html[data-v1] .v1-formular td { display: block; }
+    html[data-v1] .v1-formular select,
+    html[data-v1] .v1-formular textarea,
+    html[data-v1] .v1-formular input[type="text"] { width: 100%; }
+}

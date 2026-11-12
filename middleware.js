@@ -4,14 +4,20 @@
  * Läuft bei jedem Seitenaufruf, bevor die Seite erzeugt wird:
  *  1. frischt die Anmeldung auf (Supabase-Cookie verlängern)
  *  2. schickt nicht angemeldete Besucher zur Login-Seite
+ *  3. reicht den aufgerufenen Pfad als Kopfzeile „x-pfad“ an das Layout weiter (für /v1)
  */
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 export async function middleware(request) {
+  // Aufgerufenen Pfad an die Seite weiterreichen: Das Layout (app/layout.js) braucht ihn, um für
+  // „Version 1“ (/v1) eine schlichte Seite ohne Seitenleiste zu liefern. Ein von außen mitgeschickter
+  // Wert wird dabei immer überschrieben.
+  request.headers.set('x-pfad', request.nextUrl.pathname);
+
   // Lokaler Testbetrieb ohne Supabase (siehe .env.example)
   if (process.env.LOGIN_DEAKTIVIERT === 'true') {
-    return NextResponse.next();
+    return NextResponse.next({ request });
   }
 
   // Fehlen die Supabase-Zugangsdaten, lieber gar nichts anzeigen als ohne Schutz

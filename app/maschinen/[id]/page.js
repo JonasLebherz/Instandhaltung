@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { sql } from '@/lib/db';
+import { idAus } from '@/lib/eingabe';
 import { benutzerPflicht } from '@/lib/auth';
 import { uebersetzer } from '@/lib/sprache/server';
 import { gross } from '@/lib/sprache';
@@ -36,8 +37,8 @@ const TAGE = 365;   // Zeitraum der Kennzahlen
 export async function generateMetadata({ params }) {
   const { id } = await params;
   const t = await uebersetzer();
-  if (!/^\d+$/.test(id)) return { title: t('Maschine') };
-  const [m] = await sql`SELECT bezeichnung FROM maschine WHERE id = ${Number(id)}`;
+  if (!idAus(id)) return { title: t('Maschine') };
+  const [m] = await sql`SELECT bezeichnung FROM maschine WHERE id = ${idAus(id)}`;
   return { title: m?.bezeichnung ?? t('Maschine') };
 }
 
@@ -45,8 +46,8 @@ export default async function MaschinenSeite({ params }) {
   await benutzerPflicht();
   const t = await uebersetzer();
   const { id } = await params;
-  if (!/^\d+$/.test(id)) notFound();
-  const maschineId = Number(id);
+  const maschineId = idAus(id);   // nur echte Nummern (lib/eingabe.js)
+  if (!maschineId) notFound();
 
   const [[maschine], historie, teile, techniker, plaene] = await Promise.all([
     sql`

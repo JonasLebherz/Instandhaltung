@@ -9,6 +9,7 @@
  * Gelesen markiert wird über die Server-Aktion nachrichtenGelesen (app/aktionen.js).
  */
 import { sql } from '@/lib/db';
+import { idAus } from '@/lib/eingabe';
 import { aktuellerBenutzer } from '@/lib/auth';
 import { aktuellePerson } from '@/lib/person';
 
@@ -20,7 +21,7 @@ export async function GET(anfrage) {
   if (!ich) return Response.json({ ungelesen: 0, ohnePerson: true });
 
   const parameter = new URL(anfrage.url).searchParams;
-  const mit = Number(parameter.get('mit'));
+  const mit = idAus(parameter.get('mit'));   // Gesprächspartner (nur echte Nummern)
   const [{ ungelesen }] = await sql`SELECT COUNT(*)::int AS ungelesen FROM nachricht WHERE an_id = ${ich.id} AND gelesen_am IS NULL`;
   const antwort = { ungelesen, ich: ich.id };
 

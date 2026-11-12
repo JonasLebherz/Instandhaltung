@@ -6,14 +6,16 @@
  */
 import { sql } from '@/lib/db';
 import { aktuellerBenutzer } from '@/lib/auth';
+import { idAus } from '@/lib/eingabe';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(anfrage, { params }) {
   if (!(await aktuellerBenutzer())) return new Response('Nicht angemeldet', { status: 401 });
   const { id } = await params;
-  if (!/^\d+$/.test(id)) return new Response('Nicht gefunden', { status: 404 });
-  const [foto] = await sql`SELECT datei, mime FROM stoermeldung_foto WHERE id = ${Number(id)}`;
+  const fotoId = idAus(id);   // nur echte Nummern (lib/eingabe.js)
+  if (!fotoId) return new Response('Nicht gefunden', { status: 404 });
+  const [foto] = await sql`SELECT datei, mime FROM stoermeldung_foto WHERE id = ${fotoId}`;
   if (!foto) return new Response('Nicht gefunden', { status: 404 });
   return new Response(foto.datei, {
     headers: { 'Content-Type': foto.mime, 'Cache-Control': 'private, max-age=31536000, immutable', 'Content-Disposition': 'inline' },

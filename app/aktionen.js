@@ -18,6 +18,7 @@
  *   teilBuchen       – Ersatzteil buchen bzw. automatisch bestellen
  *   lieferungBuchen  – Wareneingang einer Bestellung
  *   nachrichtSenden, nachrichtenGelesen – Chat zwischen Personen (Seite „Mitarbeiter“, ohne Weiterleitung)
+ *   meldungAnlegenV1 – Störmeldung aus dem einfachen Formular von „Version 1“ (/v1)
  */
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
@@ -34,7 +35,8 @@ const feld = (formular, name) => String(formular.get(name) ?? '').trim();
 
 /** Ganze Zahl aus einem Formularfeld oder null */
 function ganzzahl(text) {
-  return /^\d+$/.test(text) ? Number(text) : null;
+  // höchstens 9 Ziffern: passt immer in INTEGER (sonst gäbe eine zu lange Ziffernfolge einen Datenbankfehler)
+  return /^\d{1,9}$/.test(text) ? Number(text) : null;
 }
 
 /* =====================================================================
@@ -636,4 +638,59 @@ export async function checklistePunkt(auftragId, nummer, erledigt) {
     WHERE id = ${id} AND status <> 'erledigt'`;
   revalidatePath(`/auftraege/${id}`);
   return { ok: true };
+}
+
+/* =====================================================================
+ * Version 1 (/v1): Störmeldung aus dem einfachen HTML-Formular speichern.
+ *
+ * Version 1 ist der schlichte, frühe Stand der Anwendung (siehe app/v1/Rahmen.js). Das Formular dort
+ * ist ein gewöhnliches HTML-Formular ohne Client-Code. Deshalb gibt diese Aktion nichts zurück,
+ * sondern leitet immer weiter: bei Fehlern zurück zum Formular (Fehler und Eingaben stehen in der
+ * Adresse), sonst zur Liste der Störmeldungen. Gespeichert wird wie in meldungAnlegen:
+ * Meldung + Wartungsauftrag + Verlauf in einer Transaktion. Zeitpunkt ist „jetzt“. Texte nur deutsch.
+ * ================================================================== */
+export async function meldungAnlegenV1(formular) {
+  await benutzerPflicht();
+  const person = await aktuellePerson();
+
+  const eingabe = {
+    maschine: feld(formular, 'maschine_id'),
+    von: feld(formular, 'gemeldet_von').slice(0, 120),
+    text: feld(formular, 'beschreibung').slice(0, 1100),
+    ursache: feld(formular, 'ursache_kategorie'),
+    prio: feld(formular, 'prioritaet'),
+  };
+  const fehler = [];   // Kennwörter, die Texte dazu stehen in app/v1/melden/page.js
+
+  const maschineId = ganzzahl(eingabe.maschine);
+  const [maschine] = maschineId ? await sql`SELECT id FROM maschine WHERE id = ${maschineId}` : [];
+  if (!maschine) fehler.push('maschine');
+  if (eingabe.von === '' || eingabe.von.length > 100) fehler.push('von');
+  if (eingabe.text.length < 10 || eingabe.text.length > 1000) fehler.push('text');
+  if (!URSACHEN_LISTE.includes(eingabe.ursache)) fehler.push('ursache');
+  if (!PRIORITAET_WERTE.includes(eingabe.prio)) fehler.push('prio');
+
+  // Adresse des Formulars mit Fehlern und den bisherigen Eingaben (damit nichts neu getippt werden muss)
+  const zurueck = (liste) => `/v1/melden?${new URLSearchParams({ ...eingabe, fehler: liste.join(',') })}`;
+  if (fehler.length > 0) redirect(zurueck(fehler));
+
+  let meldungId = null;
+  try {
+    meldungId = await sql.begin(async (tx) => {
+      const [meldung] = await tx`
+        INSERT INTO stoermeldung (maschine_id, gemeldet_von, zeitpunkt, beschreibung, ursache_kategorie, prioritaet)
+        VALUES (${maschineId}, ${eingabe.von}, now(), ${eingabe.text}, ${eingabe.ursache}, ${eingabe.prio})
+        RETURNING id`;
+      // Zu jeder Meldung gehört genau ein Wartungsauftrag
+      const [auftrag] = await tx`INSERT INTO wartungsauftrag (stoermeldung_id, status) VALUES (${meldung.id}, 'gemeldet') RETURNING id`;
+      await tx`INSERT INTO auftrag_verlauf (auftrag_id, person_id, aktion) VALUES (${auftrag.id}, ${person?.id ?? null}, 'gemeldet')`;
+      return meldung.id;
+    });
+  } catch (fehlerObjekt) {
+    console.error(fehlerObjekt);
+  }
+  // redirect steht nie in try/catch (es arbeitet selbst mit einer Ausnahme)
+  if (!meldungId) redirect(zurueck(['speichern']));
+  revalidatePath('/', 'layout');
+  redirect(`/v1/meldungen?neu=${meldungId}`);
 }

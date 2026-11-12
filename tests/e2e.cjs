@@ -800,6 +800,37 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.goto(BASE + '/'); await p.waitForTimeout(800);
   pruefe('Ansicht: zurück auf alles', (await p.$('.ansicht-chip')) === null);
 
+  // 21. Version 1 (/v1): früher, schlichter Stand – reines HTML ohne Seitenleiste, gleiche Datenbank
+  await p.goto(BASE + '/v1'); await p.waitForSelector('#v1-status');
+  const v1 = await p.evaluate(() => ({
+    marke: document.documentElement.dataset.v1, leiste: document.querySelectorAll('aside, .mobil-kopf').length,
+    schrift: getComputedStyle(document.querySelector('h1')).fontFamily, link: getComputedStyle(document.querySelector('a')).textDecorationLine,
+    titel: document.title, breite: document.documentElement.scrollWidth <= innerWidth,
+  }));
+  pruefe('Version 1: eigenes leeres Layout ohne Seitenleiste, Aussehen des Browsers', v1.marke === 'an' && v1.leiste === 0 && /Times/.test(v1.schrift) && v1.link === 'underline' && v1.titel === 'Instandhaltung – Version 1' && v1.breite, JSON.stringify(v1));
+  pruefe('Version 1: Datenbank „verbunden“ und Zahl der Maschinen wie in der Datenbank', (await p.textContent('#v1-status')).trim() === 'verbunden'
+    && (await p.textContent('.v1-tabelle tr:has-text("maschine") td >> nth=2')).trim() === sql('SELECT count(*) FROM maschine'));
+  pruefe('Version 1: keine Zugangsdaten auf der Seite', !/postgres(ql)?:\/\/|password|passwort/i.test(await p.textContent('body')));
+  const v1Ham = sql("SELECT id FROM standort WHERE kuerzel='HAM'");
+  await p.goto(BASE + '/v1/maschinen'); await p.selectOption('#werk', v1Ham); await p.click('button:has-text("Anzeigen")'); await p.waitForURL(/werk=/);
+  const v1Anzahl = sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id=m.gebaeude_id WHERE g.standort_id=" + v1Ham);
+  pruefe('Version 1: Maschinenliste nach Werk (GET-Formular)', (await p.$$eval('.v1-tabelle tbody tr', (z) => z.length)) === Number(v1Anzahl) && (await p.textContent('#v1-anzahl')).startsWith(v1Anzahl), v1Anzahl);
+  await p.goto(BASE + '/v1/maschinen?werk=99999999999999');
+  pruefe('Version 1: ungültiges Werk → alle Maschinen statt Serverfehler', (await p.$$eval('.v1-tabelle tbody tr', (z) => z.length)) === Number(sql('SELECT count(*) FROM maschine')));
+  await p.goto(BASE + '/v1/melden'); await p.fill('#gemeldet_von', 'Vera Eins'); await p.click('#v1-absenden'); await p.waitForSelector('#v1-fehler');
+  pruefe('Version 1: leeres Formular → Fehlerliste, Eingabe bleibt', (await p.$$eval('#v1-fehler li', (z) => z.length)) === 3 && (await p.inputValue('#gemeldet_von')) === 'Vera Eins');
+  const v1Maschine = sql("SELECT id FROM maschine WHERE anlagennummer='HAM-H2-03'");
+  await p.selectOption('#maschine_id', v1Maschine); await p.fill('#beschreibung', 'Version 1: Band läuft unrund und quietscht.');
+  await p.selectOption('#ursache_kategorie', 'Verschleiß'); await p.check('input[name=prioritaet][value=niedrig]');
+  await p.click('#v1-absenden'); await p.waitForSelector('#v1-gespeichert');
+  const v1Neu = sql("SELECT s.id || '|' || s.prioritaet || '|' || w.status || '|' || (SELECT count(*) FROM auftrag_verlauf v WHERE v.auftrag_id=w.id AND v.aktion='gemeldet') FROM stoermeldung s JOIN wartungsauftrag w ON w.stoermeldung_id=s.id WHERE s.gemeldet_von='Vera Eins' AND s.maschine_id=" + v1Maschine).split('|');
+  pruefe('Version 1: Formular speichert Meldung + Auftrag + Verlauf', v1Neu[1] === 'niedrig' && v1Neu[2] === 'gemeldet' && v1Neu[3] === '1'
+    && (await p.textContent('#v1-gespeichert')).includes(`Nr. ${v1Neu[0]}`) && (await p.textContent('.v1-neu')).includes('Vera Eins'), v1Neu.join(' '));
+  await p.click('a:has-text("zur aktuellen Version")'); await p.waitForSelector('aside');
+  pruefe('Version 1: Link zurück lädt die aktuelle App', (await p.evaluate(() => document.documentElement.dataset.v1)) === undefined && (await p.$('.leiste-konto')) !== null);
+  await p.click('.leiste-konto'); await p.click('.menue-v1'); await p.waitForSelector('#v1-status');
+  pruefe('Version 1: erreichbar über das Konto-Menü', new URL(p.url()).pathname === '/v1' && (await p.$('aside')) === null);
+
   pruefe('Keine JavaScript-Fehler in der Konsole', konsole.length === 0, konsole.slice(0, 3).join(' | '));
   console.log('\nERGEBNIS:', fehler.length === 0 ? 'alles OK' : `${fehler.length} Fehler: ${fehler.join(', ')}`);
   await b.close();

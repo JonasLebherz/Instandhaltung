@@ -16,6 +16,7 @@
 import Link from 'next/link';
 import Auswahl from '@/components/Auswahl';
 import { sql } from '@/lib/db';
+import { idAus } from '@/lib/eingabe';
 import { benutzerPflicht } from '@/lib/auth';
 import { ansichtAusCookie, ansichtBedingung } from '@/lib/ansicht';
 import { STATUS_WERTE, PRIORITAET_WERTE } from '@/lib/konstanten';
@@ -43,8 +44,9 @@ export default async function AuftraegeSeite({ searchParams }) {
     suche: String(parameter?.suche ?? '').trim().slice(0, 100),
   };
   if (filter.status !== 'offen' && !STATUS_WERTE.includes(filter.status)) filter.status = '';
-  if (!/^\d+$/.test(filter.standort)) filter.standort = '';
-  if (!/^\d+$/.test(filter.maschine)) filter.maschine = '';
+  // Nur echte Nummern (lib/eingabe.js) – sonst gäbe eine zu lange Ziffernfolge einen Datenbankfehler
+  if (!idAus(filter.standort)) filter.standort = '';
+  if (!idAus(filter.maschine)) filter.maschine = '';
   if (!PRIORITAET_WERTE.includes(filter.prioritaet)) filter.prioritaet = '';
   // Anzahl der Zeilen: ganze Vielfache von 50, höchstens 2.000
   const anzahl = Math.min(2000, Math.max(SCHRITT, Math.ceil((Number(parameter?.anzahl) || SCHRITT) / SCHRITT) * SCHRITT));
