@@ -5,12 +5,19 @@
  * offenen Störungen (seit wann) und fälligen Wartungen. Die Seitenleiste ist ausgeblendet,
  * die Daten laden sich alle 30 Sekunden neu (MonitorAnsicht.js). Aufruf: /monitor?werk=alb&halle=h1
  * (Link „Hallen-Monitor“ in der Störungskarte, Info-Spalte einer Halle). 2 Abfragen.
+ *
+ * Ohne werk/halle (Konto-Menü → „Hallen-Monitor“) erscheint zuerst die Weltkarte (MonitorWahl.js):
+ * hineinzoomen bis in eine Halle, dann öffnet sich deren Monitor.
  */
 import { notFound } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
 import { seitentitel } from '@/lib/sprache/server';
 import MonitorAnsicht from './MonitorAnsicht';
+import MonitorWahl from './MonitorWahl';
+import { alleKartenDaten, nachAnsicht } from '@/lib/karten/daten';
+import { ansichtAusCookie } from '@/lib/ansicht';
+import { uebersetzer } from '@/lib/sprache/server';
 
 export const dynamic = 'force-dynamic';
 export const generateMetadata = () => seitentitel('Hallen-Monitor');
@@ -20,6 +27,20 @@ export default async function MonitorSeite({ searchParams }) {
   const q = await searchParams;
   const werk = typeof q.werk === 'string' ? q.werk.toUpperCase().slice(0, 10) : '';
   const halle = typeof q.halle === 'string' ? q.halle.toUpperCase().slice(0, 10) : '';
+
+  // Noch keine Halle gewählt: Weltkarte zum Hineinzoomen (Ansicht aus dem Konto beachtet)
+  if (!werk || !halle) {
+    const [t, alleDaten, ansicht] = await Promise.all([uebersetzer(), alleKartenDaten(), ansichtAusCookie()]);
+    return (
+      <>
+        <div className="seitenkopf">
+          <h1>{t('Hallen-Monitor')}</h1>
+          <p>{t('Bis in eine Halle hineinzoomen – dann öffnet sich ihr Monitor.')}</p>
+        </div>
+        <MonitorWahl daten={nachAnsicht(alleDaten, ansicht)} />
+      </>
+    );
+  }
 
   const [[ort], maschinen] = await Promise.all([
     sql`

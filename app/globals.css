@@ -667,7 +667,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 }
 /* .menue-v1: der Link „Version 1“ im Konto-Menü sieht aus wie die Knöpfe daneben */
 .aufklapp-menue button,
-.aufklapp-menue .menue-v1 {
+.aufklapp-menue :is(.menue-v1, .menue-link) {
     width: 100%;
     display: flex;
     align-items: center;
@@ -681,8 +681,8 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     text-align: left;
     transition: background-color var(--uebergang);
 }
-.aufklapp-menue button:hover, .aufklapp-menue .menue-v1:hover { background: var(--fuellung); }
-.aufklapp-menue .menue-v1 { text-decoration: none; box-sizing: border-box; }
+.aufklapp-menue button:hover, .aufklapp-menue :is(.menue-v1, .menue-link):hover { background: var(--fuellung); }
+.aufklapp-menue :is(.menue-v1, .menue-link) { text-decoration: none; box-sizing: border-box; }
 .aufklapp-menue button .haken { margin-left: auto; color: var(--akzent); }
 /* Kleiner Ein/Aus-Schalter im Menü (z. B. Ton bei Kamerafahrten) */
 .mini-schalter { margin-left: auto; position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--fuellung-stark, var(--linie)); transition: background-color var(--uebergang); flex: none; }
@@ -3045,4 +3045,127 @@ html[data-v1] .v1-hinweis { border: 1px solid #008000; background: #e8ffe8; padd
     html[data-v1] .v1-formular select,
     html[data-v1] .v1-formular textarea,
     html[data-v1] .v1-formular input[type="text"] { width: 100%; }
+}
+
+/* =====================================================================
+   Frühere Versionen 2 und 3 (/v2, /v3, Seiten in app/_fruehversion)
+   ---------------------------------------------------------------------
+   Wie bei Version 1 wird zuerst ALLES zurückgenommen (all: revert, Spezifität 0,1,2). Danach kommt
+   das Aussehen der jeweiligen Version; die Regeln beginnen mit html[data-v2] bzw. html[data-v3] und
+   einer Klasse (Spezifität ≥ 0,2,1) und gewinnen so gegen das Zurücksetzen.
+   Feste Farben sind hier Absicht (Ausnahme von „nur CSS-Variablen“), kein Dunkelmodus.
+   ===================================================================== */
+/* SVG-Inhalte ausgenommen: Für Chrome sind d, cx, cy, r, x, y CSS-Eigenschaften – revert löschte die Karte */
+html[data-v2], html[data-v2] body, html[data-v2] body *:not(svg *),
+html[data-v3], html[data-v3] body, html[data-v3] body *:not(svg *) { all: revert; }
+html[data-v2] body::before, html[data-v2] body::after,
+html[data-v3] body::before, html[data-v3] body::after { content: none; }
+html[data-v2] body :is(script, style, template, [hidden]),
+html[data-v3] body :is(script, style, template, [hidden]) { display: none; }
+html[data-v2] body *, html[data-v3] body * { box-sizing: border-box; }
+html[data-v2] body .fv-breit, html[data-v3] body .fv-breit { overflow-x: auto; max-width: 100%; }
+html[data-v2] body .fv-spalten, html[data-v3] body .fv-spalten { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; align-items: start; }
+html[data-v2] body .fv-zeile, html[data-v3] body .fv-zeile { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0; }
+html[data-v2] body .fv-zeile input[type="number"], html[data-v3] body .fv-zeile input[type="number"] { width: 70px; }
+
+/* ---------- Version 2: schlicht, wie eine Firmen-Webseite um 2010 ---------- */
+html[data-v2] { color-scheme: light; background: #e8e8e8; }
+html[data-v2] body { margin: 0; font: 13px Verdana, Arial, sans-serif; color: #222; background: #e8e8e8; }
+html[data-v2] body .fv { max-width: 1100px; margin: 0 auto; background: #fff; border: 1px solid #999; min-height: 100vh; }
+html[data-v2] body .fv-kopf { background: #336699; color: #fff; padding: 8px 10px; }
+html[data-v2] body .fv-marke { font-size: 18px; margin-bottom: 6px; }
+html[data-v2] body .fv-nav { display: flex; flex-wrap: wrap; gap: 2px; background: #dde; padding: 3px; }
+html[data-v2] body .fv-nav a { color: #003366; padding: 3px 7px; border: 1px solid #99a; background: #f4f4f4; text-decoration: none; }
+html[data-v2] body .fv-nav a:hover { background: #ffc; }
+html[data-v2] body .fv-person { font-size: 11px; margin-top: 6px; }
+html[data-v2] body .fv-person a { color: #fff; }
+html[data-v2] body .fv-inhalt { padding: 10px 14px; }
+html[data-v2] body .fv-inhalt h1 { font-size: 20px; color: #336699; border-bottom: 2px solid #336699; margin: 4px 0 12px; }
+html[data-v2] body .fv-inhalt h2 { font-size: 15px; color: #336699; margin: 18px 0 6px; }
+html[data-v2] body .fv-tabelle { border-collapse: collapse; margin-bottom: 10px; }
+html[data-v2] body .fv-tabelle th, html[data-v2] body .fv-tabelle td { border: 1px solid #aaa; padding: 3px 6px; text-align: left; vertical-align: top; }
+html[data-v2] body .fv-tabelle th { background: #ccd; }
+html[data-v2] body .fv-tabelle tr.fv-neu td, html[data-v2] body .fv-tabelle tr.fv-knapp td { background: #ffc; }
+html[data-v2] body .fv-tabelle tr.fv-ueberfaellig td { color: #b00; }
+html[data-v2] body .fv-kennzahlen .fv-zahl { font-weight: bold; text-align: right; min-width: 60px; }
+html[data-v2] body .fv-formular { display: grid; grid-template-columns: minmax(0, 520px); gap: 3px; }
+html[data-v2] body .fv-formular label { font-weight: bold; margin-top: 6px; }
+html[data-v2] body .fv-hinweis { border: 1px solid; padding: 5px 8px; margin: 6px 0; }
+html[data-v2] body .fv-hinweis-erfolg { border-color: #393; background: #efe; }
+html[data-v2] body .fv-hinweis-fehler, html[data-v2] body .fv-hinweis-hinweis { border-color: #c33; background: #fee; }
+html[data-v2] body .fv-knopf { font: inherit; }
+html[data-v2] body a.fv-knopf { display: inline-block; padding: 3px 8px; border: 1px solid #888; background: #eee; color: #000; text-decoration: none; }
+html[data-v2] body .fv-google { width: 100%; height: 420px; border: 1px solid #999; }
+html[data-v2] body .fv-fuss { font-size: 11px; color: #666; border-top: 1px solid #aaa; padding: 6px 14px; }
+html[data-v2] body .fv-gruen { color: #080; }
+html[data-v2] body .fv-klein-text { font-size: 11px; }
+
+/* ---------- Version 3: erste Gestaltung mit KI-Hilfe (Farbverlauf, Karten, Emojis, bunte Abzeichen) ---------- */
+html[data-v3] { color-scheme: light; background: #f5f7fb; }
+html[data-v3] body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1f2937; background: #f5f7fb; }
+html[data-v3] body .fv-kopf { background: linear-gradient(135deg, #6366f1, #8b5cf6 60%, #ec4899); color: #fff; padding: 16px 24px; box-shadow: 0 4px 20px rgba(99, 102, 241, .35); }
+html[data-v3] body .fv-marke { font-size: 22px; display: flex; align-items: center; gap: 8px; }
+html[data-v3] body .fv-abzeichen { font-size: 11px; background: rgba(255, 255, 255, .25); padding: 2px 8px; border-radius: 999px; }
+html[data-v3] body .fv-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 8px; }
+html[data-v3] body .fv-nav a { color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .15); font-size: 14px; }
+html[data-v3] body .fv-nav a:hover { background: rgba(255, 255, 255, .3); }
+html[data-v3] body .fv-person { font-size: 13px; opacity: .95; }
+html[data-v3] body .fv-person a { color: #fff; font-weight: 600; }
+html[data-v3] body .fv-inhalt { max-width: 1200px; margin: 0 auto; padding: 24px; }
+html[data-v3] body .fv-inhalt h1 { font-size: 28px; margin: 0 0 16px; color: #4338ca; letter-spacing: -.01em; }
+html[data-v3] body .fv-inhalt h2 { font-size: 19px; margin: 28px 0 10px; color: #111827; }
+html[data-v3] body .fv-tabelle { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); overflow: hidden; margin-bottom: 12px; }
+html[data-v3] body .fv-tabelle th, html[data-v3] body .fv-tabelle td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #eef0f5; vertical-align: top; }
+html[data-v3] body .fv-tabelle thead th { background: #eef2ff; color: #4338ca; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+html[data-v3] body .fv-tabelle tbody tr:hover td { background: #f9fafb; }
+html[data-v3] body .fv-tabelle tr.fv-neu td, html[data-v3] body .fv-tabelle tr.fv-knapp td { background: #fef3c7; }
+html[data-v3] body .fv-tabelle tr.fv-ueberfaellig td { color: #dc2626; }
+html[data-v3] body .fv-tabelle a { color: #4f46e5; font-weight: 600; }
+/* Kennzahlen als bunte Kacheln */
+html[data-v3] body .fv-kennzahlen { background: none; box-shadow: none; }
+html[data-v3] body .fv-kennzahlen tbody { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+html[data-v3] body .fv-kennzahlen tr { display: flex; flex-direction: column-reverse; background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); border-top: 4px solid #8b5cf6; }
+html[data-v3] body .fv-kennzahlen th, html[data-v3] body .fv-kennzahlen td { border: 0; padding: 0; background: none; }
+html[data-v3] body .fv-kennzahlen th { color: #6b7280; font-size: 14px; font-weight: 500; }
+html[data-v3] body .fv-kennzahlen .fv-zahl { font-size: 32px; font-weight: 800; color: #4f46e5; }
+/* Abzeichen */
+html[data-v3] body .fv-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #e5e7eb; color: #374151; }
+html[data-v3] body .fv-prio-hoch { background: #fee2e2; color: #b91c1c; }
+html[data-v3] body .fv-prio-mittel { background: #fef3c7; color: #b45309; }
+html[data-v3] body .fv-prio-niedrig { background: #dbeafe; color: #1d4ed8; }
+html[data-v3] body .fv-prio-keine { background: #dcfce7; color: #15803d; }
+html[data-v3] body .fv-status-erledigt { background: #dcfce7; color: #15803d; }
+html[data-v3] body .fv-status-in-Arbeit { background: #ede9fe; color: #6d28d9; }
+html[data-v3] body .fv-status-zugewiesen { background: #dbeafe; color: #1d4ed8; }
+html[data-v3] body .fv-status-wartet-auf-Teil { background: #fef3c7; color: #b45309; }
+html[data-v3] body .fv-rolle-produktion { background: #ffedd5; color: #c2410c; }
+html[data-v3] body .fv-rolle-schichtleitung { background: #f3e8ff; color: #7e22ce; }
+html[data-v3] body .fv-rolle-instandhaltung { background: #dbeafe; color: #1d4ed8; }
+/* Formulare und Knöpfe */
+html[data-v3] body .fv-formular { display: grid; grid-template-columns: minmax(0, 560px); gap: 6px; background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); }
+html[data-v3] body .fv-formular.fv-zeile { display: flex; }
+html[data-v3] body .fv-formular label { font-weight: 600; font-size: 14px; margin-top: 8px; }
+html[data-v3] body :is(.fv-formular, .fv-zeile) :is(input, select, textarea) { font: inherit; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; }
+html[data-v3] body .fv-knopf { display: inline-block; font: inherit; font-weight: 600; color: #fff; text-decoration: none; cursor: pointer; border: 0; border-radius: 10px; padding: 9px 18px; background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 4px 14px rgba(99, 102, 241, .4); }
+html[data-v3] body .fv-knopf.fv-klein { padding: 5px 12px; font-size: 13px; }
+html[data-v3] body .fv-hinweis { padding: 12px 16px; border-radius: 12px; margin: 0 0 14px; }
+html[data-v3] body .fv-hinweis-erfolg { background: #dcfce7; color: #166534; }
+html[data-v3] body .fv-hinweis-fehler, html[data-v3] body .fv-hinweis-hinweis { background: #fee2e2; color: #991b1b; }
+html[data-v3] body .fv-gruen { color: #16a34a; }
+html[data-v3] body .fv-klein-text { font-size: 12px; color: #6b7280; }
+html[data-v3] body .fv-leer { color: #9ca3af; text-align: center; }
+/* Diagramme und eigene Karte */
+html[data-v3] body .fv-diagramm { position: relative; height: 280px; background: #fff; border-radius: 16px; padding: 12px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); margin-bottom: 12px; }
+html[data-v3] body .fv-svg-karte { width: 100%; max-width: 460px; display: block; background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); }
+html[data-v3] body .fv-land { fill: #e0e7ff; stroke: #6366f1; stroke-width: 2; }
+html[data-v3] body .fv-punkt { fill: #22c55e; stroke: #fff; stroke-width: 3; opacity: .9; }
+html[data-v3] body .fv-punkt-hoch { fill: #ef4444; }
+html[data-v3] body .fv-punkt-mittel { fill: #f59e0b; }
+html[data-v3] body .fv-punkt-niedrig { fill: #3b82f6; }
+html[data-v3] body .fv-punkt-aktiv { stroke: #111827; }
+html[data-v3] body .fv-punkt-zahl { fill: #fff; font: 700 15px system-ui, sans-serif; pointer-events: none; }
+html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13px; padding: 24px; }
+@media (max-width: 600px) {
+    html[data-v3] body .fv-inhalt { padding: 14px; }
+    html[data-v3] body .fv-kopf { padding: 12px 14px; }
 }

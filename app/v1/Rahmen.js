@@ -29,7 +29,8 @@ export default function Rahmen({ titel, children }) {
       <hr />
       <p>
         <small>
-          Version 1 – Grundgerüst mit Datenbankanbindung · <a href="/">zur aktuellen Version</a>
+          {/* Bewusst kein Link zu anderen Versionen (Wunsch des Nutzers) – hier soll Version 1 für sich stehen */}
+          Version 1 – Grundgerüst mit Datenbankanbindung
         </small>
       </p>
     </div>

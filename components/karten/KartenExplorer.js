@@ -164,6 +164,9 @@ export default function KartenExplorer({
   // läuft über dieselben Übergänge wie der Umschalter der Karte (Gebäude sinken/wachsen, Überblenden)
   // und wird nicht als Wahl der Karte gemerkt.
   ansicht = null,
+  // Wird aufgerufen, sobald eine Halle geöffnet ist (Kürzel von Werk und Halle) – z. B. Hallen-Monitor:
+  // Halle auf der Karte suchen, dann öffnet sich der Monitor dieser Halle
+  onHalle = null,
 }) {
   const { standorte, gebaeude, maschinen, offene, techniker } = daten;
   const melden = modus === 'auswahl';   // Störung melden: eigenes Aussehen, keine Störungszahlen
@@ -542,6 +545,13 @@ export default function KartenExplorer({
     const timer = setTimeout(() => { setUebergang(null); setVerlassen(null); }, uebergang.dauer);
     return () => clearTimeout(timer);
   }, [uebergang]);
+
+  // Halle geöffnet → onHalle melden, aber erst nach der Kamerafahrt (man soll das Hineinzoomen noch sehen)
+  useEffect(() => {
+    if (!onHalle || !standort || !aktuellesGebaeude || uebergang) return undefined;
+    const zeit = setTimeout(() => onHalle({ werk: standort.kuerzel.toLowerCase(), halle: aktuellesGebaeude.kuerzel.toLowerCase() }), 700);
+    return () => clearTimeout(zeit);
+  }, [onHalle, standort, aktuellesGebaeude, uebergang]);
 
   // Adresse mitführen (z. B. /karte?werk=ham&halle=h2&maschine=12), ohne die Seite neu zu laden.
   // Beim ersten Anzeigen bleibt die Adresse, wie sie ist – geändert wird erst nach einem Klick.

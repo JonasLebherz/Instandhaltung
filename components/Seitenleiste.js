@@ -393,6 +393,10 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                 <button type="button" role="menuitem" onClick={() => { setFenster(null); setPersonWahl(true); }}>
                   <i className="bi bi-person-badge" /> {person ? t('Person wechseln …') : t('Person wählen …')}
                 </button>
+                {/* Hallen-Monitor: erst Weltkarte, bis in eine Halle zoomen, dann deren Monitor (app/monitor) */}
+                <Link href="/monitor" role="menuitem" className="menue-link menue-monitor" prefetch={false} onClick={() => setFenster(null)}>
+                  <i className="bi bi-display" /> {t('Hallen-Monitor')}
+                </Link>
                 <div className="menue-trenner" />
                 {/* Ansicht: nur ein Land bzw. Werk anzeigen (Standard: alles) */}
                 <div className="menue-titel">{t('Ansicht')}</div>

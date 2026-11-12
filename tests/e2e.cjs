@@ -826,10 +826,73 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   const v1Neu = sql("SELECT s.id || '|' || s.prioritaet || '|' || w.status || '|' || (SELECT count(*) FROM auftrag_verlauf v WHERE v.auftrag_id=w.id AND v.aktion='gemeldet') FROM stoermeldung s JOIN wartungsauftrag w ON w.stoermeldung_id=s.id WHERE s.gemeldet_von='Vera Eins' AND s.maschine_id=" + v1Maschine).split('|');
   pruefe('Version 1: Formular speichert Meldung + Auftrag + Verlauf', v1Neu[1] === 'niedrig' && v1Neu[2] === 'gemeldet' && v1Neu[3] === '1'
     && (await p.textContent('#v1-gespeichert')).includes(`Nr. ${v1Neu[0]}`) && (await p.textContent('.v1-neu')).includes('Vera Eins'), v1Neu.join(' '));
-  await p.click('a:has-text("zur aktuellen Version")'); await p.waitForSelector('aside');
-  pruefe('Version 1: Link zurück lädt die aktuelle App', (await p.evaluate(() => document.documentElement.dataset.v1)) === undefined && (await p.$('.leiste-konto')) !== null);
+  pruefe('Version 1: kein Link zu anderen Versionen', (await p.$$eval('a', (z) => z.filter((a) => !a.getAttribute('href').startsWith('/v1')).length)) === 0);
+  await p.goto(BASE + '/'); await p.waitForSelector('aside');
+  pruefe('Version 1: danach lädt die aktuelle App wieder normal', (await p.evaluate(() => document.documentElement.dataset.v1)) === undefined && (await p.$('.leiste-konto')) !== null);
   await p.click('.leiste-konto'); await p.click('.menue-v1'); await p.waitForSelector('#v1-status');
   pruefe('Version 1: erreichbar über das Konto-Menü', new URL(p.url()).pathname === '/v1' && (await p.$('aside')) === null);
+
+  // 22. Versionen 2 und 3 (/v2, /v3): alle Funktionen schlicht bzw. mit erster Gestaltung, gleiche Datenbank
+  for (const v of ['v2', 'v3']) {
+    let alleOk = true;
+    for (const seite of ['', '/karte', '/melden', '/auftraege', '/auftraege/5', '/maschinen', '/maschinen/3', '/wartung', '/lager', '/statistik', '/mitarbeiter', '/datenbasis', '/person']) {
+      const r = await p.goto(`${BASE}/${v}${seite}`);
+      const ok = r.status() === 200 && (await p.$('aside')) === null && (await p.evaluate((x) => document.documentElement.hasAttribute(`data-${x}`), v));
+      if (!ok) { alleOk = false; console.log('   ', v, seite, r.status()); }
+    }
+    pruefe(`Version ${v[1]}: alle 13 Seiten ohne Seitenleiste erreichbar`, alleOk);
+  }
+  await p.goto(BASE + '/v3/karte');
+  pruefe('Version 3: eigene SVG-Karte mit einem Punkt je deutschem Werk', (await p.$$eval('.fv-svg-karte circle', (z) => z.filter((c) => c.getBBox().width > 0).length)) === Number(sql("SELECT count(*) FROM standort WHERE land_kuerzel='DE'")));
+  await p.goto(BASE + '/v2/karte');
+  pruefe('Version 2: Google-Karte eingebettet, Werke als Tabelle', (await p.getAttribute('.fv-google', 'src')).startsWith('https://maps.google.com/maps?q=')
+    && (await p.$$eval('#fv-werke tbody tr', (z) => z.length)) === Number(sql('SELECT count(*) FROM standort')));
+  await p.goto(BASE + '/v2/statistik');
+  pruefe('Version 2: Statistik wie Datenbank (Störungen 12 Monate)', (await p.textContent('[data-kennzahl="Störungen"]')).trim() === sql("SELECT count(*) FROM stoermeldung WHERE zeitpunkt > now() - interval '12 months'"));
+  // Melden in V2 → Auftrag; Bearbeiten in V3 (Techniker zuweisen)
+  await p.goto(BASE + '/v2/melden'); await p.click('#fv-absenden'); await p.waitForSelector('#fv-fehler');
+  await p.selectOption('#maschine_id', '3'); await p.fill('#gemeldet_von', 'Zwei Test'); await p.fill('#beschreibung', 'Version 2: Lager läuft heiß');
+  await p.selectOption('#ursache_kategorie', 'Verschleiß'); await p.selectOption('#prioritaet', 'hoch');
+  await p.click('#fv-absenden'); await p.waitForSelector('#fv-gespeichert');
+  const v2Auftrag = sql("SELECT w.id FROM wartungsauftrag w JOIN stoermeldung s ON s.id=w.stoermeldung_id WHERE s.gemeldet_von='Zwei Test' AND s.prioritaet='hoch'");
+  pruefe('Version 2: Störung melden legt Meldung und Auftrag an', v2Auftrag !== '' && (await p.$('.fv-neu')) !== null, v2Auftrag);
+  await p.goto(`${BASE}/v3/auftraege/${v2Auftrag}`);
+  const v3Tech = await p.$eval('#techniker_id option:nth-child(2)', (o) => o.value);
+  await p.selectOption('#techniker_id', v3Tech);
+  await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click('#fv-speichern')]); await p.waitForTimeout(1200);
+  pruefe('Version 3: Auftrag bearbeiten (gleiche Regeln: Techniker → zugewiesen)', sql(`SELECT status || '|' || techniker_id FROM wartungsauftrag WHERE id=${v2Auftrag}`) === `zugewiesen|${v3Tech}`
+    && (await p.textContent('#fv-status')) === 'zugewiesen');
+  await p.selectOption('#status', 'erledigt');
+  await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click('#fv-speichern')]); await p.waitForTimeout(1200);
+  pruefe('Version 3: Fehler beim Abschließen ohne Maßnahme als Hinweis', (await p.textContent('.fv-hinweis-fehler')).includes('Maßnahme') && sql(`SELECT status FROM wartungsauftrag WHERE id=${v2Auftrag}`) === 'zugewiesen');
+  // Lager in V2: nachbestellen
+  const v2Werk = sql("SELECT id FROM standort WHERE kuerzel='ALB'");
+  const v2Best = Number(sql(`SELECT count(*) FROM bestellung WHERE standort_id=${v2Werk} AND status='bestellt'`));
+  await p.goto(`${BASE}/v2/lager?werk=${v2Werk}`);
+  await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click('#fv-lager button:has-text("Bestellen") >> nth=0')]); await p.waitForTimeout(1200);
+  pruefe('Version 2: Lager nachbestellen', Number(sql(`SELECT count(*) FROM bestellung WHERE standort_id=${v2Werk} AND status='bestellt'`)) === v2Best + 1 && p.url().includes(`/v2/lager?werk=${v2Werk}`));
+  // Person wählen (gleiches Cookie wie die App)
+  const v3Person = sql("SELECT id || '|' || name FROM person WHERE rolle='Schichtleitung' ORDER BY id LIMIT 1").split('|');
+  await p.goto(BASE + '/v3/person'); await p.selectOption('#person_id', v3Person[0]);
+  await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click('#fv-person-speichern')]); await p.waitForTimeout(1200);
+  pruefe('Version 3: Person wählen', (await p.textContent('.fv-person')).includes(v3Person[1]));
+  await p.goto(BASE + '/'); await p.waitForSelector('aside');
+  pruefe('Version 3: gewählte Person gilt auch in der App', (await p.textContent('.leiste-konto')).includes(v3Person[1]));
+  await p.goto(BASE + '/v3/person'); await p.selectOption('#person_id', '');
+  await Promise.all([p.waitForResponse((r) => r.request().method() === 'POST'), p.click('#fv-person-speichern')]); await p.waitForTimeout(1200);
+  pruefe('Version 3: Person wieder abwählen', (await p.textContent('.fv-person')).includes('Keine Person'));
+
+  // 23. Hallen-Monitor über das Konto-Menü: Weltkarte → Land → Werk → Halle → Monitor
+  await p.goto(BASE + '/'); await p.waitForSelector('aside');
+  await p.click('.leiste-konto'); await p.click('.menue-monitor'); await p.waitForURL(/\/monitor$/); await p.waitForSelector('.ebene-neu .wkarte');
+  pruefe('Hallen-Monitor im Konto-Menü: zuerst die Weltkarte', (await p.textContent('h1')).includes('Hallen-Monitor'));
+  await p.click('.ebene-neu [data-ort="land-DE"]'); await p.waitForTimeout(1500);
+  await p.click(`.ebene-neu [data-ort="st-${v2Werk}"]`); await p.waitForTimeout(2500);
+  await p.click('.ebene-neu [data-ort^="g-"] >> nth=0');
+  await p.waitForURL(/\/monitor\?werk=alb&halle=/, { timeout: 15000 }).catch(() => {});
+  pruefe('Hallen-Monitor: Halle angeklickt → Monitor dieser Halle', /\/monitor\?werk=alb&halle=h\d/.test(p.url()) && (await p.waitForSelector('.monitor-zeile').catch(() => null)) !== null, p.url());
+  await p.click('.monitor-andere-halle'); await p.waitForURL(/\/monitor$/);
+  pruefe('Hallen-Monitor: „Andere Halle“ führt zurück zur Weltkarte', (await p.waitForSelector('.ebene-neu .wkarte').catch(() => null)) !== null);
 
   pruefe('Keine JavaScript-Fehler in der Konsole', konsole.length === 0, konsole.slice(0, 3).join(' | '));
   console.log('\nERGEBNIS:', fehler.length === 0 ? 'alles OK' : `${fehler.length} Fehler: ${fehler.join(', ')}`);

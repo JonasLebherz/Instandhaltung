@@ -18,9 +18,11 @@
  *   teilBuchen       – Ersatzteil buchen bzw. automatisch bestellen
  *   lieferungBuchen  – Wareneingang einer Bestellung
  *   nachrichtSenden, nachrichtenGelesen – Chat zwischen Personen (Seite „Mitarbeiter“, ohne Weiterleitung)
- *   meldungAnlegenV1 – Störmeldung aus dem einfachen Formular von „Version 1“ (/v1)
+ *   meldungAnlegenV1 – Störmeldung aus dem einfachen Formular von „Version 1“ (/v1, auch /v2, /v3)
+ *   auftragSpeichernFrueh, teilBuchenFrueh, wartungErledigenFrueh, personWaehlenFrueh – Hüllen für /v2, /v3
  */
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { sql } from '@/lib/db';
 import { benutzerPflicht } from '@/lib/auth';
@@ -32,6 +34,13 @@ import { URSACHEN_LISTE, PRIORITAET_WERTE, STATUS_WERTE } from '@/lib/konstanten
 
 /** Text aus einem Formularfeld, ohne Leerzeichen am Anfang und Ende */
 const feld = (formular, name) => String(formular.get(name) ?? '').trim();
+
+/** Aus welcher früheren Version (/v2, /v3) kommt das Formular? 'v2' | 'v3' oder null (aktuelle App).
+ *  Diese Versionen schicken ein verstecktes Feld „version“ mit; danach geht es dorthin zurück. */
+function fruehVersion(formular) {
+  const v = feld(formular, 'version');
+  return v === 'v2' || v === 'v3' ? v : null;
+}
 
 /** Ganze Zahl aus einem Formularfeld oder null */
 function ganzzahl(text) {
@@ -286,7 +295,7 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
 
   await flash('erfolg', status === 'erledigt' ? t('Auftrag abgeschlossen. Danke!') : t('Änderungen gespeichert. Status: {status}.', { status: t(status) }));
   revalidatePath('/', 'layout');
-  redirect(`/auftraege/${auftragId}`);
+  redirect(fruehVersion(formular) ? `/${fruehVersion(formular)}/auftraege/${auftragId}` : `/auftraege/${auftragId}`);
 }
 
 /* =====================================================================
@@ -395,7 +404,7 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
     default:
   }
   revalidatePath('/', 'layout');
-  redirect(`/auftraege/${auftragId}`);
+  redirect(fruehVersion(formular) ? `/${fruehVersion(formular)}/auftraege/${auftragId}` : `/auftraege/${auftragId}`);
 }
 
 /* =====================================================================
@@ -410,7 +419,7 @@ export async function lieferungBuchen(formular) {
   const bestellungId = ganzzahl(feld(formular, 'bestellung_id'));
   // Zurück zur Seite, von der gebucht wurde (Übersicht oder Lager) – nur feste Ziele, keine fremden Adressen
   const zurueck = feld(formular, 'zurueck');
-  const ziel = /^\/lager(\?werk=\d+(&teil=\d+)?)?$/.test(zurueck) ? zurueck : '/';
+  const ziel = /^(\/v[23])?\/lager(\?werk=\d+(&teil=\d+)?)?$/.test(zurueck) ? zurueck : '/';
   if (bestellungId === null) {
     await flash('fehler', t('Ungültige Bestellung.'));
     redirect(ziel);
@@ -459,12 +468,12 @@ export async function teilNachbestellen(formular) {
   const person = await aktuellePerson();
   if (!darfBearbeiten(person)) {
     await flash('fehler', t('Als Person aus der Produktion kannst du keine Teile bestellen.'));
-    redirect('/lager');
+    redirect(fruehVersion(formular) ? `/${fruehVersion(formular)}/lager` : '/lager');
   }
   const teilId = ganzzahl(feld(formular, 'ersatzteil_id'));
   const werk = ganzzahl(feld(formular, 'standort_id'));
   const menge = ganzzahl(feld(formular, 'menge'));
-  const zurueck = `/lager?werk=${werk ?? ''}&teil=${teilId ?? ''}`;
+  const zurueck = fruehVersion(formular) ? `/${fruehVersion(formular)}/lager?werk=${werk ?? ''}` : `/lager?werk=${werk ?? ''}&teil=${teilId ?? ''}`;
   if (teilId === null || werk === null || menge === null || menge < 1 || menge > 999) {
     await flash('fehler', t('Bitte eine Menge zwischen 1 und 999 angeben.'));
     redirect(zurueck);
@@ -641,7 +650,8 @@ export async function checklistePunkt(auftragId, nummer, erledigt) {
 }
 
 /* =====================================================================
- * Version 1 (/v1): Störmeldung aus dem einfachen HTML-Formular speichern.
+ * Version 1 (/v1), auch 2 und 3: Störmeldung aus dem einfachen HTML-Formular speichern.
+ * Verstecktes Feld „version“ (v1 | v2 | v3) bestimmt, wohin es danach geht.
  *
  * Version 1 ist der schlichte, frühe Stand der Anwendung (siehe app/v1/Rahmen.js). Das Formular dort
  * ist ein gewöhnliches HTML-Formular ohne Client-Code. Deshalb gibt diese Aktion nichts zurück,
@@ -660,7 +670,8 @@ export async function meldungAnlegenV1(formular) {
     ursache: feld(formular, 'ursache_kategorie'),
     prio: feld(formular, 'prioritaet'),
   };
-  const fehler = [];   // Kennwörter, die Texte dazu stehen in app/v1/melden/page.js
+  const fehler = [];   // Kennwörter, die Texte dazu stehen in app/v1/melden/page.js bzw. app/_fruehversion/Melden.js
+  const version = fruehVersion(formular) ?? 'v1';
 
   const maschineId = ganzzahl(eingabe.maschine);
   const [maschine] = maschineId ? await sql`SELECT id FROM maschine WHERE id = ${maschineId}` : [];
@@ -671,7 +682,7 @@ export async function meldungAnlegenV1(formular) {
   if (!PRIORITAET_WERTE.includes(eingabe.prio)) fehler.push('prio');
 
   // Adresse des Formulars mit Fehlern und den bisherigen Eingaben (damit nichts neu getippt werden muss)
-  const zurueck = (liste) => `/v1/melden?${new URLSearchParams({ ...eingabe, fehler: liste.join(',') })}`;
+  const zurueck = (liste) => `/${version}/melden?${new URLSearchParams({ ...eingabe, fehler: liste.join(',') })}`;
   if (fehler.length > 0) redirect(zurueck(fehler));
 
   let meldungId = null;
@@ -692,5 +703,59 @@ export async function meldungAnlegenV1(formular) {
   // redirect steht nie in try/catch (es arbeitet selbst mit einer Ausnahme)
   if (!meldungId) redirect(zurueck(['speichern']));
   revalidatePath('/', 'layout');
-  redirect(`/v1/meldungen?neu=${meldungId}`);
+  redirect(version === 'v1' ? `/v1/meldungen?neu=${meldungId}` : `/${version}/auftraege?neu=${meldungId}`);
+}
+
+/* =====================================================================
+ * Versionen 2 und 3 (/v2, /v3): gewöhnliche HTML-Formulare ohne Client-Code.
+ * Gespeichert wird mit denselben Aktionen wie in der aktuellen App (gleiche Prüfungen und Regeln);
+ * diese Hüllen lesen nur die ID aus dem Formular und zeigen Fehler als Hinweis (flash) an.
+ * Bei Erfolg leiten die eigentlichen Aktionen selbst zurück (Feld „version“, siehe fruehVersion).
+ * ================================================================== */
+export async function auftragSpeichernFrueh(formular) {
+  const id = ganzzahl(feld(formular, 'auftrag_id'));
+  const version = fruehVersion(formular) ?? 'v2';
+  if (!id) redirect(`/${version}/auftraege`);
+  const ergebnis = await auftragSpeichern(id, null, formular);   // leitet bei Erfolg selbst weiter
+  await flash('fehler', Object.values(ergebnis.fehler).join(' '));
+  redirect(`/${version}/auftraege/${id}`);
+}
+
+export async function teilBuchenFrueh(formular) {
+  const id = ganzzahl(feld(formular, 'auftrag_id'));
+  const version = fruehVersion(formular) ?? 'v2';
+  if (!id) redirect(`/${version}/auftraege`);
+  const ergebnis = await teilBuchen(id, null, formular);   // leitet bei Erfolg selbst weiter
+  await flash('fehler', Object.values(ergebnis.fehler).join(' '));
+  redirect(`/${version}/auftraege/${id}`);
+}
+
+export async function wartungErledigenFrueh(formular) {
+  const version = fruehVersion(formular) ?? 'v2';
+  const ergebnis = await wartungErledigen(feld(formular, 'plan_id'));
+  if (ergebnis.fehler) await flash('fehler', ergebnis.fehler);
+  else await flash('erfolg', 'Wartung als erledigt eingetragen.');
+  redirect(`/${version}/wartung`);
+}
+
+/** Person wählen (Cookie „person“ wie components/PersonWahl.js) – leer = keine Person */
+export async function personWaehlenFrueh(formular) {
+  await benutzerPflicht();
+  const version = fruehVersion(formular) ?? 'v2';
+  const id = ganzzahl(feld(formular, 'person_id'));
+  const speicher = await cookies();
+  const [p] = id ? await sql`
+    SELECT p.id, p.name, p.rolle::text AS rolle, st.stadt, st.kuerzel, st.name AS standort
+    FROM person p LEFT JOIN standort st ON st.id = p.standort_id WHERE p.id = ${id}` : [];
+  if (p) {
+    // Next.js kodiert den Wert selbst (URL-Kodierung) – personAusCookie() liest beides
+    speicher.set('person', JSON.stringify({ id: p.id, name: p.name, rolle: p.rolle, stadt: p.stadt, werk: p.kuerzel?.toLowerCase() ?? null, werkname: p.standort }),
+      { path: '/', maxAge: 31536000, sameSite: 'lax' });
+    await flash('erfolg', `Du arbeitest jetzt als ${p.name} (${p.rolle}).`);
+  } else {
+    speicher.delete('person');
+    await flash('erfolg', 'Keine Person gewählt.');
+  }
+  revalidatePath('/', 'layout');
+  redirect(`/${version}/person`);
 }
