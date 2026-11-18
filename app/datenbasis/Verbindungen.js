@@ -1,61 +1,21 @@
 'use client';
 /**
- * app/datenbasis/Verbindungen.js – „So funktioniert die App“: einfaches Schaubild mit Live-Status
+ * app/datenbasis/Verbindungen.js – „So funktioniert die App“ als Anzeigetafel wie am Bahnsteig
  *
- *   Du (Browser) ──┐                  ┌──► Supabase-Datenbank (Daten)
- *                  ├──► Vercel (App) ──┤
- *   GitHub (Code) ─┘                  └──► Supabase Auth (Anmeldung)
- *
- * Gedacht zum Erklären: Jeder Kasten sagt in einem Satz, was er tut, und zeigt,
- * ob die Verbindung gerade funktioniert (Farbe UND Text, dazu die Antwortzeit).
- * Die Prüfung läuft im Hintergrund über /api/verbindungen.
+ * Eine dunkle Tafel mit einer Zeile je Dienst, über den die App läuft:
+ *   Browser → Vercel (Server) → Supabase (Datenbank, Anmeldung), dazu GitHub (Code → Vercel).
+ * Je Zeile: Kürzel als Linienschild, Dienst, Aufgabe, Ort, Antwortzeit und Status-Leuchte
+ * (Farbe UND Text). Passt zum Datenmodell als Liniennetzplan darunter.
+ * Die Prüfung läuft im Hintergrund über /api/verbindungen; nie Zugangsdaten anzeigen.
  */
 import { useEffect, useState } from 'react';
 import { useT } from '@/components/SpracheKontext';
-import { datumZeit } from '@/lib/format';
+import { uhrzeit } from '@/lib/format';
 import { T } from '@/lib/sprache';
 
 const STATUS_TEXT = {
   ok: T('verbunden'), warnung: T('Hinweis'), fehler: T('Fehler'), unbekannt: T('nicht prüfbar'), pruefe: T('wird geprüft …'),
 };
-
-function Knoten({ bereich, symbol, name, rolle, text, status, ms, hinweis }) {
-  const t = useT();
-  return (
-    <div className={`verbund-knoten status-${status}`} style={{ gridArea: bereich }}>
-      <div className="knoten-kopf">
-        <span className="knoten-symbol" aria-hidden="true"><i className={`bi ${symbol}`} /></span>
-        <span>
-          <span className="knoten-name">{name}</span>
-          <span className="knoten-rolle">{rolle}</span>
-        </span>
-      </div>
-      <p className="knoten-text">{text}</p>
-      <span className="knoten-status">
-        <span className="punkt" aria-hidden="true" />{t(STATUS_TEXT[status])}
-        {ms !== undefined && status === 'ok' && <span className="knoten-ms">· {ms} ms</span>}
-      </span>
-      {hinweis && <span className="knoten-hinweis">{hinweis}</span>}
-    </div>
-  );
-}
-
-/** Leitung zwischen zwei Kästen; die Kurve führt zur Mitte von Vercel bzw. von dort weg */
-const KURVEN = {
-  l1: 'M0 50 C 55 50, 45 100, 100 100',   // Browser → Vercel
-  l2: 'M0 50 C 55 50, 45 0, 100 0',       // GitHub → Vercel
-  l3: 'M0 100 C 55 100, 45 50, 100 50',   // Vercel → Datenbank
-  l4: 'M0 0 C 55 0, 45 50, 100 50',       // Vercel → Anmeldung
-};
-function Leitung({ bereich, status, text }) {
-  const t = useT();
-  return (
-    <div className={`verbund-leitung leitung-${bereich} status-${status}`} style={{ gridArea: bereich }}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path className="linie" d={KURVEN[bereich]} /></svg>
-      <span className="leitung-text">{t(text)}</span>
-    </div>
-  );
-}
 
 export default function Verbindungen() {
   const t = useT();
@@ -78,50 +38,48 @@ export default function Verbindungen() {
 
   const k = daten?.knoten;
   const status = (knoten) => (!daten ? (fehler ? 'fehler' : 'pruefe') : knoten?.status ?? 'unbekannt');
-  const lokal = t('nur online prüfbar');
+  const { vercel: vc, github: gh, datenbank: db, login: au } = k ?? {};
 
-  const vc = k?.vercel;
-  const gh = k?.github;
-  const db = k?.datenbank;
-  const au = k?.login;
+  // Zeilen der Tafel (Reihenfolge = Weg einer Anfrage)
+  const zeilen = [
+    { id: 'br', schild: 'WEB', dienst: t('Browser'), aufgabe: t('PC, Tablet oder Handy'), ort: '–', ms: browserMs, status: daten ? 'ok' : status(null) },
+    { id: 'vc', schild: 'APP', dienst: 'Vercel', aufgabe: t('Next.js – Seiten, Prüfungen, Abfragen'), status: status(vc),
+      ort: vc?.grund === 'lokal' ? t('lokal') : vc?.region ?? '–', hinweis: vc?.grund === 'lokal' ? t('Lokaler Testbetrieb – nicht bei Vercel') : null },
+    { id: 'db', schild: 'DB', dienst: 'Supabase', aufgabe: t('PostgreSQL mit Zeilensicherheit'), ms: db?.ms, status: status(db),
+      ort: db?.region ?? (db?.art === 'lokal' ? t('lokal') : '–'), port: db?.port,
+      hinweis: db?.status === 'warnung' ? t('Session Pooler (Port 5432) – bitte Port 6543 verwenden') : db?.meldung },
+    { id: 'au', schild: 'AUTH', dienst: 'Supabase Auth', aufgabe: t('Anmeldung'), ms: au?.ms || undefined, status: status(au), ort: '–',
+      hinweis: au?.grund === 'deaktiviert' ? t('Login für lokale Tests abgeschaltet') : au?.meldung },
+    { id: 'gh', schild: 'GIT', dienst: 'GitHub', aufgabe: t('Quellcode, jeder Push wird veröffentlicht'), status: status(gh), ort: 'github.com',
+      hinweis: gh?.grund === 'lokal' ? t('nur online prüfbar') : null },
+  ];
 
   return (
-    <section className="karte verbund-karte" style={{ '--i': 4 }}>
+    <section className="karte tafel-karte" style={{ '--i': 4 }}>
       <div className="karte-kopf">
         <h2 className="abschnitt-titel">{t('So funktioniert die App')}</h2>
-        <div className="d-flex align-items-center gap-3">
-          {daten && <span className="klein">{t('Geprüft: {zeit}', { zeit: datumZeit(daten.zeit, t.sprache) })}</span>}
-          <button type="button" className="btn btn-sekundaer btn-klein" onClick={pruefen} disabled={laedt}>
-            <i className={`bi bi-arrow-repeat${laedt ? ' drehen' : ''}`} aria-hidden="true" /> {t('Erneut prüfen')}
-          </button>
-        </div>
+        <button type="button" className="btn btn-sekundaer btn-klein" onClick={pruefen} disabled={laedt}>
+          <i className={`bi bi-arrow-repeat${laedt ? ' drehen' : ''}`} aria-hidden="true" /> {t('Erneut prüfen')}
+        </button>
       </div>
-      {fehler && (
-        <div className="hinweis hinweis-fehler" role="alert">
-          <i className="bi bi-x-circle-fill" aria-hidden="true" />
-          <span className="hinweis-text">{t('Die Prüfung konnte nicht ausgeführt werden.')}</span>
+      <div className="tafel" aria-busy={laedt}>
+        <div className="tafel-kopf" aria-hidden="true">
+          <span>{t('Linie')}</span><span>{t('Dienst')}</span><span>{t('Aufgabe')}</span><span>{t('Ort')}</span><span className="rechts">{t('Zeit')}</span><span>{t('Status')}</span>
         </div>
-      )}
-
-      <div className="verbund" aria-busy={laedt}>
-        <Knoten bereich="br" symbol="bi-laptop" name={t('Du')} rolle={t('Browser')} status={daten ? 'ok' : status(null)} ms={browserMs}
-                text={t('PC, Tablet oder Handy')} />
-        <Leitung bereich="l1" status={daten ? 'ok' : status(null)} text={T('Seite aufrufen')} />
-        <Knoten bereich="gh" symbol="bi-github" name="GitHub" rolle={t('Programmcode')} status={status(gh)}
-                text={t('Quellcode, jeder Push wird veröffentlicht')}
-                hinweis={gh?.grund === 'lokal' ? lokal : null} />
-        <Leitung bereich="l2" status={vc?.grund === 'lokal' ? 'unbekannt' : status(gh)} text={T('veröffentlichen')} />
-        <Knoten bereich="vc" symbol="bi-cloud-check" name="Vercel" rolle={t('Server')} status={status(vc)}
-                text={t('Next.js – Seiten, Prüfungen, Abfragen')}
-                hinweis={vc?.grund === 'lokal' ? t('Lokaler Testbetrieb – nicht bei Vercel') : vc?.region ? t('Rechenzentrum: {r}', { r: vc.region }) : null} />
-        <Leitung bereich="l3" status={status(db)} text={T('Daten lesen & speichern')} />
-        <Knoten bereich="db" symbol="bi-database" name="Supabase" rolle={t('Datenbank')} status={status(db)} ms={db?.ms}
-                text={t('PostgreSQL mit Zeilensicherheit')}
-                hinweis={db?.status === 'warnung' ? t('Session Pooler (Port 5432) – bitte Port 6543 verwenden') : db?.meldung} />
-        <Leitung bereich="l4" status={status(au)} text={T('Anmeldung prüfen')} />
-        <Knoten bereich="au" symbol="bi-shield-lock" name="Supabase Auth" rolle={t('Anmeldung')} status={status(au)} ms={au?.ms}
-                text={t('Prüft beim Login E-Mail und Passwort.')}
-                hinweis={au?.grund === 'deaktiviert' ? t('Login für lokale Tests abgeschaltet') : au?.meldung} />
+        {zeilen.map((z) => (
+          <div key={z.id} className={`tafel-zeile status-${z.status}`} data-dienst={z.id}>
+            <span className={`tafel-schild schild-${z.id}`}>{z.schild}</span>
+            <span className="tafel-dienst">{z.dienst}</span>
+            <span className="tafel-aufgabe">{z.aufgabe}{z.hinweis && <small>{z.hinweis}</small>}</span>
+            <span className="tafel-ort">{z.ort}{z.port ? ` · ${z.port}` : ''}</span>
+            <span className="tafel-ms rechts">{z.ms !== undefined && z.status === 'ok' ? `${z.ms} ms` : '–'}</span>
+            <span className="tafel-status"><i className="tafel-led" aria-hidden="true" />{t(STATUS_TEXT[z.status])}</span>
+          </div>
+        ))}
+        <div className="tafel-fuss">
+          <span>{daten ? t('Geprüft: {zeit}', { zeit: uhrzeit(daten.zeit, t.sprache) }) : fehler ? t('Die Prüfung konnte nicht ausgeführt werden.') : t('wird geprüft …')}</span>
+          <span className="tafel-weg">WEB → APP → DB · AUTH &nbsp;·&nbsp; GIT → APP</span>
+        </div>
       </div>
     </section>
   );

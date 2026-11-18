@@ -1948,93 +1948,13 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
  * 7. Datenbasis (app/datenbasis/) – Verbindungen und Datenmodell
  * ================================================================== */
 
-/* ---------- Verbindungen: Knoten und Leitungen im Raster ---------- */
+/* ---------- Statusfarben (Verbindungen, Tafel) ---------- */
 .status-ok        { --zustand: var(--gruen);  --zustand-bg: var(--gruen-bg); }
 .status-warnung   { --zustand: var(--orange); --zustand-bg: var(--orange-bg); }
 .status-fehler    { --zustand: var(--rot);    --zustand-bg: var(--rot-bg); }
 .status-unbekannt { --zustand: var(--grau);   --zustand-bg: var(--grau-bg); }
 .status-pruefe    { --zustand: var(--text-leise); --zustand-bg: var(--fuellung); }
 
-.verbund {
-    display: grid;
-    grid-template-columns: 1fr 90px 1.1fr 90px 1fr;
-    grid-template-rows: 1fr 1fr;
-    grid-template-areas:
-        "br l1 vc l3 db"
-        "gh l2 vc l4 au";
-    gap: 0;
-}
-.verbund-knoten {
-    margin: 8px 0;
-    display: flex; flex-direction: column; gap: 8px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    background: var(--karte-erhoeht);
-    border: 1px solid color-mix(in srgb, var(--zustand) 35%, var(--glas-rand));
-    box-shadow: var(--glas-kante), 0 4px 14px rgba(31, 38, 64, .06);
-    min-width: 0;
-    transition: border-color .4s ease;
-}
-/* Vercel steht in der Mitte zwischen beiden Zeilen */
-.verbund-knoten[style*="vc"] { align-self: center; }
-.knoten-kopf { display: flex; gap: 10px; align-items: center; }
-.knoten-symbol {
-    width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px;
-    display: grid; place-items: center; font-size: 1.1rem;
-    background: var(--fuellung); color: var(--text);
-}
-.knoten-name { display: block; font-weight: 650; line-height: 1.2; }
-.knoten-rolle { display: block; font-size: .75rem; color: var(--text-leise); line-height: 1.2; }
-.knoten-text { margin: 0; font-size: .82rem; line-height: 1.4; color: var(--text); }
-.knoten-status {
-    align-self: flex-start; margin-top: auto;
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 2px 10px; border-radius: 999px;
-    font-size: .75rem; font-weight: 600;
-    color: var(--zustand); background: var(--zustand-bg);
-}
-.knoten-ms { font-weight: 500; font-variant-numeric: tabular-nums; }
-.knoten-status .punkt { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.status-pruefe .knoten-status .punkt { animation: pulsieren 1s ease-in-out infinite; }
-.knoten-hinweis { font-size: .72rem; color: var(--text-leise); line-height: 1.35; overflow-wrap: anywhere; }
-
-.verbund-leitung { position: relative; min-height: 40px; }
-.verbund-leitung svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.verbund-leitung .linie {
-    fill: none; stroke: var(--zustand); stroke-width: 2.5; vector-effect: non-scaling-stroke;
-    stroke-linecap: round; stroke-dasharray: 2 7;
-}
-/* Funktionierende Leitungen "fließen" */
-.verbund-leitung.status-ok .linie { animation: fliessen 1.1s linear infinite; }
-.verbund-leitung.status-unbekannt .linie, .verbund-leitung.status-pruefe .linie { opacity: .5; }
-.leitung-text {
-    position: absolute; left: 50%; transform: translateX(-50%);
-    font-size: .6875rem; color: var(--text-leise); text-align: center; line-height: 1.25;
-    width: 100%; padding: 0 4px;
-}
-.leitung-l1 .leitung-text, .leitung-l3 .leitung-text { top: calc(50% - 26px); }
-.leitung-l2 .leitung-text, .leitung-l4 .leitung-text { top: calc(50% + 8px); }
-@keyframes fliessen { to { stroke-dashoffset: -18; } }
-.bi.drehen { display: inline-block; animation: drehen .8s linear infinite; }
-
-/* Schmaler als 1000 px: Kästen untereinander, Leitungen senkrecht */
-@media (max-width: 999.98px) {
-    .verbund { display: flex; flex-direction: column; align-items: stretch; }
-    .verbund-leitung { min-height: 38px; display: flex; align-items: center; }
-    .verbund-leitung svg { display: none; }
-    .verbund-leitung::before {
-        content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 0;
-        border-left: 2.5px dotted var(--zustand);
-    }
-    .verbund-leitung .leitung-text { position: static; transform: none; margin-left: calc(50% + 12px); width: auto; text-align: left; }
-    /* Reihenfolge: Browser → Vercel → Datenbank → Anmeldung, GitHub mit Abstand darunter */
-    .verbund-knoten[style*="br"] { order: 0; } .leitung-l1 { order: 1; }
-    .verbund-knoten[style*="vc"] { order: 2; } .leitung-l3 { order: 3; }
-    .verbund-knoten[style*="db"] { order: 4; } .leitung-l4 { order: 5; }
-    .verbund-knoten[style*="au"] { order: 6; }
-    .leitung-l2 { display: none; }
-    .verbund-knoten[style*="gh"] { order: 7; margin-top: 22px; }
-}
 
 /* ---------- Datenmodell ---------- */
 .er-legende { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: -4px 0 16px; }
@@ -3183,22 +3103,27 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
    Datenmodell als Liniennetzplan (app/datenbasis/Datenmodell.js)
    Strecken in der Farbe des Themas (--gruppe), Stationen als weiße Ringe wie auf einem U-Bahn-Plan.
    ===================================================================== */
-.netz-legende { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--text-leise); }
-.netz-legende span { display: inline-flex; align-items: center; gap: 7px; }
-.netz-legende i { width: 22px; height: 5px; border-radius: 3px; background: var(--gruppe); }
+.netz-legende { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--text); }
+.netz-legende span { display: inline-flex; align-items: center; gap: 7px; font-weight: 500; }
+/* Linienschild wie auf dem U-Bahn-Plan: Farbe des Themas, weiße fette Schrift */
+.netz-schild { display: inline-grid; place-items: center; min-width: 30px; height: 20px; padding: 0 5px; border-radius: 4px; background: var(--gruppe); color: #fff; font-size: .74rem; font-weight: 800; letter-spacing: .02em; }
 .netzplan-rahmen { overflow-x: auto; margin: 4px -8px 0; padding: 0 8px; }
-.netzplan { width: 100%; height: auto; display: block; }
-.netz-strecke { fill: none; stroke: var(--gruppe); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: .78; transition: opacity .2s, stroke-width .2s; }
-.netz-strecke.aktiv { opacity: 1; stroke-width: 7; }
+.netzplan { width: 100%; height: auto; display: block; font-family: "Inter", -apple-system, "Segoe UI", sans-serif; }
+.netz-strecke { fill: none; stroke: var(--gruppe); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: .92; transition: opacity .2s, stroke-width .2s; }
+.netz-strecke.aktiv { opacity: 1; stroke-width: 10; }
 .netz-strecke.gedimmt { opacity: .12; }
 .netz-station { cursor: pointer; outline: none; transition: opacity .2s; }
-.netz-station.gedimmt { opacity: .3; }
+.netz-station.gedimmt { opacity: .28; }
 .netz-flaeche { fill: transparent; }
-.netz-ring { fill: var(--karte-solid); stroke: var(--gruppe); stroke-width: 5; transition: stroke-width .15s; }
-.netz-station:hover .netz-ring, .netz-station:focus-visible .netz-ring { stroke-width: 7; }
+/* Station: weißer Punkt mit dunklem Rand; Umsteigebahnhof als breite Kapsel */
+.netz-ring { fill: #fff; stroke: #1d1d1f; stroke-width: 3; transition: stroke-width .15s; }
+:root[data-theme="dark"] .netz-ring { stroke: #0b0b0c; }
+.netz-station:hover .netz-ring, .netz-station:focus-visible .netz-ring { stroke-width: 4.5; }
 .netz-station.gewaehlt .netz-ring { fill: var(--gruppe); }
-.netz-name { text-anchor: middle; font: 600 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; fill: var(--text); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 4px; stroke-linejoin: round; }
-.netz-anzahl { text-anchor: middle; font-size: 11.5px; fill: var(--text-leise); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 4px; font-variant-numeric: tabular-nums; }
+.netz-name { text-anchor: middle; font-size: 13px; font-weight: 700; fill: var(--text); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 5px; stroke-linejoin: round; letter-spacing: -.01em; }
+.netz-mini-schild { fill: var(--gruppe); }
+.netz-mini-text { text-anchor: middle; font-size: 9px; font-weight: 800; fill: #fff; }
+.netz-anzahl { text-anchor: middle; font-size: 11px; fill: var(--text-leise); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 4px; font-variant-numeric: tabular-nums; }
 .netz-unten { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px 32px; margin-top: 8px; border-top: 1px solid var(--linie); padding-top: 4px; }
 .netz-liste { list-style: none; margin: 0; padding: 0; }
 .netz-liste li { border-bottom: 1px solid var(--linie); }
@@ -3246,3 +3171,50 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
 .anlegen-arten button { display: inline-flex; align-items: center; gap: 6px; }
 .anlegen fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .anlegen-formular { max-width: 880px; }
+
+/* ---------- Statistik: Seiten und eigene Seiten ---------- */
+.stat-seiten-rahmen { margin: 6px 0 18px; }
+.stat-seiten { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--linie); }
+.stat-seiten button { border: 0; background: none; padding: 10px 14px; color: var(--text-leise); font-weight: 600; font-size: .95rem; border-bottom: 2.5px solid transparent; margin-bottom: -1px; }
+.stat-seiten button:hover { color: var(--text); }
+.stat-seiten button.aktiv { color: var(--text); border-bottom-color: var(--akzent); }
+.stat-seiten button.eigen { font-style: italic; }
+.stat-seiten .stat-seite-neu { margin-left: auto; color: var(--akzent); font-weight: 500; }
+.stat-seite-werkzeug { display: flex; gap: 14px; justify-content: flex-end; padding-top: 8px; }
+.stat-seite-werkzeug button { border: 0; background: none; color: var(--text-leise); font-size: .85rem; }
+.stat-seite-werkzeug button:hover { color: var(--akzent); }
+.stat-seite-editor { margin-top: 14px; }
+.stat-baustein-wahl { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; margin-top: 16px; }
+.stat-baustein-wahl label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--linie); cursor: pointer; font-size: .9rem; }
+.stat-baustein-wahl label.gewaehlt { border-color: var(--akzent); background: color-mix(in srgb, var(--akzent) 8%, transparent); }
+.stat-raster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.stat-zelle.breit { grid-column: 1 / -1; }
+.stat-zelle > .karte { height: 100%; margin-bottom: 0; }
+@media (max-width: 991.98px) { .stat-raster { grid-template-columns: minmax(0, 1fr); } }
+
+/* =====================================================================
+   „So funktioniert die App“ als Anzeigetafel (app/datenbasis/Verbindungen.js)
+   Bewusst dunkel wie eine Bahnsteig-Anzeige – in Hell- und Dunkelmodus gleich (feste Tafelfarben).
+   ===================================================================== */
+.tafel { --tafel-grund: #0f1b26; --tafel-linie: #22313f; --tafel-text: #e9eef2; --tafel-leise: #8fa3b3; --tafel-gelb: #ffd24a;
+  background: var(--tafel-grund); color: var(--tafel-text); border-radius: 14px; padding: 6px 18px 12px; overflow-x: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; box-shadow: inset 0 0 0 1px #1d2b38, inset 0 10px 30px rgba(0,0,0,.35); }
+.tafel-kopf, .tafel-zeile { display: grid; grid-template-columns: 64px minmax(110px, 1fr) minmax(200px, 2.2fr) minmax(70px, .8fr) 70px 140px; gap: 14px; align-items: center; min-width: 760px; }
+.tafel-kopf { padding: 10px 0 8px; font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--tafel-leise); border-bottom: 1px solid var(--tafel-linie); }
+.tafel-zeile { padding: 11px 0; border-bottom: 1px dashed var(--tafel-linie); font-size: .9rem; }
+.tafel .rechts { text-align: right; }
+.tafel-schild { display: inline-grid; place-items: center; height: 26px; min-width: 52px; padding: 0 6px; border-radius: 5px; font-weight: 800; font-size: .74rem; letter-spacing: .04em; color: #fff; }
+.schild-br { background: #4a6072; } .schild-vc { background: #1c7f85; } .schild-db { background: #2f7d32; } .schild-au { background: #6e3fc4; } .schild-gh { background: #b45a00; }
+.tafel-dienst { color: var(--tafel-gelb); font-weight: 700; }
+.tafel-aufgabe small { display: block; color: var(--tafel-leise); font-size: .75rem; margin-top: 2px; }
+.tafel-ort, .tafel-ms { color: var(--tafel-text); font-variant-numeric: tabular-nums; }
+.tafel-status { display: inline-flex; align-items: center; gap: 9px; color: var(--tafel-text); }
+.tafel-led { width: 10px; height: 10px; border-radius: 50%; background: #5d6b78; box-shadow: 0 0 0 2px rgba(255,255,255,.06); flex: none; }
+.status-ok .tafel-led { background: #3ee06a; box-shadow: 0 0 8px #3ee06a; }
+.status-warnung .tafel-led { background: #ffb020; box-shadow: 0 0 8px #ffb020; }
+.status-fehler .tafel-led { background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; }
+.status-pruefe .tafel-led { background: #9fb3c4; animation: tafel-blinken 1s steps(2) infinite; }
+@keyframes tafel-blinken { 50% { opacity: .25; } }
+.tafel-fuss { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 10px; font-size: .75rem; color: var(--tafel-leise); min-width: 760px; }
+.tafel-weg { color: var(--tafel-gelb); letter-spacing: .06em; }
+@media (prefers-reduced-motion: reduce) { .status-pruefe .tafel-led { animation: none; } }

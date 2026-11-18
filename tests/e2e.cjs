@@ -310,7 +310,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Statistik: 8 Länder im Vergleich', (await p.$$eval('.stat-kachel', (z) => z.length)) === 8);
   // „i“-Knopf: Quelle (Tabellen) und Berechnung je Wert
   pruefe('Statistik: „i“ an jeder Kennzahl, jedem Leistenwert und jedem Abschnitt', (await p.$$eval('.kennzahl .info-knopf', (z) => z.length)) === 4
-    && (await p.$$eval('.stat-leiste .info-knopf', (z) => z.length)) === 8 && (await p.$$eval('h2.abschnitt-titel .info-knopf', (z) => z.length)) >= 12);
+    && (await p.$$eval('.stat-leiste .info-knopf', (z) => z.length)) === 8 && (await p.$$eval('h2.abschnitt-titel .info-knopf', (z) => z.length)) >= 3);
   await p.click('.kennzahl .info-knopf >> nth=0'); await p.waitForTimeout(300);
   const infoText = await p.textContent('.info-fenster');
   pruefe('Statistik: „i“ zeigt Tabellen und Berechnung der MTTR', infoText.includes('wartungsauftrag') && infoText.includes('Berechnung') && infoText.includes('ende_zeit − start_zeit'));
@@ -334,9 +334,15 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click('.stat-pfad button:has-text("Weltweit")'); await p.waitForTimeout(900);
   pruefe('Statistik: Pfad zoomt heraus', (await p.textContent('h1')) === 'Statistik' && (await p.$$eval('.stat-kachel', (z) => z.length)) === 8);
   const neueAuswertungen = ['Verfügbarkeit pro Monat', 'Reaktionszeit nach Priorität', 'Größte Zeitfresser (Pareto)', 'Offene Aufträge nach Alter', 'Störungen nach Maschinenalter'];
-  const titelDa = await p.$$eval('.abschnitt-titel', (z) => z.map((h) => h.textContent));
-  pruefe('Statistik: weitere Auswertungen (Verfügbarkeit, Reaktionszeit, Pareto, Alter)', neueAuswertungen.every((x) => titelDa.includes(x)), titelDa.join(' | '));
-  pruefe('Statistik: Diagramme gezeichnet', (await p.$$eval('.stat-ebene canvas', (z) => z.length)) === 6 && (await p.$('.heat-zelle')) === null);
+  pruefe('Statistik: Diagramme gezeichnet (Überblick)', (await p.$$eval('.stat-ebene canvas', (z) => z.length)) === 2 && (await p.$('.heat-zelle')) === null);
+  // Seiten nach Thema: Titel aller Seiten einsammeln
+  const titelDa = [];
+  for (const seite of ['stoerungen', 'instandhaltung', 'anlagen']) {
+    await p.click(`.stat-seiten [data-seite="${seite}"]`); await p.waitForTimeout(500);
+    titelDa.push(...await p.$$eval('.abschnitt-titel', (z) => z.map((h) => h.textContent)));
+  }
+  pruefe('Statistik: Seiten Störungen/Instandhaltung/Anlagen mit weiteren Auswertungen', neueAuswertungen.every((x) => titelDa.includes(x)), titelDa.join(' | '));
+  await p.click('.stat-seiten [data-seite="ueberblick"]'); await p.waitForTimeout(300);
   await p.goto(BASE + '/statistik'); await p.waitForTimeout(1500);
   await p.screenshot({ path: SHOTS + 'n-statistik-hell.png', fullPage: true });
 
@@ -345,8 +351,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Datenbasis: 17 Tabellen als Stationen im Netzplan', (await p.$$eval('.netz-station', (z) => z.length)) === 17);
   pruefe('Datenbasis: eine Strecke je Fremdschlüssel', (await p.$$eval('.netz-strecke', (z) => z.length)) === 26, await p.$$eval('.netz-strecke', (z) => z.length));
   pruefe('Datenbasis: 5 Views', (await p.$$eval('.netz-liste:not(.netz-werte) button', (z) => z.length)) === 5);
-  pruefe('Datenbasis: Verbindung zur Datenbank geprüft', (await p.textContent('.verbund-knoten[style*="db"]')).includes('verbunden'));
-  pruefe('Datenbasis: einfach erklärt, ohne Power BI und Commit-Texte', (await p.$$eval('.verbund-knoten', (z) => z.length)) === 5
+  pruefe('Datenbasis: Verbindung zur Datenbank geprüft', (await p.textContent('.tafel-zeile[data-dienst="db"]')).includes('verbunden'));
+  pruefe('Datenbasis: einfach erklärt, ohne Power BI und Commit-Texte', (await p.$$eval('.tafel-zeile', (z) => z.length)) === 5
     && !(await p.textContent('main')).includes('Power BI') && !(await p.textContent('main')).includes('Commit'));
   await p.hover('.netz-station[data-tabelle="maschine"] .netz-ring'); await p.waitForTimeout(300);
   const maschStrecken = Number(sql("SELECT count(*) FROM information_schema.table_constraints tc JOIN information_schema.constraint_column_usage ccu USING (constraint_name, table_schema) WHERE tc.table_schema='public' AND tc.constraint_type='FOREIGN KEY' AND (tc.table_name='maschine' OR ccu.table_name='maschine')"));
@@ -902,17 +908,30 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
 
   // 24. Statistik: Kreuzfilter wie in Power BI und neue Darstellungen
   await p.goto(BASE + '/statistik'); await p.waitForTimeout(2500);
+  await p.click('.stat-seiten [data-seite="stoerungen"]'); await p.waitForTimeout(800);
   const kfAlle = Number((await p.textContent('.kennzahl >> nth=2')).match(/\d[\d.]*/)[0].replace('.', ''));
-  pruefe('Statistik: Ring, Treemap und Streudiagramm vorhanden', (await p.$$('.diagramm canvas')).length >= 6 && (await p.$$('.kachelflaeche-feld')).length >= 3);
+  pruefe('Statistik: Ring, Treemap und Streudiagramm vorhanden', (await p.$$('.diagramm canvas')).length >= 2 && (await p.$$('.kachelflaeche-feld')).length >= 3);
   const kfHochLegende = Number(await p.textContent('.stat-legende-knopf >> nth=0 >> strong'));
   await p.click('.stat-legende-knopf >> nth=0'); await p.waitForTimeout(1200);
   const kfHoch = Number((await p.textContent('.kennzahl >> nth=2')).match(/\d[\d.]*/)[0].replace('.', ''));
   pruefe('Statistik: Klick auf Priorität hoch filtert alle Kennzahlen', kfHoch < kfAlle && kfHoch === kfHochLegende && (await p.textContent('.stat-filterleiste')).includes('Hoch'), `${kfAlle} → ${kfHoch} (Legende ${kfHochLegende})`);
   await p.click('.kachelflaeche-feld >> nth=0'); await p.waitForTimeout(1000);
   pruefe('Statistik: zweiter Filter aus der Treemap', (await p.$$('.stat-chip')).length === 2);
-  await p.click('.stat-chip-alle'); await p.waitForTimeout(800);
+  await p.click('.stat-chip-alle'); await p.waitForTimeout(1800);
   pruefe('Statistik: „Alle Filter löschen“ zeigt wieder alles', (await p.$('.stat-filterleiste')) === null
     && Number((await p.textContent('.kennzahl >> nth=2')).match(/\d[\d.]*/)[0].replace('.', '')) === kfAlle);
+  // Eigene Seite anlegen, bleibt nach Neuladen, bearbeiten, löschen
+  await p.click('.stat-seite-neu'); await p.fill('#seiten-name', 'Meine Seite');
+  await p.check('[data-baustein="treemap"]'); await p.check('[data-baustein="techniker"]');
+  await p.click('.stat-seite-editor button[type=submit]'); await p.waitForTimeout(800);
+  pruefe('Statistik: eigene Seite mit gewählten Auswertungen', (await p.textContent('.stat-seiten button.aktiv')).trim() === 'Meine Seite' && (await p.$$('.stat-zelle')).length === 2);
+  await p.reload(); await p.waitForTimeout(2500);
+  pruefe('Statistik: eigene Seite bleibt nach Neuladen', (await p.textContent('.stat-seiten button.aktiv')).trim() === 'Meine Seite');
+  await p.click('.stat-seite-werkzeug button >> nth=0'); await p.uncheck('[data-baustein="techniker"]');
+  await p.click('.stat-seite-editor button[type=submit]'); await p.waitForTimeout(800);
+  pruefe('Statistik: eigene Seite bearbeiten', (await p.$$('.stat-zelle')).length === 1);
+  await p.click('.stat-seite-werkzeug button >> nth=1'); await p.waitForTimeout(800);
+  pruefe('Statistik: eigene Seite löschen → Überblick', (await p.$$('.stat-seiten .eigen')).length === 0 && (await p.textContent('.stat-seiten button.aktiv')).trim() === 'Überblick');
 
   // 25. Neu anlegen über das Konto-Menü: Werk → Halle → Maschine, Mitarbeiter
   await p.goto(BASE + '/'); await p.waitForSelector('aside');

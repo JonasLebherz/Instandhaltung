@@ -21,7 +21,7 @@ const PLATZ = {
   bestellung: [0, 2], techniker: [2, 2], person: [4, 2], stoermeldung: [6, 2], stoermeldung_foto: [8, 2], nachricht: [10, 2],
   lagerbestand: [0, 4], ersatzteil: [2, 4], auftrag_ersatzteil: [4, 4], wartungsauftrag: [6, 4], auftrag_verlauf: [8, 4],
 };
-const RX = 104, RY = 78, RAND = 60, RAND_X = 100;   // Pixel je Rastereinheit, Rand (seitlich breiter für lange Namen)
+const RX = 112, RY = 96, RAND = 60, RAND_X = 100;   // Pixel je Rastereinheit, Rand (seitlich breiter für lange Namen)
 const px = ([x, y]) => [RAND_X + x * RX, RAND + 20 + y * RY];
 
 // Thema jeder Tabelle (Farbe der Karte und Legende)
@@ -32,6 +32,8 @@ const GRUPPEN = [
   { id: 'personen', name: T('Personen'), tabellen: ['techniker', 'person', 'nachricht'] },
   { id: 'material', name: T('Ersatzteile'), tabellen: ['ersatzteil', 'auftrag_ersatzteil', 'bestellung', 'lagerbestand'] },
 ];
+// Liniennummer je Thema (wie U1, U2 … auf einem Netzplan)
+const LINIE = { orte: 'U1', stoerung: 'U2', wartung: 'U3', personen: 'U4', material: 'U5', sonst: 'U6' };
 const gruppeVon = (name) => GRUPPEN.find((g) => g.tabellen.includes(name))?.id ?? 'sonst';
 
 // Kurzbeschreibung der Views (in der Datenbank gibt es dafür keinen Kommentar)
@@ -61,11 +63,26 @@ function strecke(a, b, versatz) {
     const xs = dx === 0 ? x1 + 1 : x2 - sx;                    // senkrecht auf einer Spur zwischen zwei Spalten
     punkte = [a, [x1 + (dx === 0 ? 1 : sx), y1 + sy, 'h'], [xs, y1 + sy, 'hv'], [xs, y2 - sy, 'v'], b];
   }
-  return punkte.map(([x, y, art], i) => {
+  const p = punkte.map(([x, y, art]) => {
     const [X, Y] = px([x, y]);
     const o = art?.includes('h') ? [0, versatz] : art === 'v' ? [versatz, 0] : [0, 0];
-    return `${i === 0 ? 'M' : 'L'} ${X + (art === 'hv' ? versatz : o[0])} ${Y + o[1]}`;
-  }).join(' ');
+    return [X + (art === 'hv' ? versatz : o[0]), Y + o[1]];
+  });
+  return rundePfad(p, 16);
+}
+
+/** Linienzug mit abgerundeten Ecken (Radius r) – Kurven wie auf einem gedruckten Netzplan */
+function rundePfad(p, r) {
+  let d = `M ${p[0][0]} ${p[0][1]}`;
+  for (let i = 1; i < p.length - 1; i += 1) {
+    const [a, b, c] = [p[i - 1], p[i], p[i + 1]];
+    const l1 = Math.hypot(b[0] - a[0], b[1] - a[1]), l2 = Math.hypot(c[0] - b[0], c[1] - b[1]);
+    const k = Math.min(r, l1 / 2, l2 / 2);
+    const vor = [b[0] - ((b[0] - a[0]) / l1) * k, b[1] - ((b[1] - a[1]) / l1) * k];
+    const nach = [b[0] + ((c[0] - b[0]) / l2) * k, b[1] + ((c[1] - b[1]) / l2) * k];
+    d += ` L ${vor[0]} ${vor[1]} Q ${b[0]} ${b[1]} ${nach[0]} ${nach[1]}`;
+  }
+  return `${d} L ${p[p.length - 1][0]} ${p[p.length - 1][1]}`;
 }
 
 export default function Datenmodell({ tabellen, wertelisten }) {
@@ -103,7 +120,8 @@ export default function Datenmodell({ tabellen, wertelisten }) {
   const aktiv = hervor ?? gewaehlt;
   const betroffen = (s) => aktiv && (s.von === aktiv || s.nach === aktiv);
   const nachbar = (name) => !aktiv || name === aktiv || strecken.some((s) => (s.von === aktiv && s.nach === name) || (s.nach === aktiv && s.von === name));
-  const groesse = (anzahl) => 9 + Math.min(11, Math.log10((anzahl ?? 0) + 1) * 3.2);
+  // Welche Linien halten an einer Station? Mehr als eine = Umsteigebahnhof (größerer Ring)
+  const linienAn = (name) => [...new Set([gruppeVon(name), ...strecken.filter((s) => s.nach === name || s.von === name).map((s) => gruppeVon(s.von))])];
 
   function waehlen(name) { setGewaehlt(gewaehlt === name ? null : name); }
   useEffect(() => {
@@ -116,7 +134,7 @@ export default function Datenmodell({ tabellen, wertelisten }) {
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">{t('Datenmodell')}</h2>
           <div className="netz-legende klein">
-            {GRUPPEN.map((g) => <span key={g.id} className={`gruppe-${g.id}`}><i aria-hidden="true" />{t(g.name)}</span>)}
+            {GRUPPEN.map((g) => <span key={g.id} className={`gruppe-${g.id}`}><b className="netz-schild">{LINIE[g.id]}</b>{t(g.name)}</span>)}
           </div>
         </div>
 
@@ -132,18 +150,28 @@ export default function Datenmodell({ tabellen, wertelisten }) {
             </g>
             {nurTabellen.map((tab) => {
               const [X, Y] = px(lage[tab.name]);
-              const r = groesse(tab.anzahl);
+              const linien = linienAn(tab.name);
+              const umsteigen = linien.length > 1;
               return (
-                <g key={tab.name} className={`netz-station gruppe-${gruppeVon(tab.name)}${gewaehlt === tab.name ? ' gewaehlt' : ''}${nachbar(tab.name) ? '' : ' gedimmt'}`}
+                <g key={tab.name} className={`netz-station gruppe-${gruppeVon(tab.name)}${umsteigen ? ' umsteigen' : ''}${gewaehlt === tab.name ? ' gewaehlt' : ''}${nachbar(tab.name) ? '' : ' gedimmt'}`}
                    data-tabelle={tab.name} transform={`translate(${X} ${Y})`} tabIndex={0} role="button" aria-pressed={gewaehlt === tab.name}
                    aria-label={`${tab.name}, ${tab.anzahl ?? 0} ${t('Datensätze')}`}
                    onClick={() => waehlen(tab.name)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); waehlen(tab.name); } }}
                    onMouseEnter={() => setHervor(tab.name)} onMouseLeave={() => setHervor(null)}
                    onFocus={() => setHervor(tab.name)} onBlur={() => setHervor(null)}>
-                  <circle r={r + 10} className="netz-flaeche" />
-                  <circle r={r} className="netz-ring" />
-                  <text y={r + 18} className="netz-name">{tab.name}</text>
-                  <text y={r + 33} className="netz-anzahl">{(tab.anzahl ?? 0).toLocaleString(t.sprache === 'en' ? 'en-US' : 'de-DE')}</text>
+                  <circle r={22} className="netz-flaeche" />
+                  {umsteigen ? <rect x={-14} y={-9} width={28} height={18} rx={9} className="netz-ring" /> : <circle r={8} className="netz-ring" />}
+                  <text y={30} className="netz-name">{tab.name}</text>
+                  <g transform={`translate(${-(linien.length * 23 - 3) / 2} 38)`}>
+                    {linien.map((l, i) => (
+                      <g key={l} transform={`translate(${i * 23} 0)`} className={`gruppe-${l}`}>
+                        <rect width={20} height={13} rx={2.5} className="netz-mini-schild" />
+                        <text x={10} y={10} className="netz-mini-text">{LINIE[l]}</text>
+                      </g>
+                    ))}
+                  </g>
+                  <text y={66} className="netz-anzahl">{(tab.anzahl ?? 0).toLocaleString(t.sprache === 'en' ? 'en-US' : 'de-DE')}</text>
+                  <title>{`${tab.name} · ${(tab.anzahl ?? 0)} ${t('Datensätze')}`}</title>
                 </g>
               );
             })}

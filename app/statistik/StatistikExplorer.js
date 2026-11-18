@@ -21,6 +21,10 @@
  * Das angeklickte Diagramm zeigt weiter alle Werte und hebt die Auswahl hervor –
  * es wird mit allen Filtern außer seinem eigenen gerechnet (ohneFilter(dim)).
  *
+ * Seiten: Die Auswertungen sind Bausteine (BAUSTEINE); feste Seiten (SEITEN) zeigen je Thema eine
+ * Auswahl, dazu eigene Seiten mit Name und frei gewählten Bausteinen (localStorage „statistikSeiten“).
+ * Die gewählte Seite steht in localStorage „statistikSeite“. Kennzahlen und Filter gelten für alle Seiten.
+ *
  * Definitionen wie in den Views: MTTR = Ø (ende_zeit − start_zeit) erledigter
  * Aufträge, Ausfallzeit = Σ (ende_zeit − Meldezeitpunkt) erledigter Aufträge.
  */
@@ -85,6 +89,35 @@ function treemap(eintraege, x = 0, y = 0, b = 100, h = 100) {
     : [...treemap(eintraege.slice(0, i), x, y, b, h * teil), ...treemap(eintraege.slice(i), x, y + h * teil, b, h * (1 - teil))];
 }
 
+// Alle Bausteine mit Namen (für eigene Seiten) – breit: über die ganze Breite
+const BAUSTEINE = {
+  leiste: { name: T('Weitere Kennzahlen'), breit: true },
+  vergleich: { name: T('Vergleich der Unterebene'), breit: true },
+  streuung: { name: T('Maschinen: Häufigkeit × Reparaturdauer'), breit: true },
+  proMonat: { name: T('Störungen pro Monat') },
+  mttrMonat: { name: T('MTTR pro Monat') },
+  ursachen: { name: T('Störursachen') },
+  treemap: { name: T('Ausfallzeit nach Ursache') },
+  status: { name: T('Bearbeitungsstand') },
+  prioritaeten: { name: T('Prioritäten') },
+  schichten: { name: T('Störungen nach Schicht') },
+  verfuegbarkeit: { name: T('Verfügbarkeit pro Monat') },
+  reaktion: { name: T('Reaktionszeit nach Priorität') },
+  pareto: { name: T('Größte Zeitfresser (Pareto)') },
+  typ: { name: T('Ausfallzeit nach Maschinentyp') },
+  alter: { name: T('Offene Aufträge nach Alter') },
+  maschinenalter: { name: T('Störungen nach Maschinenalter') },
+  techniker: { name: T('Techniker') },
+  ersatzteile: { name: T('Verbaute Ersatzteile') },
+};
+// Feste Seiten nach Thema
+const SEITEN = [
+  { id: 'ueberblick', name: T('Überblick'), bausteine: ['leiste', 'vergleich', 'proMonat', 'status'] },
+  { id: 'stoerungen', name: T('Störungen'), bausteine: ['proMonat', 'ursachen', 'treemap', 'prioritaeten', 'schichten'] },
+  { id: 'instandhaltung', name: T('Instandhaltung'), bausteine: ['mttrMonat', 'reaktion', 'status', 'alter', 'techniker', 'ersatzteile'] },
+  { id: 'anlagen', name: T('Anlagen'), bausteine: ['streuung', 'verfuegbarkeit', 'pareto', 'typ', 'maschinenalter'] },
+];
+
 /** Kennzahlen für eine Menge von Störmeldungen */
 function auswerten(liste) {
   const erledigt = liste.filter((e) => e.status === 'erledigt');
@@ -112,6 +145,24 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
   });
   const [zoom, setZoom] = useState(null);   // { richtung: 'rein'|'raus', ursprung: 'x y' }
   const [filter, setFilter] = useState({}); // Kreuzfilter, z. B. { prioritaet: 'hoch', monat: '2026-03' }
+  // Seiten: gewählte Seite und eigene Seiten (erst im Browser lesen, sonst passt das Server-HTML nicht)
+  const [seiteId, setSeiteId] = useState('ueberblick');
+  const [eigeneSeiten, setEigeneSeiten] = useState([]);
+  useEffect(() => {
+    try {
+      const gespeichert = JSON.parse(localStorage.getItem('statistikSeiten') ?? '[]');
+      if (Array.isArray(gespeichert)) setEigeneSeiten(gespeichert.filter((x) => x?.id && Array.isArray(x.bausteine)));
+      const zuletzt = localStorage.getItem('statistikSeite');
+      if (zuletzt) setSeiteId(zuletzt);
+    } catch { /* kein Speicher: feste Seiten */ }
+  }, []);
+  const seiteWaehlen = (id) => { setSeiteId(id); try { localStorage.setItem('statistikSeite', id); } catch { /* egal */ } };
+  /** Eigene Seiten speichern (neue Liste); wahl = Seite, die danach offen ist */
+  const eigeneSpeichern = (liste, wahl) => {
+    setEigeneSeiten(liste);
+    try { localStorage.setItem('statistikSeiten', JSON.stringify(liste)); } catch { /* egal */ }
+    seiteWaehlen(wahl);
+  };
   /** Filter setzen bzw. wieder entfernen (zweiter Klick auf dieselbe Auswahl) */
   const umschalten = (dim, wert) => setFilter((f) => {
     const neu = { ...f };
@@ -363,6 +414,307 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     alle: t('Länder im Vergleich'), land: t('Standorte im Vergleich'), werk: t('Gebäude im Vergleich'), gebaeude: t('Maschinen im Vergleich'),
   }[stufe];
 
+  /* ---------- Bausteine: je Auswertung eine Karte; die Seiten setzen sie zusammen ---------- */
+  const bausteine = {
+    leiste: (
+      <section className="karte stat-leiste" style={{ '--i': 5 }}>
+        {stufe === 'maschine' ? (
+          <div>
+            <strong>{k.anzahl ? zahl(zeitraumTage / k.anzahl, 1, s) : '–'}</strong>
+            <span>{t('Ø Tage zwischen Störungen (MTBF)')}{info('mtbf', t('Ø Tage zwischen Störungen (MTBF)'))}</span>
+          </div>
+        ) : (
+          <div>
+            <strong>{zahl(a.maschinenAnzahl ? k.anzahl / a.maschinenAnzahl : 0, 1, s)}</strong>
+            <span>{t('Störungen je Maschine ({n} Maschinen)', { n: a.maschinenAnzahl })}{info('jeMaschine', t('Störungen je Maschine ({n} Maschinen)', { n: a.maschinenAnzahl }))}</span>
+          </div>
+        )}
+        <div>
+          <strong>{k.erledigt ? `${zahl(k.ausfall_min / k.erledigt / 60, 1, s)} h` : '–'}</strong>
+          <span>{t('Ø Ausfall je Störung')}{info('ausfallJeStoerung', t('Ø Ausfall je Störung'))}</span>
+        </div>
+        <div>
+          <strong>{zahl(anteil(k.hoch, k.anzahl), 0, s)} %</strong>
+          <span>{t('Anteil Priorität hoch')}{info('anteilHoch', t('Anteil Priorität hoch'))}</span>
+        </div>
+        <div>
+          <strong>{zahl(anteil(k.erledigt, k.anzahl), 0, s)} %</strong>
+          <span>{t('Erledigungsquote')}{info('erledigungsquote', t('Erledigungsquote'))}</span>
+        </div>
+        <div>
+          <strong>{a.maschinenAnzahl ? `${zahl(Math.max(0, 100 - anteil(k.ausfall_min, a.maschinenAnzahl * zeitraumTage * 1440)), 2, s)} %` : '–'}</strong>
+          <span>{t('Verfügbarkeit (ohne Ausfall)')}{info('verfuegbarkeit', t('Verfügbarkeit (ohne Ausfall)'))}</span>
+        </div>
+        <div>
+          <strong>{a.reaktionGesamt === null ? '–' : `${zahl(a.reaktionGesamt / 60, 1, s)} h`}</strong>
+          <span>{t('Ø Reaktionszeit bis Arbeitsbeginn')}{info('reaktion', t('Ø Reaktionszeit bis Arbeitsbeginn'))}</span>
+        </div>
+        <div>
+          <strong>{zahl(anteil(a.wiederholt, k.anzahl), 0, s)} %</strong>
+          <span>{t('Wiederholungen (≤ 7 Tage an derselben Maschine)')}{info('wiederholung', t('Wiederholungen (≤ 7 Tage an derselben Maschine)'))}</span>
+        </div>
+        <div>
+          <strong>{zahl(k.anzahl / Math.max(1, zeitraumTage / 7), 1, s)}</strong>
+          <span>{t('Störungen pro Woche')}{info('proWoche', t('Störungen pro Woche'))}</span>
+        </div>
+      </section>
+    ),
+    vergleich: stufe !== 'maschine' ? (
+      <section className="karte" style={{ '--i': 6 }}>
+        <div className="karte-kopf">
+          <h2 className="abschnitt-titel">{kinderTitel}{info('vergleich', kinderTitel)}</h2>
+          <span className="klein">{t('sortiert nach Ausfallzeit')}</span>
+        </div>
+        <div className="stat-kacheln">
+          {kinder.map((kind) => (
+            <button key={kind.id} type="button" className="stat-kachel" onClick={(e) => kachelGeklickt(kind, e)}>
+              <span className="kachel-kopf">
+                {kind.typ && <i className={`bi ${MASCHINEN_SYMBOLE[kind.typ] ?? 'bi-gear'}`} aria-hidden="true" />}
+                <span>
+                  <span className="kachel-name">{kind.name}</span>
+                  <span className="kachel-unter">
+                    {kind.unter}{kind.art !== 'maschine' ? ` · ${t('{n} Maschinen', { n: kind.maschinen })}` : ''}
+                  </span>
+                </span>
+                <i className="bi bi-zoom-in kachel-lupe" aria-hidden="true" />
+              </span>
+              <span className="kachel-zahlen">
+                <span><strong>{kind.anzahl}</strong>{t('Störungen')}</span>
+                <span><strong>{kind.mttr_min === null ? '–' : `${zahl(kind.mttr_min / 60, 1, s)} h`}</strong>MTTR</span>
+                <span><strong>{zahl(kind.ausfall_min / 60, 0, s)} h</strong>{t('Ausfall')}</span>
+              </span>
+              <span className="mini-balken" aria-hidden="true">
+                <span style={{ width: `${Math.round((kind.ausfall_min / maxAusfallKind) * 100)}%` }} />
+              </span>
+              {kind.offen > 0 && <span className="kachel-offen">{t('{n} offen', { n: kind.offen })}</span>}
+            </button>
+          ))}
+        </div>
+      </section>
+    ) : (
+      <section className="karte" style={{ '--i': 6 }}>
+        <div className="karte-kopf">
+          <h2 className="abschnitt-titel">{t('Störungen dieser Maschine')}{info('maschinenListe', t('Störungen dieser Maschine'))}</h2>
+          <span className="d-flex gap-3">
+            <Link href={`/maschinen/${maschine.id}`}>{t('Maschinenhistorie')}</Link>
+            <Link href={`/melden?maschine=${maschine.id}`}>{t('Störung melden')}</Link>
+          </span>
+        </div>
+        {a.liste.length === 0 ? (
+          <p className="leer"><i className="bi bi-check-circle" />{t('Keine Störungen im Zeitraum.')}</p>
+        ) : (
+          <ul className="ort-liste">
+            {a.liste.slice(0, 15).map((e) => (
+              <li key={e.meldung_id}>
+                <Link href={`/auftraege/${e.auftrag_id}`} prefetch={false}>
+                  <span className="flex-grow-1">
+                    <span className="ort-titel">{e.beschreibung}</span>
+                    <span className="ort-unter">{datumZeit(e.zeitpunkt, s)} · {t(e.ursache)}</span>
+                    <span className="d-flex gap-2 mt-1 flex-wrap"><PrioritaetPill prioritaet={e.prioritaet} /><StatusPill status={e.status} /></span>
+                  </span>
+                  <i className="bi bi-chevron-right text-leise" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    ),
+    streuung: stufe !== 'maschine' && a.streuung.length > 1 ? (
+      <section className="karte" style={{ '--i': 7 }}>
+        <h2 className="abschnitt-titel">{t('Maschinen: Häufigkeit × Reparaturdauer')}{info('streuung', t('Maschinen: Häufigkeit × Reparaturdauer'))}</h2>
+        <Streuung punkte={a.streuung} onKlick={(id) => {
+          const o = maschineVon[id];
+          zoomen({ land: o.land, standortId: o.standort_id, gebaeudeId: o.gebaeude_id, maschineId: id }, 'rein');
+        }} />
+      </section>
+    ) : null,
+    proMonat: (
+      <section className="karte" style={{ '--i': 7 }}>
+        <h2 className="abschnitt-titel">{t('Störungen pro Monat')}{info('proMonat', t('Störungen pro Monat'))}</h2>
+        <Diagramm titel={t('Störungen pro Monat')} art="saeulen" labels={a.proMonat.map((m) => m.label)} werte={a.proMonat.map((m) => m.anzahl)}
+                  reihen={a.monatPrio.map((r) => ({ name: gross(t(r.prioritaet)), werte: r.werte, farbe: PRIO_FARBE[r.prioritaet] }))}
+                  onKlick={(i) => umschalten('monat', a.proMonat[i].schluessel)} auswahl={a.proMonat.findIndex((m) => m.schluessel === filter.monat)}
+                  einheit={t('Störungen')} spalte={t('Monat')} beschreibung={t('Säulendiagramm: Anzahl der Störungen pro Monat nach Priorität')} />
+      </section>
+    ),
+    mttrMonat: (
+      <section className="karte" style={{ '--i': 8 }}>
+        <h2 className="abschnitt-titel">{t('MTTR pro Monat')}{info('mttrMonat', t('MTTR pro Monat'))}</h2>
+        <Diagramm titel={t('MTTR pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.proMonat.map((m) => (m.mttr === null ? null : m.mttr / 60))}
+                  onKlick={(i) => umschalten('monat', a.proMonat[i].schluessel)}
+                  einheit="h" nachkomma={1} spalte={t('Monat')} beschreibung={t('Liniendiagramm: durchschnittliche Reparaturdauer pro Monat in Stunden')} />
+      </section>
+    ),
+    ursachen: (
+      <section className="karte" style={{ '--i': 9 }}>
+        <h2 className="abschnitt-titel">{t('Störursachen')}{info('ursachen', t('Störursachen'))}</h2>
+        <Diagramm titel={t('Störursachen')} art="balken" labels={a.ursachen.map((u) => t(u.ursache))} werte={a.ursachen.map((u) => u.anzahl)} hoehe={260}
+                  onKlick={(i) => umschalten('ursache', a.ursachen[i].ursache)} auswahl={a.ursachen.findIndex((u) => u.ursache === filter.ursache)}
+                  einheit={t('Störungen')} spalte={t('Ursache')} beschreibung={t('Balkendiagramm: Störungen nach Ursache')} />
+      </section>
+    ),
+    status: (
+      <section className="karte" style={{ '--i': 10 }}>
+        <h2 className="abschnitt-titel">{t('Bearbeitungsstand')}{info('status', t('Bearbeitungsstand'))}</h2>
+        <Diagramm titel={t('Bearbeitungsstand')} art="ring" labels={a.status.map((x) => gross(t(x.status)))} werte={a.status.map((x) => x.anzahl)}
+                  farben={a.status.map((x) => STATUS_FARBE[x.status])} hoehe={240}
+                  onKlick={(i) => umschalten('status', a.status[i].status)} auswahl={a.status.findIndex((x) => x.status === filter.status)}
+                  einheit={t('Aufträge')} spalte={t('Status')} beschreibung={t('Ringdiagramm: Aufträge nach Status')} />
+      </section>
+    ),
+    treemap: (
+      <section className="karte" style={{ '--i': 10 }}>
+        <h2 className="abschnitt-titel">{t('Ausfallzeit nach Ursache')}{info('ausfallUrsache', t('Ausfallzeit nach Ursache'))}</h2>
+        <Kachelflaeche eintraege={a.ursachen.filter((u) => u.ausfall_h > 0).sort((x, y) => y.ausfall_h - x.ausfall_h)
+          .map((u) => ({ schluessel: u.ursache, name: t(u.ursache), wert: u.ausfall_h, text: `${zahl(u.ausfall_h, 0, s)} h` }))}
+                       auswahl={filter.ursache} onKlick={(w) => umschalten('ursache', w)} />
+      </section>
+    ),
+    prioritaeten: (
+      <section className="karte" style={{ '--i': 11 }}>
+        <h2 className="abschnitt-titel">{t('Prioritäten')}{info('prioritaeten', t('Prioritäten'))}</h2>
+        <div className="karte-export">
+          <ExportKnopf titel={t('Prioritäten')} daten={() => ({
+            spalten: [t('Priorität'), t('Anzahl'), t('Anteil (%)')],
+            zeilen: a.prioritaeten.map((p) => [gross(t(p.prioritaet)), p.anzahl, Math.round(anteil(p.anzahl, k.anzahl))]),
+          })} />
+        </div>
+        <div className="stat-stapel" aria-hidden="true">
+          {a.prioritaeten.filter((p) => p.anzahl > 0).map((p) => (
+            <span key={p.prioritaet} className={`stapel-${PRIORITAET_LISTE[p.prioritaet]}${filter.prioritaet && filter.prioritaet !== p.prioritaet ? ' blass' : ''}`}
+                  style={{ flexGrow: p.anzahl }} title={`${gross(t(p.prioritaet))}: ${p.anzahl}`} />
+          ))}
+        </div>
+        <ul className="stat-legende">
+          {a.prioritaeten.map((p) => (
+            <li key={p.prioritaet}>
+              <button type="button" className={`stat-legende-knopf${filter.prioritaet === p.prioritaet ? ' gewaehlt' : filter.prioritaet ? ' blass' : ''}`}
+                      aria-pressed={filter.prioritaet === p.prioritaet} onClick={() => umschalten('prioritaet', p.prioritaet)}>
+                <PrioritaetPill prioritaet={p.prioritaet} />
+                <strong>{p.anzahl}</strong>
+                <span className="klein">{zahl(anteil(p.anzahl, a.prioritaeten.reduce((sum, x) => sum + x.anzahl, 0)), 0, s)} %</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ),
+    schichten: (
+      <section className="karte" style={{ '--i': 12 }}>
+        <h2 className="abschnitt-titel">{t('Störungen nach Schicht')}{info('schichten', t('Störungen nach Schicht'))}</h2>
+        <BalkenListe titel={t('Störungen nach Schicht')} auswahl={filter.schicht} onKlick={(w) => umschalten('schicht', w)} zeilen={a.schichten.map((sch) => ({
+          schluessel: sch.name, name: t(sch.name), zusatz: t('{zeit} Uhr', { zeit: sch.zeit }), wert: sch.anzahl,
+          text: `${sch.anzahl} · ${zahl(anteil(sch.anzahl, k.anzahl), 0, s)} %`,
+        }))} />
+      </section>
+    ),
+    verfuegbarkeit: (
+      <section className="karte" style={{ '--i': 13 }}>
+        <h2 className="abschnitt-titel">{t('Verfügbarkeit pro Monat')}{info('verfuegbarkeitMonat', t('Verfügbarkeit pro Monat'))}</h2>
+        <Diagramm titel={t('Verfügbarkeit pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.verfuegbarkeit} einheit="%" nachkomma={2} abNull={false} max={100}
+                  spalte={t('Monat')} beschreibung={t('Liniendiagramm: Anteil der Zeit ohne Ausfall pro Monat in Prozent')} />
+      </section>
+    ),
+    reaktion: (
+      <section className="karte" style={{ '--i': 14 }}>
+        <h2 className="abschnitt-titel">{t('Reaktionszeit nach Priorität')}{info('reaktionPrio', t('Reaktionszeit nach Priorität'))}</h2>
+        <p className="klein text-leise">{t('Ø Zeit von der Meldung bis zum Arbeitsbeginn')}</p>
+        <BalkenListe titel={t('Reaktionszeit nach Priorität')} zeilen={a.reaktion.filter((r) => r.anzahl > 0).map((r) => ({
+          name: gross(t(r.prioritaet)), zusatz: t('{n} Aufträge', { n: r.anzahl }), wert: r.min ?? 0,
+          text: r.min === null ? '–' : `${zahl(r.min / 60, 1, s)} h`,
+        }))} />
+      </section>
+    ),
+    pareto: stufe !== 'maschine' ? (
+      <section className="karte" style={{ '--i': 15 }}>
+        <h2 className="abschnitt-titel">{t('Größte Zeitfresser (Pareto)')}{info('pareto', t('Größte Zeitfresser (Pareto)'))}</h2>
+        <p className="klein text-leise">{t('Maschinen mit der meisten Ausfallzeit – rechts der Anteil an der gesamten Ausfallzeit (kumuliert)')}</p>
+        {a.pareto.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
+          <BalkenListe titel={t('Größte Zeitfresser (Pareto)')} zeilen={a.pareto.map((z) => ({
+            name: z.maschine?.bezeichnung ?? '–', zusatz: z.maschine?.anlagennummer, wert: z.min,
+            text: `${zahl(z.min / 60, 0, s)} h · ${zahl(z.anteil, 0, s)} %`,
+          }))} />
+        )}
+      </section>
+    ) : null,
+    typ: stufe !== 'maschine' ? (
+      <section className="karte" style={{ '--i': 16 }}>
+        <h2 className="abschnitt-titel">{t('Ausfallzeit nach Maschinentyp')}{info('ausfallTyp', t('Ausfallzeit nach Maschinentyp'))}</h2>
+        {a.ausfallTyp.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
+          <BalkenListe titel={t('Ausfallzeit nach Maschinentyp')} auswahl={filter.typ} onKlick={(w) => umschalten('typ', w)}
+                       zeilen={a.ausfallTyp.map((x) => ({ schluessel: x.typ, name: t(x.typ), wert: x.h, text: `${zahl(x.h, 0, s)} h` }))} />
+        )}
+      </section>
+    ) : null,
+    alter: (
+      <section className="karte" style={{ '--i': 17 }}>
+        <h2 className="abschnitt-titel">{t('Offene Aufträge nach Alter')}{info('alter', t('Offene Aufträge nach Alter'))}</h2>
+        <p className="klein text-leise">{t('Wie lange warten die noch offenen Störungen schon?')}</p>
+        {k.offen === 0 ? <p className="leer"><i className="bi bi-check-circle" />{t('Keine offenen Aufträge.')}</p> : (
+          <BalkenListe titel={t('Offene Aufträge nach Alter')} zeilen={a.alter.map((st) => ({ name: t(st.name), wert: st.anzahl, text: String(st.anzahl) }))} />
+        )}
+      </section>
+    ),
+    maschinenalter: stufe !== 'maschine' ? (
+      <section className="karte" style={{ '--i': 18 }}>
+        <h2 className="abschnitt-titel">{t('Störungen nach Maschinenalter')}{info('maschinenalter', t('Störungen nach Maschinenalter'))}</h2>
+        <p className="klein text-leise">{t('Ø Störungen je Maschine im Zeitraum, nach Baujahr gruppiert')}</p>
+        <BalkenListe titel={t('Störungen nach Maschinenalter')} zeilen={a.nachAlter.map((st) => ({
+          name: t(st.name), zusatz: t('{n} Maschinen', { n: st.maschinen }), wert: st.jeMaschine, text: zahl(st.jeMaschine, 1, s),
+        }))} />
+      </section>
+    ) : null,
+    techniker: (
+      <section className="karte" style={{ '--i': 19 }}>
+        <h2 className="abschnitt-titel">{t('Techniker')}{info('techniker', t('Techniker'))}</h2>
+        <div className="karte-export">
+          <ExportKnopf titel={t('Techniker')} daten={() => ({
+            spalten: [t('Techniker'), t('Qualifikation'), t('Aufträge'), t('Erledigt'), 'MTTR (h)'],
+            zeilen: a.proTechniker.map((te) => [te.name, t(te.qualifikation), te.anzahl, te.erledigt, te.mttr_min === null ? null : Math.round(te.mttr_min / 6) / 10]),
+          })} />
+        </div>
+        {a.proTechniker.length === 0 ? (
+          <p className="leer">{t('Keine zugewiesenen Aufträge im Zeitraum.')}</p>
+        ) : (
+          <div className="tabelle-rahmen">
+            <table className="tabelle">
+              <thead>
+                <tr>
+                  <th>{t('Techniker')}</th>
+                  <th className="zahl">{t('Aufträge')}</th>
+                  <th className="zahl">{t('Erledigt')}</th>
+                  <th className="zahl">MTTR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {a.proTechniker.map((te) => (
+                  <tr key={te.id}>
+                    <td>{te.name}<div className="klein">{t(te.qualifikation)}</div></td>
+                    <td className="zahl">{te.anzahl}</td>
+                    <td className="zahl">{te.erledigt}</td>
+                    <td className="zahl">{te.mttr_min === null ? '–' : `${zahl(te.mttr_min / 60, 1, s)} h`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    ),
+    ersatzteile: (
+      <section className="karte" style={{ '--i': 20 }}>
+        <h2 className="abschnitt-titel">{t('Verbaute Ersatzteile')}{info('ersatzteile', t('Verbaute Ersatzteile'))}</h2>
+        {a.ersatzteile.length === 0 ? (
+          <p className="leer">{t('Keine Ersatzteile im Zeitraum gebucht.')}</p>
+        ) : (
+          <BalkenListe titel={t('Verbaute Ersatzteile')} zeilen={a.ersatzteile.map((e) => ({ name: e.bezeichnung, wert: e.menge, text: t('{n} Stk.', { n: e.menge }) }))} />
+        )}
+      </section>
+    ),
+  };
+  const seite = [...SEITEN, ...eigeneSeiten].find((x) => x.id === seiteId) ?? SEITEN[0];
+
   return (
     <>
       {/* Kopf: Pfad zum Herauszoomen, Titel, Zeitraum */}
@@ -462,335 +814,14 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             </div>
           </div>
 
-          {/* Weitere Werte in einer Zeile */}
-          <section className="karte stat-leiste" style={{ '--i': 5 }}>
-            {stufe === 'maschine' ? (
-              <div>
-                <strong>{k.anzahl ? zahl(zeitraumTage / k.anzahl, 1, s) : '–'}</strong>
-                <span>{t('Ø Tage zwischen Störungen (MTBF)')}{info('mtbf', t('Ø Tage zwischen Störungen (MTBF)'))}</span>
-              </div>
-            ) : (
-              <div>
-                <strong>{zahl(a.maschinenAnzahl ? k.anzahl / a.maschinenAnzahl : 0, 1, s)}</strong>
-                <span>{t('Störungen je Maschine ({n} Maschinen)', { n: a.maschinenAnzahl })}{info('jeMaschine', t('Störungen je Maschine ({n} Maschinen)', { n: a.maschinenAnzahl }))}</span>
-              </div>
-            )}
-            <div>
-              <strong>{k.erledigt ? `${zahl(k.ausfall_min / k.erledigt / 60, 1, s)} h` : '–'}</strong>
-              <span>{t('Ø Ausfall je Störung')}{info('ausfallJeStoerung', t('Ø Ausfall je Störung'))}</span>
-            </div>
-            <div>
-              <strong>{zahl(anteil(k.hoch, k.anzahl), 0, s)} %</strong>
-              <span>{t('Anteil Priorität hoch')}{info('anteilHoch', t('Anteil Priorität hoch'))}</span>
-            </div>
-            <div>
-              <strong>{zahl(anteil(k.erledigt, k.anzahl), 0, s)} %</strong>
-              <span>{t('Erledigungsquote')}{info('erledigungsquote', t('Erledigungsquote'))}</span>
-            </div>
-            <div>
-              <strong>{a.maschinenAnzahl ? `${zahl(Math.max(0, 100 - anteil(k.ausfall_min, a.maschinenAnzahl * zeitraumTage * 1440)), 2, s)} %` : '–'}</strong>
-              <span>{t('Verfügbarkeit (ohne Ausfall)')}{info('verfuegbarkeit', t('Verfügbarkeit (ohne Ausfall)'))}</span>
-            </div>
-            <div>
-              <strong>{a.reaktionGesamt === null ? '–' : `${zahl(a.reaktionGesamt / 60, 1, s)} h`}</strong>
-              <span>{t('Ø Reaktionszeit bis Arbeitsbeginn')}{info('reaktion', t('Ø Reaktionszeit bis Arbeitsbeginn'))}</span>
-            </div>
-            <div>
-              <strong>{zahl(anteil(a.wiederholt, k.anzahl), 0, s)} %</strong>
-              <span>{t('Wiederholungen (≤ 7 Tage an derselben Maschine)')}{info('wiederholung', t('Wiederholungen (≤ 7 Tage an derselben Maschine)'))}</span>
-            </div>
-            <div>
-              <strong>{zahl(k.anzahl / Math.max(1, zeitraumTage / 7), 1, s)}</strong>
-              <span>{t('Störungen pro Woche')}{info('proWoche', t('Störungen pro Woche'))}</span>
-            </div>
-          </section>
 
-          {/* Vergleich der Unterebene – Klick zoomt hinein */}
-          {stufe !== 'maschine' ? (
-            <section className="karte" style={{ '--i': 6 }}>
-              <div className="karte-kopf">
-                <h2 className="abschnitt-titel">{kinderTitel}{info('vergleich', kinderTitel)}</h2>
-                <span className="klein">{t('sortiert nach Ausfallzeit')}</span>
-              </div>
-              <div className="stat-kacheln">
-                {kinder.map((kind) => (
-                  <button key={kind.id} type="button" className="stat-kachel" onClick={(e) => kachelGeklickt(kind, e)}>
-                    <span className="kachel-kopf">
-                      {kind.typ && <i className={`bi ${MASCHINEN_SYMBOLE[kind.typ] ?? 'bi-gear'}`} aria-hidden="true" />}
-                      <span>
-                        <span className="kachel-name">{kind.name}</span>
-                        <span className="kachel-unter">
-                          {kind.unter}{kind.art !== 'maschine' ? ` · ${t('{n} Maschinen', { n: kind.maschinen })}` : ''}
-                        </span>
-                      </span>
-                      <i className="bi bi-zoom-in kachel-lupe" aria-hidden="true" />
-                    </span>
-                    <span className="kachel-zahlen">
-                      <span><strong>{kind.anzahl}</strong>{t('Störungen')}</span>
-                      <span><strong>{kind.mttr_min === null ? '–' : `${zahl(kind.mttr_min / 60, 1, s)} h`}</strong>MTTR</span>
-                      <span><strong>{zahl(kind.ausfall_min / 60, 0, s)} h</strong>{t('Ausfall')}</span>
-                    </span>
-                    <span className="mini-balken" aria-hidden="true">
-                      <span style={{ width: `${Math.round((kind.ausfall_min / maxAusfallKind) * 100)}%` }} />
-                    </span>
-                    {kind.offen > 0 && <span className="kachel-offen">{t('{n} offen', { n: kind.offen })}</span>}
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : (
-            <section className="karte" style={{ '--i': 6 }}>
-              <div className="karte-kopf">
-                <h2 className="abschnitt-titel">{t('Störungen dieser Maschine')}{info('maschinenListe', t('Störungen dieser Maschine'))}</h2>
-                <span className="d-flex gap-3">
-                  <Link href={`/maschinen/${maschine.id}`}>{t('Maschinenhistorie')}</Link>
-                  <Link href={`/melden?maschine=${maschine.id}`}>{t('Störung melden')}</Link>
-                </span>
-              </div>
-              {a.liste.length === 0 ? (
-                <p className="leer"><i className="bi bi-check-circle" />{t('Keine Störungen im Zeitraum.')}</p>
-              ) : (
-                <ul className="ort-liste">
-                  {a.liste.slice(0, 15).map((e) => (
-                    <li key={e.meldung_id}>
-                      <Link href={`/auftraege/${e.auftrag_id}`} prefetch={false}>
-                        <span className="flex-grow-1">
-                          <span className="ort-titel">{e.beschreibung}</span>
-                          <span className="ort-unter">{datumZeit(e.zeitpunkt, s)} · {t(e.ursache)}</span>
-                          <span className="d-flex gap-2 mt-1 flex-wrap"><PrioritaetPill prioritaet={e.prioritaet} /><StatusPill status={e.status} /></span>
-                        </span>
-                        <i className="bi bi-chevron-right text-leise" aria-hidden="true" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          )}
-
-          {stufe !== 'maschine' && a.streuung.length > 1 && (
-            <section className="karte" style={{ '--i': 7 }}>
-              <h2 className="abschnitt-titel">{t('Maschinen: Häufigkeit × Reparaturdauer')}{info('streuung', t('Maschinen: Häufigkeit × Reparaturdauer'))}</h2>
-              <Streuung punkte={a.streuung} onKlick={(id) => {
-                const o = maschineVon[id];
-                zoomen({ land: o.land, standortId: o.standort_id, gebaeudeId: o.gebaeude_id, maschineId: id }, 'rein');
-              }} />
-            </section>
-          )}
-
-          {/* Verlauf: Anzahl und MTTR je Monat – zwei Diagramme statt zwei Achsen in einem */}
-          <div className="row g-4">
-            <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 7 }}>
-                <h2 className="abschnitt-titel">{t('Störungen pro Monat')}{info('proMonat', t('Störungen pro Monat'))}</h2>
-                <Diagramm titel={t('Störungen pro Monat')} art="saeulen" labels={a.proMonat.map((m) => m.label)} werte={a.proMonat.map((m) => m.anzahl)}
-                          reihen={a.monatPrio.map((r) => ({ name: gross(t(r.prioritaet)), werte: r.werte, farbe: PRIO_FARBE[r.prioritaet] }))}
-                          onKlick={(i) => umschalten('monat', a.proMonat[i].schluessel)} auswahl={a.proMonat.findIndex((m) => m.schluessel === filter.monat)}
-                          einheit={t('Störungen')} spalte={t('Monat')} beschreibung={t('Säulendiagramm: Anzahl der Störungen pro Monat nach Priorität')} />
-              </section>
-            </div>
-            <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 8 }}>
-                <h2 className="abschnitt-titel">{t('MTTR pro Monat')}{info('mttrMonat', t('MTTR pro Monat'))}</h2>
-                <Diagramm titel={t('MTTR pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.proMonat.map((m) => (m.mttr === null ? null : m.mttr / 60))}
-                          onKlick={(i) => umschalten('monat', a.proMonat[i].schluessel)}
-                          einheit="h" nachkomma={1} spalte={t('Monat')} beschreibung={t('Liniendiagramm: durchschnittliche Reparaturdauer pro Monat in Stunden')} />
-              </section>
-            </div>
-          </div>
-
-          {/* Ursachen */}
-          <section className="karte" style={{ '--i': 9 }}>
-            <h2 className="abschnitt-titel">{t('Störursachen')}{info('ursachen', t('Störursachen'))}</h2>
-            <Diagramm titel={t('Störursachen')} art="balken" labels={a.ursachen.map((u) => t(u.ursache))} werte={a.ursachen.map((u) => u.anzahl)} hoehe={260}
-                      onKlick={(i) => umschalten('ursache', a.ursachen[i].ursache)} auswahl={a.ursachen.findIndex((u) => u.ursache === filter.ursache)}
-                      einheit={t('Störungen')} spalte={t('Ursache')} beschreibung={t('Balkendiagramm: Störungen nach Ursache')} />
-          </section>
-
-          {/* Bearbeitungsstand als Ring und Ausfallzeit nach Ursache als Treemap */}
-          <div className="row g-4">
-            <div className="col-lg-5">
-              <section className="karte" style={{ '--i': 10 }}>
-                <h2 className="abschnitt-titel">{t('Bearbeitungsstand')}{info('status', t('Bearbeitungsstand'))}</h2>
-                <Diagramm titel={t('Bearbeitungsstand')} art="ring" labels={a.status.map((x) => gross(t(x.status)))} werte={a.status.map((x) => x.anzahl)}
-                          farben={a.status.map((x) => STATUS_FARBE[x.status])} hoehe={240}
-                          onKlick={(i) => umschalten('status', a.status[i].status)} auswahl={a.status.findIndex((x) => x.status === filter.status)}
-                          einheit={t('Aufträge')} spalte={t('Status')} beschreibung={t('Ringdiagramm: Aufträge nach Status')} />
-              </section>
-            </div>
-            <div className="col-lg-7">
-              <section className="karte" style={{ '--i': 10 }}>
-                <h2 className="abschnitt-titel">{t('Ausfallzeit nach Ursache')}{info('ausfallUrsache', t('Ausfallzeit nach Ursache'))}</h2>
-                <Kachelflaeche eintraege={a.ursachen.filter((u) => u.ausfall_h > 0).sort((x, y) => y.ausfall_h - x.ausfall_h)
-                  .map((u) => ({ schluessel: u.ursache, name: t(u.ursache), wert: u.ausfall_h, text: `${zahl(u.ausfall_h, 0, s)} h` }))}
-                               auswahl={filter.ursache} onKlick={(w) => umschalten('ursache', w)} />
-              </section>
-            </div>
-          </div>
-
-          {/* Prioritäten und Schichten */}
-          <div className="row g-4">
-            <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 11 }}>
-                <h2 className="abschnitt-titel">{t('Prioritäten')}{info('prioritaeten', t('Prioritäten'))}</h2>
-                <div className="karte-export">
-                  <ExportKnopf titel={t('Prioritäten')} daten={() => ({
-                    spalten: [t('Priorität'), t('Anzahl'), t('Anteil (%)')],
-                    zeilen: a.prioritaeten.map((p) => [gross(t(p.prioritaet)), p.anzahl, Math.round(anteil(p.anzahl, k.anzahl))]),
-                  })} />
-                </div>
-                <div className="stat-stapel" aria-hidden="true">
-                  {a.prioritaeten.filter((p) => p.anzahl > 0).map((p) => (
-                    <span key={p.prioritaet} className={`stapel-${PRIORITAET_LISTE[p.prioritaet]}${filter.prioritaet && filter.prioritaet !== p.prioritaet ? ' blass' : ''}`}
-                          style={{ flexGrow: p.anzahl }} title={`${gross(t(p.prioritaet))}: ${p.anzahl}`} />
-                  ))}
-                </div>
-                <ul className="stat-legende">
-                  {a.prioritaeten.map((p) => (
-                    <li key={p.prioritaet}>
-                      <button type="button" className={`stat-legende-knopf${filter.prioritaet === p.prioritaet ? ' gewaehlt' : filter.prioritaet ? ' blass' : ''}`}
-                              aria-pressed={filter.prioritaet === p.prioritaet} onClick={() => umschalten('prioritaet', p.prioritaet)}>
-                        <PrioritaetPill prioritaet={p.prioritaet} />
-                        <strong>{p.anzahl}</strong>
-                        <span className="klein">{zahl(anteil(p.anzahl, a.prioritaeten.reduce((sum, x) => sum + x.anzahl, 0)), 0, s)} %</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-            <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 12 }}>
-                <h2 className="abschnitt-titel">{t('Störungen nach Schicht')}{info('schichten', t('Störungen nach Schicht'))}</h2>
-                <BalkenListe titel={t('Störungen nach Schicht')} auswahl={filter.schicht} onKlick={(w) => umschalten('schicht', w)} zeilen={a.schichten.map((sch) => ({
-                  schluessel: sch.name, name: t(sch.name), zusatz: t('{zeit} Uhr', { zeit: sch.zeit }), wert: sch.anzahl,
-                  text: `${sch.anzahl} · ${zahl(anteil(sch.anzahl, k.anzahl), 0, s)} %`,
-                }))} />
-              </section>
-            </div>
-          </div>
-
-          {/* Verfügbarkeit je Monat und Reaktionszeit je Priorität */}
-          <div className="row g-4">
-            <div className="col-lg-7">
-              <section className="karte" style={{ '--i': 13 }}>
-                <h2 className="abschnitt-titel">{t('Verfügbarkeit pro Monat')}{info('verfuegbarkeitMonat', t('Verfügbarkeit pro Monat'))}</h2>
-                <Diagramm titel={t('Verfügbarkeit pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.verfuegbarkeit} einheit="%" nachkomma={2} abNull={false} max={100}
-                          spalte={t('Monat')} beschreibung={t('Liniendiagramm: Anteil der Zeit ohne Ausfall pro Monat in Prozent')} />
-              </section>
-            </div>
-            <div className="col-lg-5">
-              <section className="karte" style={{ '--i': 14 }}>
-                <h2 className="abschnitt-titel">{t('Reaktionszeit nach Priorität')}{info('reaktionPrio', t('Reaktionszeit nach Priorität'))}</h2>
-                <p className="klein text-leise">{t('Ø Zeit von der Meldung bis zum Arbeitsbeginn')}</p>
-                <BalkenListe titel={t('Reaktionszeit nach Priorität')} zeilen={a.reaktion.filter((r) => r.anzahl > 0).map((r) => ({
-                  name: gross(t(r.prioritaet)), zusatz: t('{n} Aufträge', { n: r.anzahl }), wert: r.min ?? 0,
-                  text: r.min === null ? '–' : `${zahl(r.min / 60, 1, s)} h`,
-                }))} />
-              </section>
-            </div>
-          </div>
-
-          {/* Pareto der Ausfallzeit und Ausfall nach Maschinentyp (nicht auf Maschinenebene) */}
-          {stufe !== 'maschine' && (
-            <div className="row g-4">
-              <div className="col-lg-6">
-                <section className="karte" style={{ '--i': 15 }}>
-                  <h2 className="abschnitt-titel">{t('Größte Zeitfresser (Pareto)')}{info('pareto', t('Größte Zeitfresser (Pareto)'))}</h2>
-                  <p className="klein text-leise">{t('Maschinen mit der meisten Ausfallzeit – rechts der Anteil an der gesamten Ausfallzeit (kumuliert)')}</p>
-                  {a.pareto.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
-                    <BalkenListe titel={t('Größte Zeitfresser (Pareto)')} zeilen={a.pareto.map((z) => ({
-                      name: z.maschine?.bezeichnung ?? '–', zusatz: z.maschine?.anlagennummer, wert: z.min,
-                      text: `${zahl(z.min / 60, 0, s)} h · ${zahl(z.anteil, 0, s)} %`,
-                    }))} />
-                  )}
-                </section>
-              </div>
-              <div className="col-lg-6">
-                <section className="karte" style={{ '--i': 16 }}>
-                  <h2 className="abschnitt-titel">{t('Ausfallzeit nach Maschinentyp')}{info('ausfallTyp', t('Ausfallzeit nach Maschinentyp'))}</h2>
-                  {a.ausfallTyp.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
-                    <BalkenListe titel={t('Ausfallzeit nach Maschinentyp')} auswahl={filter.typ} onKlick={(w) => umschalten('typ', w)}
-                                 zeilen={a.ausfallTyp.map((x) => ({ schluessel: x.typ, name: t(x.typ), wert: x.h, text: `${zahl(x.h, 0, s)} h` }))} />
-                  )}
-                </section>
-              </div>
-            </div>
-          )}
-
-          {/* Offene Aufträge nach Alter und Störungen nach Maschinenalter */}
-          <div className="row g-4">
-            <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 17 }}>
-                <h2 className="abschnitt-titel">{t('Offene Aufträge nach Alter')}{info('alter', t('Offene Aufträge nach Alter'))}</h2>
-                <p className="klein text-leise">{t('Wie lange warten die noch offenen Störungen schon?')}</p>
-                {k.offen === 0 ? <p className="leer"><i className="bi bi-check-circle" />{t('Keine offenen Aufträge.')}</p> : (
-                  <BalkenListe titel={t('Offene Aufträge nach Alter')} zeilen={a.alter.map((st) => ({ name: t(st.name), wert: st.anzahl, text: String(st.anzahl) }))} />
-                )}
-              </section>
-            </div>
-            {stufe !== 'maschine' && (
-              <div className="col-lg-6">
-                <section className="karte" style={{ '--i': 18 }}>
-                  <h2 className="abschnitt-titel">{t('Störungen nach Maschinenalter')}{info('maschinenalter', t('Störungen nach Maschinenalter'))}</h2>
-                  <p className="klein text-leise">{t('Ø Störungen je Maschine im Zeitraum, nach Baujahr gruppiert')}</p>
-                  <BalkenListe titel={t('Störungen nach Maschinenalter')} zeilen={a.nachAlter.map((st) => ({
-                    name: t(st.name), zusatz: t('{n} Maschinen', { n: st.maschinen }), wert: st.jeMaschine, text: zahl(st.jeMaschine, 1, s),
-                  }))} />
-                </section>
-              </div>
-            )}
-          </div>
-
-          {/* Techniker und Ersatzteile */}
-          <div className="row g-4">
-            <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 19 }}>
-                <h2 className="abschnitt-titel">{t('Techniker')}{info('techniker', t('Techniker'))}</h2>
-                <div className="karte-export">
-                  <ExportKnopf titel={t('Techniker')} daten={() => ({
-                    spalten: [t('Techniker'), t('Qualifikation'), t('Aufträge'), t('Erledigt'), 'MTTR (h)'],
-                    zeilen: a.proTechniker.map((te) => [te.name, t(te.qualifikation), te.anzahl, te.erledigt, te.mttr_min === null ? null : Math.round(te.mttr_min / 6) / 10]),
-                  })} />
-                </div>
-                {a.proTechniker.length === 0 ? (
-                  <p className="leer">{t('Keine zugewiesenen Aufträge im Zeitraum.')}</p>
-                ) : (
-                  <div className="tabelle-rahmen">
-                    <table className="tabelle">
-                      <thead>
-                        <tr>
-                          <th>{t('Techniker')}</th>
-                          <th className="zahl">{t('Aufträge')}</th>
-                          <th className="zahl">{t('Erledigt')}</th>
-                          <th className="zahl">MTTR</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {a.proTechniker.map((te) => (
-                          <tr key={te.id}>
-                            <td>{te.name}<div className="klein">{t(te.qualifikation)}</div></td>
-                            <td className="zahl">{te.anzahl}</td>
-                            <td className="zahl">{te.erledigt}</td>
-                            <td className="zahl">{te.mttr_min === null ? '–' : `${zahl(te.mttr_min / 60, 1, s)} h`}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-            </div>
-            <div className="col-lg-6">
-              <section className="karte" style={{ '--i': 20 }}>
-                <h2 className="abschnitt-titel">{t('Verbaute Ersatzteile')}{info('ersatzteile', t('Verbaute Ersatzteile'))}</h2>
-                {a.ersatzteile.length === 0 ? (
-                  <p className="leer">{t('Keine Ersatzteile im Zeitraum gebucht.')}</p>
-                ) : (
-                  <BalkenListe titel={t('Verbaute Ersatzteile')} zeilen={a.ersatzteile.map((e) => ({ name: e.bezeichnung, wert: e.menge, text: t('{n} Stk.', { n: e.menge }) }))} />
-                )}
-              </section>
-            </div>
+          {/* Seiten der Statistik: feste Themen und eigene Seiten (im Browser gespeichert) */}
+          <StatistikSeiten seiten={SEITEN} eigene={eigeneSeiten} aktiv={seite.id} onWaehlen={seiteWaehlen}
+                           bausteinNamen={BAUSTEINE} onSpeichern={eigeneSpeichern} />
+          <div className="stat-raster">
+            {seite.bausteine.filter((id) => bausteine[id]).map((id) => (
+              <div key={`${seite.id}-${id}`} className={`stat-zelle${BAUSTEINE[id]?.breit ? ' breit' : ''}`}>{bausteine[id]}</div>
+            ))}
           </div>
         </div>
       </div>
@@ -847,6 +878,71 @@ function Kachelflaeche({ eintraege, auswahl, onKlick }) {
           <span>{e.name}</span><b>{e.text}</b>
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Reiter der Statistik-Seiten und Editor für eigene Seiten (Name + angehakte Bausteine).
+ * Eigene Seiten liegen nur in diesem Browser (localStorage).
+ */
+function StatistikSeiten({ seiten, eigene, aktiv, onWaehlen, bausteinNamen, onSpeichern }) {
+  const t = useT();
+  const [bearbeiten, setBearbeiten] = useState(null);   // null | { id, name, bausteine }
+  const aktiveEigene = eigene.find((x) => x.id === aktiv);
+  function speichern(e) {
+    e.preventDefault();
+    const name = bearbeiten.name.trim() || t('Eigene Seite');
+    if (bearbeiten.bausteine.length === 0) return;
+    const seite = { ...bearbeiten, name };
+    const liste = eigene.some((x) => x.id === seite.id) ? eigene.map((x) => (x.id === seite.id ? seite : x)) : [...eigene, seite];
+    onSpeichern(liste, seite.id);
+    setBearbeiten(null);
+  }
+  const umschalten = (id) => setBearbeiten((b) => ({ ...b, bausteine: b.bausteine.includes(id) ? b.bausteine.filter((x) => x !== id) : [...b.bausteine, id] }));
+  return (
+    <div className="stat-seiten-rahmen">
+      <nav className="stat-seiten" aria-label={t('Seiten')}>
+        {seiten.map((x) => (
+          <button key={x.id} type="button" className={aktiv === x.id ? 'aktiv' : ''} aria-current={aktiv === x.id ? 'page' : undefined} onClick={() => onWaehlen(x.id)} data-seite={x.id}>
+            {t(x.name)}
+          </button>
+        ))}
+        {eigene.map((x) => (
+          <button key={x.id} type="button" className={`eigen${aktiv === x.id ? ' aktiv' : ''}`} aria-current={aktiv === x.id ? 'page' : undefined} onClick={() => onWaehlen(x.id)} data-seite={x.id}>
+            {x.name}
+          </button>
+        ))}
+        <button type="button" className="stat-seite-neu" onClick={() => setBearbeiten({ id: `eigen-${Date.now()}`, name: '', bausteine: [] })}>
+          <i className="bi bi-plus-lg" aria-hidden="true" /> {t('Eigene Seite')}
+        </button>
+      </nav>
+      {aktiveEigene && !bearbeiten && (
+        <div className="stat-seite-werkzeug">
+          <button type="button" onClick={() => setBearbeiten({ ...aktiveEigene })}><i className="bi bi-pencil" aria-hidden="true" /> {t('Bearbeiten')}</button>
+          <button type="button" onClick={() => onSpeichern(eigene.filter((x) => x.id !== aktiveEigene.id), seiten[0].id)}><i className="bi bi-trash" aria-hidden="true" /> {t('Löschen')}</button>
+        </div>
+      )}
+      {bearbeiten && (
+        <form className="karte stat-seite-editor" onSubmit={speichern}>
+          <div className="d-flex gap-3 flex-wrap align-items-end">
+            <div className="flex-grow-1">
+              <label className="form-label" htmlFor="seiten-name">{t('Name der Seite')}</label>
+              <input id="seiten-name" className="form-control" maxLength={40} value={bearbeiten.name} onChange={(e) => setBearbeiten({ ...bearbeiten, name: e.target.value })} />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={bearbeiten.bausteine.length === 0}>{t('Speichern')}</button>
+            <button type="button" className="btn btn-sekundaer" onClick={() => setBearbeiten(null)}>{t('Abbrechen')}</button>
+          </div>
+          <div className="stat-baustein-wahl">
+            {Object.entries(bausteinNamen).map(([id, b]) => (
+              <label key={id} className={bearbeiten.bausteine.includes(id) ? 'gewaehlt' : ''}>
+                <input type="checkbox" checked={bearbeiten.bausteine.includes(id)} onChange={() => umschalten(id)} data-baustein={id} />
+                {t(b.name)}
+              </label>
+            ))}
+          </div>
+        </form>
+      )}
     </div>
   );
 }
