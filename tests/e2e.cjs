@@ -336,22 +336,22 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   const neueAuswertungen = ['Verfügbarkeit pro Monat', 'Reaktionszeit nach Priorität', 'Größte Zeitfresser (Pareto)', 'Offene Aufträge nach Alter', 'Störungen nach Maschinenalter'];
   const titelDa = await p.$$eval('.abschnitt-titel', (z) => z.map((h) => h.textContent));
   pruefe('Statistik: weitere Auswertungen (Verfügbarkeit, Reaktionszeit, Pareto, Alter)', neueAuswertungen.every((x) => titelDa.includes(x)), titelDa.join(' | '));
-  pruefe('Statistik: Diagramme gezeichnet', (await p.$$eval('.stat-ebene canvas', (z) => z.length)) === 4 && (await p.$('.heat-zelle')) === null);
+  pruefe('Statistik: Diagramme gezeichnet', (await p.$$eval('.stat-ebene canvas', (z) => z.length)) === 6 && (await p.$('.heat-zelle')) === null);
   await p.goto(BASE + '/statistik'); await p.waitForTimeout(1500);
   await p.screenshot({ path: SHOTS + 'n-statistik-hell.png', fullPage: true });
 
   // 15c. Datenbasis: Tabellen, Beziehungen, Vorschau, Verbindungen
   await p.goto(BASE + '/datenbasis'); await p.waitForTimeout(2000);
-  pruefe('Datenbasis: 17 Tabellen im Diagramm', (await p.$$eval('.er-tabelle', (z) => z.length)) === 17);
-  pruefe('Datenbasis: Beziehungslinien gezeichnet', (await p.$$eval('.er-linie', (z) => z.length)) === 26, await p.$$eval('.er-linie', (z) => z.length));
-  pruefe('Datenbasis: 5 Views', (await p.$$eval('.er-view', (z) => z.length)) === 5);
+  pruefe('Datenbasis: 17 Tabellen als Stationen im Netzplan', (await p.$$eval('.netz-station', (z) => z.length)) === 17);
+  pruefe('Datenbasis: eine Strecke je Fremdschlüssel', (await p.$$eval('.netz-strecke', (z) => z.length)) === 26, await p.$$eval('.netz-strecke', (z) => z.length));
+  pruefe('Datenbasis: 5 Views', (await p.$$eval('.netz-liste:not(.netz-werte) button', (z) => z.length)) === 5);
   pruefe('Datenbasis: Verbindung zur Datenbank geprüft', (await p.textContent('.verbund-knoten[style*="db"]')).includes('verbunden'));
   pruefe('Datenbasis: einfach erklärt, ohne Power BI und Commit-Texte', (await p.$$eval('.verbund-knoten', (z) => z.length)) === 5
     && !(await p.textContent('main')).includes('Power BI') && !(await p.textContent('main')).includes('Commit'));
-  pruefe('Datenbasis: zuerst nur Schlüssel, „Alle Spalten“ zeigt alle', (await p.$$eval('.er-spalte', (z) => z.length)) < Number(sql("SELECT count(*) FROM information_schema.columns c JOIN information_schema.tables x USING (table_schema, table_name) WHERE c.table_schema = 'public' AND x.table_type = 'BASE TABLE'")));
-  await p.click('.er-alle'); await p.waitForTimeout(300);
-  pruefe('Datenbasis: alle Spalten sichtbar', (await p.$$eval('.er-spalte', (z) => z.length)) === Number(sql("SELECT count(*) FROM information_schema.columns c JOIN information_schema.tables x USING (table_schema, table_name) WHERE c.table_schema = 'public' AND x.table_type = 'BASE TABLE'")));
-  await p.click('.er-tabelle:has-text("maschine") >> nth=0'); await p.waitForTimeout(1200);
+  await p.hover('.netz-station[data-tabelle="maschine"] .netz-ring'); await p.waitForTimeout(300);
+  const maschStrecken = Number(sql("SELECT count(*) FROM information_schema.table_constraints tc JOIN information_schema.constraint_column_usage ccu USING (constraint_name, table_schema) WHERE tc.table_schema='public' AND tc.constraint_type='FOREIGN KEY' AND (tc.table_name='maschine' OR ccu.table_name='maschine')"));
+  pruefe('Datenbasis: Darüberfahren hebt die Strecken der Station hervor', (await p.$$eval('.netz-strecke.aktiv', (z) => z.length)) === maschStrecken, maschStrecken);
+  await p.click('.netz-station[data-tabelle="maschine"] .netz-ring'); await p.waitForTimeout(1200);
   const maschinen = Number(sql('SELECT count(*) FROM maschine'));
   pruefe('Datenbasis: Vorschau der Tabelle maschine', (await p.$$eval('.er-vorschau tbody tr', (z) => z.length)) === 25 && (await p.textContent('.er-detail')).includes(`(${maschinen})`));
   await p.click('.er-detail button[aria-label="Nächste Seite"]'); await p.waitForTimeout(800);
@@ -812,10 +812,10 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     && (await p.textContent('.v1-tabelle tr:has-text("maschine") td >> nth=2')).trim() === sql('SELECT count(*) FROM maschine'));
   pruefe('Version 1: keine Zugangsdaten auf der Seite', !/postgres(ql)?:\/\/|password|passwort/i.test(await p.textContent('body')));
   const v1Ham = sql("SELECT id FROM standort WHERE kuerzel='HAM'");
-  await p.goto(BASE + '/v1/maschinen'); await p.selectOption('#werk', v1Ham); await p.click('button:has-text("Anzeigen")'); await p.waitForURL(/werk=/);
+  await p.goto(BASE + '/v1/maschinen', { waitUntil: 'networkidle' }); await p.selectOption('#werk', v1Ham); await p.click('button:has-text("Anzeigen")'); await p.waitForURL(/werk=/);
   const v1Anzahl = sql("SELECT count(*) FROM maschine m JOIN gebaeude g ON g.id=m.gebaeude_id WHERE g.standort_id=" + v1Ham);
   pruefe('Version 1: Maschinenliste nach Werk (GET-Formular)', (await p.$$eval('.v1-tabelle tbody tr', (z) => z.length)) === Number(v1Anzahl) && (await p.textContent('#v1-anzahl')).startsWith(v1Anzahl), v1Anzahl);
-  await p.goto(BASE + '/v1/maschinen?werk=99999999999999');
+  await p.goto(BASE + '/v1/maschinen?werk=99999999999999', { waitUntil: 'networkidle' });
   pruefe('Version 1: ungültiges Werk → alle Maschinen statt Serverfehler', (await p.$$eval('.v1-tabelle tbody tr', (z) => z.length)) === Number(sql('SELECT count(*) FROM maschine')));
   await p.goto(BASE + '/v1/melden'); await p.fill('#gemeldet_von', 'Vera Eins'); await p.click('#v1-absenden'); await p.waitForSelector('#v1-fehler');
   pruefe('Version 1: leeres Formular → Fehlerliste, Eingabe bleibt', (await p.$$eval('#v1-fehler li', (z) => z.length)) === 3 && (await p.inputValue('#gemeldet_von')) === 'Vera Eins');
@@ -836,7 +836,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   for (const v of ['v2', 'v3']) {
     let alleOk = true;
     for (const seite of ['', '/karte', '/melden', '/auftraege', '/auftraege/5', '/maschinen', '/maschinen/3', '/wartung', '/lager', '/statistik', '/mitarbeiter', '/datenbasis', '/person']) {
-      const r = await p.goto(`${BASE}/${v}${seite}`);
+      // networkidle: erst weiter, wenn die Seite fertig aufgebaut ist (sonst bricht React das Aufbauen ab → Hinweis #418)
+      const r = await p.goto(`${BASE}/${v}${seite}`, { waitUntil: 'networkidle' });
       const ok = r.status() === 200 && (await p.$('aside')) === null && (await p.evaluate((x) => document.documentElement.hasAttribute(`data-${x}`), v));
       if (!ok) { alleOk = false; console.log('   ', v, seite, r.status()); }
     }
@@ -898,6 +899,43 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Vollbildmodus: Schließen zeigt die Seitenleiste wieder', await p.isVisible('.seitenleiste'));
   await p.goto(BASE + '/monitor');
   pruefe('Hallen-Monitor ohne Halle führt zum Vollbildmodus', /\/vollbild$/.test(p.url()));
+
+  // 24. Statistik: Kreuzfilter wie in Power BI und neue Darstellungen
+  await p.goto(BASE + '/statistik'); await p.waitForTimeout(2500);
+  const kfAlle = Number((await p.textContent('.kennzahl >> nth=2')).match(/\d[\d.]*/)[0].replace('.', ''));
+  pruefe('Statistik: Ring, Treemap und Streudiagramm vorhanden', (await p.$$('.diagramm canvas')).length >= 6 && (await p.$$('.kachelflaeche-feld')).length >= 3);
+  const kfHochLegende = Number(await p.textContent('.stat-legende-knopf >> nth=0 >> strong'));
+  await p.click('.stat-legende-knopf >> nth=0'); await p.waitForTimeout(1200);
+  const kfHoch = Number((await p.textContent('.kennzahl >> nth=2')).match(/\d[\d.]*/)[0].replace('.', ''));
+  pruefe('Statistik: Klick auf Priorität hoch filtert alle Kennzahlen', kfHoch < kfAlle && kfHoch === kfHochLegende && (await p.textContent('.stat-filterleiste')).includes('Hoch'), `${kfAlle} → ${kfHoch} (Legende ${kfHochLegende})`);
+  await p.click('.kachelflaeche-feld >> nth=0'); await p.waitForTimeout(1000);
+  pruefe('Statistik: zweiter Filter aus der Treemap', (await p.$$('.stat-chip')).length === 2);
+  await p.click('.stat-chip-alle'); await p.waitForTimeout(800);
+  pruefe('Statistik: „Alle Filter löschen“ zeigt wieder alles', (await p.$('.stat-filterleiste')) === null
+    && Number((await p.textContent('.kennzahl >> nth=2')).match(/\d[\d.]*/)[0].replace('.', '')) === kfAlle);
+
+  // 25. Neu anlegen über das Konto-Menü: Werk → Halle → Maschine, Mitarbeiter
+  await p.goto(BASE + '/'); await p.waitForSelector('aside');
+  await p.click('.leiste-konto'); await p.click('.menue-anlegen'); await p.waitForURL(/\/anlegen/);
+  await p.click('[data-art="werk"]'); await p.waitForSelector('#kuerzel');
+  await p.click('button:has-text("Werk anlegen")'); await p.waitForTimeout(1200);
+  pruefe('Anlegen: leeres Werk-Formular zeigt Fehler', (await p.$$('.is-invalid')).length >= 5);
+  await p.fill('#name', 'Werk Testhausen'); await p.fill('#kuerzel', 'tst'); await p.fill('#stadt', 'Ulm'); await p.fill('#adresse', 'Teststraße 1, 89073 Ulm');
+  await p.fill('#schwerpunkt', 'Prüfstände'); await p.fill('#breitengrad', '48,40'); await p.fill('#laengengrad', '9,99');
+  await p.click('button:has-text("Werk anlegen")'); await p.waitForURL(/art=halle/);
+  pruefe('Anlegen: Werk gespeichert, weiter zur Halle', sql("SELECT name FROM standort WHERE kuerzel='TST'") === 'Werk Testhausen');
+  await p.fill('#kuerzel', 'H1'); await p.fill('#bezeichnung', 'Halle 1 – Prüffeld');
+  await p.click('button:has-text("Halle anlegen")'); await p.waitForURL(/art=maschine/);
+  pruefe('Anlegen: Halle mit Lage auf dem Gelände', sql("SELECT g.lage_x_m >= 15 AND g.lage_y_m >= 15 FROM gebaeude g JOIN standort s ON s.id = g.standort_id WHERE s.kuerzel='TST'") === 't');
+  await waehle(p, 'typ', 'Fräsen'); await p.fill('#bezeichnung', 'Testfräse TF-1');
+  await p.click('button:has-text("Maschine anlegen")'); await p.waitForURL(/\/maschinen\/\d+/);
+  pruefe('Anlegen: Maschine mit automatischer Anlagennummer und Platz in der Halle', sql("SELECT anlagennummer || ' ' || (pos_x_m >= 4) FROM maschine WHERE bezeichnung='Testfräse TF-1'") === 'TST-H1-01 true');
+  await p.goto(BASE + '/anlegen?art=person'); await p.waitForSelector('#name');
+  await p.fill('#name', 'Tina Test'); await waehle(p, 'standort_id', sql("SELECT id FROM standort WHERE kuerzel='TST'")); await waehle(p, 'qualifikation', 'Mechatroniker/in');
+  await p.click('button:has-text("Mitarbeiter anlegen")'); await p.waitForURL(/\/mitarbeiter/);
+  pruefe('Anlegen: Mitarbeiter der Instandhaltung bekommt einen Techniker', sql("SELECT p.rolle || ' ' || t.qualifikation FROM person p JOIN techniker t ON t.id = p.techniker_id WHERE p.name='Tina Test'") === 'Instandhaltung Mechatroniker/in');
+  await p.goto(BASE + '/karte?werk=tst&halle=h1'); await p.waitForTimeout(2000);
+  pruefe('Anlegen: neue Halle samt Maschine auf der Karte', (await p.textContent('.explorer-karte')).includes('Halle 1 – Prüffeld'));
 
   pruefe('Keine JavaScript-Fehler in der Konsole', konsole.length === 0, konsole.slice(0, 3).join(' | '));
   console.log('\nERGEBNIS:', fehler.length === 0 ? 'alles OK' : `${fehler.length} Fehler: ${fehler.join(', ')}`);

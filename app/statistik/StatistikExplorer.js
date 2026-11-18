@@ -16,6 +16,11 @@
  *  - Störungen und MTTR pro Monat, Ursachen, Wochentag × Uhrzeit, Prioritäten,
  *    Schichten, Techniker, verbaute Ersatzteile
  *
+ * Kreuzfilter wie in Power BI: Klick auf einen Monat, eine Ursache, Priorität, Schicht,
+ * einen Maschinentyp oder Status filtert alle übrigen Auswertungen (Leiste mit Filtern oben).
+ * Das angeklickte Diagramm zeigt weiter alle Werte und hebt die Auswahl hervor –
+ * es wird mit allen Filtern außer seinem eigenen gerechnet (ohneFilter(dim)).
+ *
  * Definitionen wie in den Views: MTTR = Ø (ende_zeit − start_zeit) erledigter
  * Aufträge, Ausfallzeit = Σ (ende_zeit − Meldezeitpunkt) erledigter Aufträge.
  */
@@ -26,8 +31,9 @@ import { StatusPill, PrioritaetPill } from '@/components/Pills';
 import { useT } from '@/components/SpracheKontext';
 import { gross, T } from '@/lib/sprache';
 import { datum, datumZeit, zahl, euro } from '@/lib/format';
-import { URSACHEN_LISTE, MASCHINEN_SYMBOLE, PRIORITAET_LISTE } from '@/lib/konstanten';
+import { URSACHEN_LISTE, MASCHINEN_SYMBOLE, PRIORITAET_LISTE, STATUS_LISTE } from '@/lib/konstanten';
 import Diagramm from './Diagramm';
+import Streuung from './Streuung';
 import ExportKnopf from '@/components/ExportKnopf';
 import InfoKnopf from '@/components/InfoKnopf';
 import { STATISTIK_INFO, STATISTIK_GRUNDLAGE } from '@/lib/statistikInfo';
@@ -48,6 +54,36 @@ const MASCHINENALTER = [
   { name: T('jünger als 5 Jahre'), ab: 0, bis: 5 }, { name: T('5–9 Jahre'), ab: 5, bis: 10 },
   { name: T('10–19 Jahre'), ab: 10, bis: 20 }, { name: T('20 Jahre und älter'), ab: 20, bis: Infinity },
 ];
+
+// Kreuzfilter: Name der Dimension und wie man den Wert einer Störmeldung liest
+const FILTER = {
+  monat: { name: T('Monat') },
+  ursache: { name: T('Ursache') },
+  prioritaet: { name: T('Priorität') },
+  schicht: { name: T('Schicht') },
+  typ: { name: T('Maschinentyp') },
+  status: { name: T('Status') },
+};
+// Farben je Priorität bzw. Status (CSS-Variablen) für gestapelte Säulen und Ring
+const PRIO_FARBE = { hoch: '--rot', mittel: '--orange', niedrig: '--blau' };
+const STATUS_FARBE = { gemeldet: '--grau', zugewiesen: '--blau', 'in Arbeit': '--lila', 'wartet auf Teil': '--orange', erledigt: '--gruen' };
+
+/**
+ * Treemap: Rechtecke (x, y, b, h in %) für Werte – rekursiv halbiert entlang der längeren Seite.
+ * Einfacher als „squarified“, für bis zu ~10 Kacheln gut lesbar.
+ */
+function treemap(eintraege, x = 0, y = 0, b = 100, h = 100) {
+  if (eintraege.length === 0) return [];
+  if (eintraege.length === 1) return [{ ...eintraege[0], x, y, b, h }];
+  const gesamt = eintraege.reduce((sum, e) => sum + e.wert, 0) || 1;
+  let links = 0, i = 0;
+  while (i < eintraege.length - 1 && links + eintraege[i].wert <= gesamt / 2) { links += eintraege[i].wert; i += 1; }
+  if (i === 0) { links = eintraege[0].wert; i = 1; }
+  const teil = links / gesamt;
+  return b >= h
+    ? [...treemap(eintraege.slice(0, i), x, y, b * teil, h), ...treemap(eintraege.slice(i), x + b * teil, y, b * (1 - teil), h)]
+    : [...treemap(eintraege.slice(0, i), x, y, b, h * teil), ...treemap(eintraege.slice(i), x, y + h * teil, b, h * (1 - teil))];
+}
 
 /** Kennzahlen für eine Menge von Störmeldungen */
 function auswerten(liste) {
@@ -75,6 +111,13 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     land: start.land ?? null, standortId: start.standortId ?? null, gebaeudeId: start.gebaeudeId ?? null, maschineId: start.maschineId ?? null,
   });
   const [zoom, setZoom] = useState(null);   // { richtung: 'rein'|'raus', ursprung: 'x y' }
+  const [filter, setFilter] = useState({}); // Kreuzfilter, z. B. { prioritaet: 'hoch', monat: '2026-03' }
+  /** Filter setzen bzw. wieder entfernen (zweiter Klick auf dieselbe Auswahl) */
+  const umschalten = (dim, wert) => setFilter((f) => {
+    const neu = { ...f };
+    if (wert === undefined || wert === null || f[dim] === wert) delete neu[dim]; else neu[dim] = wert;
+    return neu;
+  });
 
   /* ---------- Nachschlagelisten aus den Maschinen ---------- */
   const { laender, standorte, gebaeude, maschineVon } = useMemo(() => {
@@ -93,6 +136,12 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     };
   }, [orte]);
 
+  /** Wert einer Störmeldung in einer Filter-Dimension */
+  const wertVon = (dim, e) => (dim === 'schicht' ? SCHICHTEN.find((sch) => sch.passt(e.stunde))?.name
+    : dim === 'typ' ? maschineVon[e.maschine_id]?.typ : e[dim]);
+  /** Passt die Meldung zu allen Filtern (außer „ohne“)? */
+  const passt = (e, ohne = null) => Object.entries(filter).every(([dim, wert]) => dim === ohne || wertVon(dim, e) === wert);
+
   const stufe = ebene.maschineId ? 'maschine' : ebene.gebaeudeId ? 'gebaeude' : ebene.standortId ? 'werk' : ebene.land ? 'land' : 'alle';
   const land = laender.find((l) => l.id === ebene.land) ?? null;
   const standort = standorte.find((s) => s.id === ebene.standortId) ?? null;
@@ -108,27 +157,45 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
   /* ---------- Auswertung der aktuellen Ebene ---------- */
   const a = useMemo(() => {
     const maschinenIds = new Set(orte.filter(imBlick).map((o) => o.id));
-    const liste = ereignisse.filter((e) => maschinenIds.has(e.maschine_id));
+    const basis = ereignisse.filter((e) => maschinenIds.has(e.maschine_id));
+    const liste = basis.filter((e) => passt(e));
+    // Für das Diagramm einer Dimension: alle Filter außer ihrem eigenen (Auswahl bleibt sichtbar)
+    const ohneFilter = (dim) => basis.filter((e) => passt(e, dim));
     const kennzahlen = auswerten(liste);
     // Ausfallkosten = Σ Ausfallzeit (h) × Kosten einer Stillstandsstunde der Maschine
     const ausfallkosten = liste.reduce((sum, e) => sum + ((e.ausfall_min ?? 0) / 60) * (maschineVon[e.maschine_id]?.kosten_pro_stunde ?? 0), 0);
 
     // Pro Monat: Anzahl und MTTR
+    const fuerMonate = ohneFilter('monat');
     const proMonat = monate.map((m) => {
-      const imMonat = liste.filter((e) => e.monat === m.schluessel);
-      return { label: m.label, anzahl: imMonat.length, mttr: auswerten(imMonat).mttr_min };
+      const imMonat = fuerMonate.filter((e) => e.monat === m.schluessel);
+      return { schluessel: m.schluessel, label: m.label, anzahl: imMonat.length, mttr: auswerten(imMonat).mttr_min };
     });
+    // Je Monat nach Priorität (gestapelte Säulen) – ohne Monats- und Prioritätsfilter
+    const fuerStapel = basis.filter((e) => passt(e, 'monat') && passt(e, 'prioritaet'));
+    const monatPrio = Object.keys(PRIORITAET_LISTE).map((p) => ({
+      prioritaet: p, werte: monate.map((m) => fuerStapel.filter((e) => e.monat === m.schluessel && e.prioritaet === p).length),
+    }));
 
     // Ursachen (alle Kategorien, häufigste zuerst)
+    const fuerUrsachen = ohneFilter('ursache');
     const ursachen = URSACHEN_LISTE
-      .map((u) => ({ ursache: u, anzahl: liste.filter((e) => e.ursache === u).length }))
+      .map((u) => {
+        const zeilen = fuerUrsachen.filter((e) => e.ursache === u);
+        return { ursache: u, anzahl: zeilen.length, ausfall_h: zeilen.reduce((sum, e) => sum + (e.ausfall_min ?? 0), 0) / 60 };
+      })
       .sort((x, y) => y.anzahl - x.anzahl);
+    // Bearbeitungsstand (Status) – ohne Statusfilter
+    const fuerStatus = ohneFilter('status');
+    const status = Object.keys(STATUS_LISTE).map((st) => ({ status: st, anzahl: fuerStatus.filter((e) => e.status === st).length }));
 
     // Wochentag (1 = Montag) × 3-Stunden-Block
 
     // Prioritäten und Schichten
-    const prioritaeten = Object.keys(PRIORITAET_LISTE).map((p) => ({ prioritaet: p, anzahl: liste.filter((e) => e.prioritaet === p).length }));
-    const schichten = SCHICHTEN.map((s) => ({ ...s, anzahl: liste.filter((e) => s.passt(e.stunde)).length }));
+    const fuerPrio = ohneFilter('prioritaet');
+    const prioritaeten = Object.keys(PRIORITAET_LISTE).map((p) => ({ prioritaet: p, anzahl: fuerPrio.filter((e) => e.prioritaet === p).length }));
+    const fuerSchicht = ohneFilter('schicht');
+    const schichten = SCHICHTEN.map((s) => ({ ...s, anzahl: fuerSchicht.filter((e) => s.passt(e.stunde)).length }));
 
     // Techniker: Aufträge, erledigt, MTTR
     const proTechniker = techniker
@@ -146,7 +213,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
 
     // Verfügbarkeit je Monat: 1 − Ausfallzeit / (Maschinen × Zeit im Monat)
     const verfuegbarkeit = monate.map((mo) => {
-      const ausfall = liste.filter((e) => e.monat === mo.schluessel).reduce((sum, e) => sum + (e.ausfall_min ?? 0), 0);
+      const ausfall = fuerMonate.filter((e) => e.monat === mo.schluessel).reduce((sum, e) => sum + (e.ausfall_min ?? 0), 0);
       const moeglich = maschinenIds.size * mo.tage * 1440;
       return moeglich ? Math.max(0, 100 * (1 - ausfall / moeglich)) : null;
     });
@@ -172,7 +239,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
 
     // Ausfallzeit nach Maschinentyp (Stunden)
     const jeTyp = {};
-    liste.forEach((e) => { const typ = maschineVon[e.maschine_id]?.typ; if (typ && e.ausfall_min) jeTyp[typ] = (jeTyp[typ] ?? 0) + e.ausfall_min / 60; });
+    ohneFilter('typ').forEach((e) => { const typ = maschineVon[e.maschine_id]?.typ; if (typ && e.ausfall_min) jeTyp[typ] = (jeTyp[typ] ?? 0) + e.ausfall_min / 60; });
     const ausfallTyp = Object.entries(jeTyp).map(([typ, h]) => ({ typ, h })).sort((x, y) => y.h - x.h);
 
     // Offene Aufträge nach Alter (seit der Meldung)
@@ -197,12 +264,19 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
       return { ...st, maschinen: ids.size, jeMaschine: ids.size ? stoerungen / ids.size : 0 };
     }).filter((st) => st.maschinen > 0);
 
+    // Streudiagramm: je Maschine Anzahl, MTTR und Ausfallzeit (nur Maschinen mit erledigter Reparatur)
+    const streuung = [...maschinenIds].map((id) => {
+      const zeilen = liste.filter((e) => e.maschine_id === id);
+      const w = auswerten(zeilen);
+      return { id, name: `${maschineVon[id]?.anlagennummer} · ${maschineVon[id]?.bezeichnung}`, anzahl: w.anzahl, mttr_h: (w.mttr_min ?? 0) / 60, ausfall_h: w.ausfall_min / 60 };
+    }).filter((x) => x.anzahl > 0 && x.mttr_h > 0);
+
     return {
-      liste, maschinenAnzahl: maschinenIds.size, kennzahlen, ausfallkosten, proMonat, ursachen, prioritaeten, schichten, proTechniker, ersatzteile,
+      liste, status, monatPrio, streuung, maschinenAnzahl: maschinenIds.size, kennzahlen, ausfallkosten, proMonat, ursachen, prioritaeten, schichten, proTechniker, ersatzteile,
       verfuegbarkeit, reaktion, reaktionGesamt, pareto, ausfallTyp, alter, wiederholt, nachAlter,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ebene, orte, ereignisse, teile, techniker, monate]);
+  }, [ebene, filter, orte, ereignisse, teile, techniker, monate]);
 
   /* ---------- Unterebene zum Vergleichen (Kacheln) ---------- */
   const kinder = useMemo(() => {
@@ -224,10 +298,10 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     }
     return liste.map((k) => {
       const ids = new Set(orte.filter(k.filter).map((o) => o.id));
-      return { ...k, maschinen: ids.size, ...auswerten(ereignisse.filter((e) => ids.has(e.maschine_id))) };
+      return { ...k, maschinen: ids.size, ...auswerten(ereignisse.filter((e) => ids.has(e.maschine_id) && passt(e))) };
     }).sort((x, y) => y.ausfall_min - x.ausfall_min || y.anzahl - x.anzahl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stufe, ebene, laender, standorte, gebaeude, orte, ereignisse]);
+  }, [stufe, ebene, filter, laender, standorte, gebaeude, orte, ereignisse]);
 
   /* ---------- Zoomen ---------- */
   function zoomen(neu, richtung, element = null) {
@@ -350,6 +424,20 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
         </div>
       </form>
 
+      {/* Aktive Kreuzfilter als Chips (× entfernt), dazu „Alle Filter löschen“ */}
+      {Object.keys(filter).length > 0 && (
+        <div className="stat-filterleiste" role="status">
+          <i className="bi bi-funnel-fill" aria-hidden="true" />
+          {Object.entries(filter).map(([dim, wert]) => (
+            <button key={dim} type="button" className="stat-chip" onClick={() => umschalten(dim)} aria-label={t('Filter entfernen')}>
+              <span>{t(FILTER[dim].name)}:</span> <b>{dim === 'monat' ? monate.find((m) => m.schluessel === wert)?.label : gross(t(wert))}</b>
+              <i className="bi bi-x" aria-hidden="true" />
+            </button>
+          ))}
+          <button type="button" className="stat-chip-alle" onClick={() => setFilter({})}>{t('Alle Filter löschen')}</button>
+        </div>
+      )}
+
       {/* Die Bühne: Inhalt der Ebene. Beim Zoomen wächst er aus der angeklickten Kachel. */}
       <div ref={buehneRef} className="stat-buehne">
         <div key={`${ebene.standortId}-${ebene.gebaeudeId}-${ebene.maschineId}`}
@@ -422,7 +510,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             <section className="karte" style={{ '--i': 6 }}>
               <div className="karte-kopf">
                 <h2 className="abschnitt-titel">{kinderTitel}{info('vergleich', kinderTitel)}</h2>
-                <span className="klein">{t('Anklicken zum Hineinzoomen · sortiert nach Ausfallzeit')}</span>
+                <span className="klein">{t('sortiert nach Ausfallzeit')}</span>
               </div>
               <div className="stat-kacheln">
                 {kinder.map((kind) => (
@@ -480,19 +568,32 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             </section>
           )}
 
+          {stufe !== 'maschine' && a.streuung.length > 1 && (
+            <section className="karte" style={{ '--i': 7 }}>
+              <h2 className="abschnitt-titel">{t('Maschinen: Häufigkeit × Reparaturdauer')}{info('streuung', t('Maschinen: Häufigkeit × Reparaturdauer'))}</h2>
+              <Streuung punkte={a.streuung} onKlick={(id) => {
+                const o = maschineVon[id];
+                zoomen({ land: o.land, standortId: o.standort_id, gebaeudeId: o.gebaeude_id, maschineId: id }, 'rein');
+              }} />
+            </section>
+          )}
+
           {/* Verlauf: Anzahl und MTTR je Monat – zwei Diagramme statt zwei Achsen in einem */}
           <div className="row g-4">
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 7 }}>
                 <h2 className="abschnitt-titel">{t('Störungen pro Monat')}{info('proMonat', t('Störungen pro Monat'))}</h2>
                 <Diagramm titel={t('Störungen pro Monat')} art="saeulen" labels={a.proMonat.map((m) => m.label)} werte={a.proMonat.map((m) => m.anzahl)}
-                          einheit={t('Störungen')} spalte={t('Monat')} beschreibung={t('Säulendiagramm: Anzahl der Störungen pro Monat')} />
+                          reihen={a.monatPrio.map((r) => ({ name: gross(t(r.prioritaet)), werte: r.werte, farbe: PRIO_FARBE[r.prioritaet] }))}
+                          onKlick={(i) => umschalten('monat', a.proMonat[i].schluessel)} auswahl={a.proMonat.findIndex((m) => m.schluessel === filter.monat)}
+                          einheit={t('Störungen')} spalte={t('Monat')} beschreibung={t('Säulendiagramm: Anzahl der Störungen pro Monat nach Priorität')} />
               </section>
             </div>
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 8 }}>
                 <h2 className="abschnitt-titel">{t('MTTR pro Monat')}{info('mttrMonat', t('MTTR pro Monat'))}</h2>
                 <Diagramm titel={t('MTTR pro Monat')} art="linie" labels={a.proMonat.map((m) => m.label)} werte={a.proMonat.map((m) => (m.mttr === null ? null : m.mttr / 60))}
+                          onKlick={(i) => umschalten('monat', a.proMonat[i].schluessel)}
                           einheit="h" nachkomma={1} spalte={t('Monat')} beschreibung={t('Liniendiagramm: durchschnittliche Reparaturdauer pro Monat in Stunden')} />
               </section>
             </div>
@@ -502,8 +603,30 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           <section className="karte" style={{ '--i': 9 }}>
             <h2 className="abschnitt-titel">{t('Störursachen')}{info('ursachen', t('Störursachen'))}</h2>
             <Diagramm titel={t('Störursachen')} art="balken" labels={a.ursachen.map((u) => t(u.ursache))} werte={a.ursachen.map((u) => u.anzahl)} hoehe={260}
+                      onKlick={(i) => umschalten('ursache', a.ursachen[i].ursache)} auswahl={a.ursachen.findIndex((u) => u.ursache === filter.ursache)}
                       einheit={t('Störungen')} spalte={t('Ursache')} beschreibung={t('Balkendiagramm: Störungen nach Ursache')} />
           </section>
+
+          {/* Bearbeitungsstand als Ring und Ausfallzeit nach Ursache als Treemap */}
+          <div className="row g-4">
+            <div className="col-lg-5">
+              <section className="karte" style={{ '--i': 10 }}>
+                <h2 className="abschnitt-titel">{t('Bearbeitungsstand')}{info('status', t('Bearbeitungsstand'))}</h2>
+                <Diagramm titel={t('Bearbeitungsstand')} art="ring" labels={a.status.map((x) => gross(t(x.status)))} werte={a.status.map((x) => x.anzahl)}
+                          farben={a.status.map((x) => STATUS_FARBE[x.status])} hoehe={240}
+                          onKlick={(i) => umschalten('status', a.status[i].status)} auswahl={a.status.findIndex((x) => x.status === filter.status)}
+                          einheit={t('Aufträge')} spalte={t('Status')} beschreibung={t('Ringdiagramm: Aufträge nach Status')} />
+              </section>
+            </div>
+            <div className="col-lg-7">
+              <section className="karte" style={{ '--i': 10 }}>
+                <h2 className="abschnitt-titel">{t('Ausfallzeit nach Ursache')}{info('ausfallUrsache', t('Ausfallzeit nach Ursache'))}</h2>
+                <Kachelflaeche eintraege={a.ursachen.filter((u) => u.ausfall_h > 0).sort((x, y) => y.ausfall_h - x.ausfall_h)
+                  .map((u) => ({ schluessel: u.ursache, name: t(u.ursache), wert: u.ausfall_h, text: `${zahl(u.ausfall_h, 0, s)} h` }))}
+                               auswahl={filter.ursache} onKlick={(w) => umschalten('ursache', w)} />
+              </section>
+            </div>
+          </div>
 
           {/* Prioritäten und Schichten */}
           <div className="row g-4">
@@ -518,16 +641,19 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
                 </div>
                 <div className="stat-stapel" aria-hidden="true">
                   {a.prioritaeten.filter((p) => p.anzahl > 0).map((p) => (
-                    <span key={p.prioritaet} className={`stapel-${PRIORITAET_LISTE[p.prioritaet]}`}
+                    <span key={p.prioritaet} className={`stapel-${PRIORITAET_LISTE[p.prioritaet]}${filter.prioritaet && filter.prioritaet !== p.prioritaet ? ' blass' : ''}`}
                           style={{ flexGrow: p.anzahl }} title={`${gross(t(p.prioritaet))}: ${p.anzahl}`} />
                   ))}
                 </div>
                 <ul className="stat-legende">
                   {a.prioritaeten.map((p) => (
                     <li key={p.prioritaet}>
-                      <PrioritaetPill prioritaet={p.prioritaet} />
-                      <strong>{p.anzahl}</strong>
-                      <span className="klein">{zahl(anteil(p.anzahl, k.anzahl), 0, s)} %</span>
+                      <button type="button" className={`stat-legende-knopf${filter.prioritaet === p.prioritaet ? ' gewaehlt' : filter.prioritaet ? ' blass' : ''}`}
+                              aria-pressed={filter.prioritaet === p.prioritaet} onClick={() => umschalten('prioritaet', p.prioritaet)}>
+                        <PrioritaetPill prioritaet={p.prioritaet} />
+                        <strong>{p.anzahl}</strong>
+                        <span className="klein">{zahl(anteil(p.anzahl, a.prioritaeten.reduce((sum, x) => sum + x.anzahl, 0)), 0, s)} %</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -536,8 +662,8 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
             <div className="col-lg-6">
               <section className="karte" style={{ '--i': 12 }}>
                 <h2 className="abschnitt-titel">{t('Störungen nach Schicht')}{info('schichten', t('Störungen nach Schicht'))}</h2>
-                <BalkenListe titel={t('Störungen nach Schicht')} zeilen={a.schichten.map((sch) => ({
-                  name: t(sch.name), zusatz: t('{zeit} Uhr', { zeit: sch.zeit }), wert: sch.anzahl,
+                <BalkenListe titel={t('Störungen nach Schicht')} auswahl={filter.schicht} onKlick={(w) => umschalten('schicht', w)} zeilen={a.schichten.map((sch) => ({
+                  schluessel: sch.name, name: t(sch.name), zusatz: t('{zeit} Uhr', { zeit: sch.zeit }), wert: sch.anzahl,
                   text: `${sch.anzahl} · ${zahl(anteil(sch.anzahl, k.anzahl), 0, s)} %`,
                 }))} />
               </section>
@@ -584,7 +710,8 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
                 <section className="karte" style={{ '--i': 16 }}>
                   <h2 className="abschnitt-titel">{t('Ausfallzeit nach Maschinentyp')}{info('ausfallTyp', t('Ausfallzeit nach Maschinentyp'))}</h2>
                   {a.ausfallTyp.length === 0 ? <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p> : (
-                    <BalkenListe titel={t('Ausfallzeit nach Maschinentyp')} zeilen={a.ausfallTyp.map((x) => ({ name: t(x.typ), wert: x.h, text: `${zahl(x.h, 0, s)} h` }))} />
+                    <BalkenListe titel={t('Ausfallzeit nach Maschinentyp')} auswahl={filter.typ} onKlick={(w) => umschalten('typ', w)}
+                                 zeilen={a.ausfallTyp.map((x) => ({ schluessel: x.typ, name: t(x.typ), wert: x.h, text: `${zahl(x.h, 0, s)} h` }))} />
                   )}
                 </section>
               </div>
@@ -672,7 +799,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
 }
 
 /** Waagerechte Balken in HTML: Name, Balken, Wert. Mit titel: Export-Knopf oben rechts in der Karte */
-function BalkenListe({ zeilen, titel }) {
+function BalkenListe({ zeilen, titel, onKlick = null, auswahl = null }) {
   const t = useT();
   const max = Math.max(1, ...zeilen.map((z) => z.wert));
   return (
@@ -686,14 +813,40 @@ function BalkenListe({ zeilen, titel }) {
       </div>
     )}
     <ul className="balken-liste">
-      {zeilen.map((z) => (
-        <li key={z.name}>
-          <span className="balken-name">{z.name}{z.zusatz && <small>{z.zusatz}</small>}</span>
-          <span className="mini-balken" aria-hidden="true"><span style={{ width: `${(z.wert / max) * 100}%` }} /></span>
-          <span className="balken-wert">{z.text}</span>
-        </li>
-      ))}
+      {zeilen.map((z) => {
+        const inhalt = (
+          <>
+            <span className="balken-name">{z.name}{z.zusatz && <small>{z.zusatz}</small>}</span>
+            <span className="mini-balken" aria-hidden="true"><span style={{ width: `${(z.wert / max) * 100}%` }} /></span>
+            <span className="balken-wert">{z.text}</span>
+          </>
+        );
+        // Mit onKlick: Zeile ist ein Knopf für den Kreuzfilter, die Auswahl bleibt kräftig
+        return (
+          <li key={z.name} className={onKlick ? `klickbar${auswahl === z.schluessel ? ' gewaehlt' : auswahl ? ' blass' : ''}` : undefined}>
+            {onKlick ? <button type="button" aria-pressed={auswahl === z.schluessel} onClick={() => onKlick(z.schluessel)}>{inhalt}</button> : inhalt}
+          </li>
+        );
+      })}
     </ul>
     </>
+  );
+}
+
+/** Treemap: Fläche je Eintrag proportional zum Wert, Klick setzt den Kreuzfilter */
+function Kachelflaeche({ eintraege, auswahl, onKlick }) {
+  const t = useT();
+  if (eintraege.length === 0) return <p className="leer">{t('Keine Ausfallzeit im Zeitraum.')}</p>;
+  return (
+    <div className="kachelflaeche" role="list">
+      {treemap(eintraege).map((e, i) => (
+        <button key={e.schluessel} type="button" role="listitem" aria-pressed={auswahl === e.schluessel}
+                className={`kachelflaeche-feld${i >= 2 ? ' hell' : ''}${auswahl === e.schluessel ? ' gewaehlt' : auswahl ? ' blass' : ''}`}
+                style={{ left: `${e.x}%`, top: `${e.y}%`, width: `${e.b}%`, height: `${e.h}%`, '--stufe': `${Math.max(22, 92 - i * 14)}%` }}
+                onClick={() => onKlick(e.schluessel)} title={`${e.name}: ${e.text}`}>
+          <span>{e.name}</span><b>{e.text}</b>
+        </button>
+      ))}
+    </div>
   );
 }

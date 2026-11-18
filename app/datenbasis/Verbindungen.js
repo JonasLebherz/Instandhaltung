@@ -105,18 +105,18 @@ export default function Verbindungen() {
 
       <div className="verbund" aria-busy={laedt}>
         <Knoten bereich="br" symbol="bi-laptop" name={t('Du')} rolle={t('Browser')} status={daten ? 'ok' : status(null)} ms={browserMs}
-                text={t('Du öffnest die App im Browser – am PC, Tablet oder Handy.')} />
+                text={t('PC, Tablet oder Handy')} />
         <Leitung bereich="l1" status={daten ? 'ok' : status(null)} text={T('Seite aufrufen')} />
         <Knoten bereich="gh" symbol="bi-github" name="GitHub" rolle={t('Programmcode')} status={status(gh)}
-                text={t('Hier liegt der Code. Jede Änderung wird automatisch veröffentlicht.')}
+                text={t('Quellcode, jeder Push wird veröffentlicht')}
                 hinweis={gh?.grund === 'lokal' ? lokal : null} />
         <Leitung bereich="l2" status={vc?.grund === 'lokal' ? 'unbekannt' : status(gh)} text={T('veröffentlichen')} />
-        <Knoten bereich="vc" symbol="bi-cloud-check" name="Vercel" rolle={t('Hier läuft die App')} status={status(vc)}
-                text={t('Baut die Seiten, prüft Eingaben und fragt die Datenbank ab.')}
+        <Knoten bereich="vc" symbol="bi-cloud-check" name="Vercel" rolle={t('Server')} status={status(vc)}
+                text={t('Next.js – Seiten, Prüfungen, Abfragen')}
                 hinweis={vc?.grund === 'lokal' ? t('Lokaler Testbetrieb – nicht bei Vercel') : vc?.region ? t('Rechenzentrum: {r}', { r: vc.region }) : null} />
         <Leitung bereich="l3" status={status(db)} text={T('Daten lesen & speichern')} />
         <Knoten bereich="db" symbol="bi-database" name="Supabase" rolle={t('Datenbank')} status={status(db)} ms={db?.ms}
-                text={t('Speichert alle Daten: Werke, Maschinen, Störungen und Aufträge.')}
+                text={t('PostgreSQL mit Zeilensicherheit')}
                 hinweis={db?.status === 'warnung' ? t('Session Pooler (Port 5432) – bitte Port 6543 verwenden') : db?.meldung} />
         <Leitung bereich="l4" status={status(au)} text={T('Anmeldung prüfen')} />
         <Knoten bereich="au" symbol="bi-shield-lock" name="Supabase Auth" rolle={t('Anmeldung')} status={status(au)} ms={au?.ms}

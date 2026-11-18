@@ -47,7 +47,7 @@ export default async function QrSeite({ searchParams }) {
     <>
       <div className="seitenkopf nicht-drucken">
         <h1>{t('QR-Etiketten')}</h1>
-        <p>{t('Ausdrucken und an die Maschine kleben. Mit dem Handy scannen öffnet direkt „Störung melden“ für diese Maschine.')}</p>
+        <p>{t('Etiketten 90 × 55 mm')}</p>
       </div>
       <div className="d-flex gap-2 flex-wrap mb-4 nicht-drucken">
         <DruckKnopf />

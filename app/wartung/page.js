@@ -55,7 +55,6 @@ export default async function WartungSeite() {
     <>
       <div className="seitenkopf">
         <h1>{t('Wartungsplan')}</h1>
-        <p>{t('Vorbeugende Wartung: Jede Maschine hat feste Intervalle – so wird gewartet, bevor etwas kaputtgeht.')}</p>
       </div>
 
       <div className="row g-4 mb-2">

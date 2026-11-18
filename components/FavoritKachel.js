@@ -98,7 +98,7 @@ export default function FavoritKachel() {
         <button type="button" className="favorit-kachel-leer" onClick={() => setFenster(true)} disabled={favoriten === null}>
           <i className="bi bi-plus-circle" aria-hidden="true" />
           <strong>{t('Favorit auswählen')}</strong>
-          <span>{t('Eine angepinnte Kartenansicht hier als kleines Fenster zeigen')}</span>
+          <span>{t('Noch kein Favorit gewählt')}</span>
         </button>
       )}
 

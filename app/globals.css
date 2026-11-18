@@ -3178,3 +3178,71 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
     html[data-v3] body .fv-inhalt { padding: 14px; }
     html[data-v3] body .fv-kopf { padding: 12px 14px; }
 }
+
+/* =====================================================================
+   Datenmodell als Liniennetzplan (app/datenbasis/Datenmodell.js)
+   Strecken in der Farbe des Themas (--gruppe), Stationen als weiße Ringe wie auf einem U-Bahn-Plan.
+   ===================================================================== */
+.netz-legende { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--text-leise); }
+.netz-legende span { display: inline-flex; align-items: center; gap: 7px; }
+.netz-legende i { width: 22px; height: 5px; border-radius: 3px; background: var(--gruppe); }
+.netzplan-rahmen { overflow-x: auto; margin: 4px -8px 0; padding: 0 8px; }
+.netzplan { width: 100%; height: auto; display: block; }
+.netz-strecke { fill: none; stroke: var(--gruppe); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: .78; transition: opacity .2s, stroke-width .2s; }
+.netz-strecke.aktiv { opacity: 1; stroke-width: 7; }
+.netz-strecke.gedimmt { opacity: .12; }
+.netz-station { cursor: pointer; outline: none; transition: opacity .2s; }
+.netz-station.gedimmt { opacity: .3; }
+.netz-flaeche { fill: transparent; }
+.netz-ring { fill: var(--karte-solid); stroke: var(--gruppe); stroke-width: 5; transition: stroke-width .15s; }
+.netz-station:hover .netz-ring, .netz-station:focus-visible .netz-ring { stroke-width: 7; }
+.netz-station.gewaehlt .netz-ring { fill: var(--gruppe); }
+.netz-name { text-anchor: middle; font: 600 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; fill: var(--text); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 4px; stroke-linejoin: round; }
+.netz-anzahl { text-anchor: middle; font-size: 11.5px; fill: var(--text-leise); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 4px; font-variant-numeric: tabular-nums; }
+.netz-unten { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px 32px; margin-top: 8px; border-top: 1px solid var(--linie); padding-top: 4px; }
+.netz-liste { list-style: none; margin: 0; padding: 0; }
+.netz-liste li { border-bottom: 1px solid var(--linie); }
+.netz-liste li:last-child { border-bottom: 0; }
+.netz-liste button, .netz-werte li { display: flex; gap: 14px; align-items: baseline; width: 100%; padding: 8px 2px; border: 0; background: none; color: var(--text); text-align: left; font-size: .9rem; }
+.netz-liste button:hover, .netz-liste button.gewaehlt { color: var(--akzent); }
+.netz-liste code { flex: 0 0 auto; min-width: 170px; color: inherit; font-size: .82rem; }
+.netz-liste span { color: var(--text-leise); }
+
+/* ---------- Statistik: Kreuzfilter (StatistikExplorer.js) ---------- */
+.stat-filterleiste { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -6px 0 18px; color: var(--akzent); }
+.stat-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--linie); border-radius: 999px; padding: 4px 8px 4px 12px; background: var(--karte-solid); color: var(--text); font-size: .85rem; }
+.stat-chip span { color: var(--text-leise); }
+.stat-chip:hover { border-color: var(--akzent); }
+.stat-chip .bi-x { font-size: 1.05rem; color: var(--text-leise); }
+.stat-chip-alle { border: 0; background: none; color: var(--akzent); font-size: .85rem; padding: 4px 6px; }
+.diagramm.klickbar canvas { cursor: pointer; }
+.stat-stapel span.blass { opacity: .3; }
+.stat-legende li { display: block; }
+.stat-legende-knopf { width: 100%; display: grid; grid-template-columns: 1fr auto 52px; align-items: center; gap: 12px; border: 0; background: none; padding: 4px 6px; margin: -4px -6px; border-radius: 8px; color: var(--text); text-align: left; }
+.stat-legende-knopf:hover { background: var(--fuellung); }
+.stat-legende-knopf .pill { justify-self: start; }
+.stat-legende-knopf.blass { opacity: .4; }
+.stat-legende-knopf.gewaehlt { background: var(--fuellung); }
+.balken-liste li.klickbar { padding: 0; display: block; }
+.balken-liste li.klickbar button { width: 100%; display: grid; grid-template-columns: minmax(110px, 38%) 1fr auto; align-items: center; gap: 12px; padding: 9px 4px; border: 0; background: none; color: inherit; text-align: left; border-radius: 8px; }
+.balken-liste li.klickbar button:hover { background: var(--fuellung); }
+.balken-liste li.blass { opacity: .4; }
+.balken-liste li.gewaehlt .mini-balken span { background: var(--akzent-flaeche); }
+/* Treemap: Ausfallzeit nach Ursache */
+.kachelflaeche { position: relative; height: 240px; border-radius: 12px; overflow: hidden; }
+.kachelflaeche-feld { position: absolute; border: 2px solid var(--karte-solid); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; overflow: hidden;
+  background: color-mix(in srgb, var(--akzent-flaeche) var(--stufe), var(--karte-solid)); color: var(--akzent-text); transition: opacity .2s, filter .2s; }
+/* Helle Kacheln (kleinere Werte): dunkle Schrift, sonst zu wenig Kontrast */
+.kachelflaeche-feld.hell { color: var(--text); }
+.kachelflaeche-feld.hell span { text-shadow: none; }
+.kachelflaeche-feld span { font-size: .8rem; font-weight: 600; line-height: 1.2; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.kachelflaeche-feld b { font-size: .95rem; font-variant-numeric: tabular-nums; }
+.kachelflaeche-feld:hover { filter: brightness(1.08); }
+.kachelflaeche-feld.blass { opacity: .35; }
+.kachelflaeche-feld.gewaehlt { outline: 3px solid var(--text); outline-offset: -3px; }
+
+/* ---------- Neu anlegen (app/anlegen) ---------- */
+.anlegen-arten { flex-wrap: wrap; }
+.anlegen-arten button { display: inline-flex; align-items: center; gap: 6px; }
+.anlegen fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.anlegen-formular { max-width: 880px; }

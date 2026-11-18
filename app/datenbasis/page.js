@@ -34,7 +34,6 @@ export default async function DatenbasisSeite() {
     <>
       <div className="seitenkopf">
         <h1>{t('Datenbasis')}</h1>
-        <p>{t('Wie die App aufgebaut ist und wo die Daten liegen – live aus der Datenbank.')}</p>
       </div>
 
       <div className="row g-4 mb-2">

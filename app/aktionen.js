@@ -20,6 +20,7 @@
  *   nachrichtSenden, nachrichtenGelesen – Chat zwischen Personen (Seite „Mitarbeiter“, ohne Weiterleitung)
  *   meldungAnlegenV1 – Störmeldung aus dem einfachen Formular von „Version 1“ (/v1, auch /v2, /v3)
  *   auftragSpeichernFrueh, teilBuchenFrueh, wartungErledigenFrueh, personWaehlenFrueh – Hüllen für /v2, /v3
+ *   werkAnlegen, halleAnlegen, maschineAnlegen, personAnlegen – Stammdaten anlegen (Seite /anlegen)
  */
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
@@ -30,7 +31,8 @@ import { uebersetzer } from '@/lib/sprache/server';
 import { aktuellePerson, darfBearbeiten } from '@/lib/person';
 import { flash } from '@/lib/flash';
 import { berlinZuDate, datumZeit } from '@/lib/format';
-import { URSACHEN_LISTE, PRIORITAET_WERTE, STATUS_WERTE } from '@/lib/konstanten';
+import { URSACHEN_LISTE, PRIORITAET_WERTE, STATUS_WERTE, MASCHINEN_SYMBOLE } from '@/lib/konstanten';
+import { MASCHINEN_VORGABEN, QUALIFIKATIONEN, SCHICHTEN, freiePosition } from '@/lib/stammdaten';
 
 /** Text aus einem Formularfeld, ohne Leerzeichen am Anfang und Ende */
 const feld = (formular, name) => String(formular.get(name) ?? '').trim();
@@ -758,4 +760,184 @@ export async function personWaehlenFrueh(formular) {
   }
   revalidatePath('/', 'layout');
   redirect(`/${version}/person`);
+}
+
+/* =====================================================================
+ * Stammdaten anlegen (Seite /anlegen, Konto-Menü „Neu anlegen“)
+ *
+ * Damit der Betrieb die App mit eigenen Werken, Hallen, Maschinen und Mitarbeitern füllen kann.
+ * Hallen und Maschinen bekommen automatisch einen freien Platz (lib/stammdaten.js), damit sie
+ * sofort auf Lageplan, Grundriss und in 3D erscheinen. Produktion darf nichts anlegen.
+ * ================================================================== */
+
+/** Kommazahl aus einem Formularfeld („48,21“ oder „48.21“) oder null */
+function kommazahl(text) {
+  const n = Number(String(text).replace(',', '.'));
+  return text !== '' && Number.isFinite(n) ? n : null;
+}
+
+/** Gemeinsamer Anfang: angemeldet, Sprache, Rechte */
+async function anlegenErlaubt() {
+  await benutzerPflicht();
+  const t = await uebersetzer();
+  const person = await aktuellePerson();
+  return { t, verboten: !darfBearbeiten(person) ? t('Als Person aus der Produktion kannst du nichts anlegen.') : null };
+}
+
+export async function werkAnlegen(vorherigerZustand, formular) {
+  const { t, verboten } = await anlegenErlaubt();
+  const eingabe = Object.fromEntries(['name', 'kuerzel', 'stadt', 'adresse', 'land_kuerzel', 'schwerpunkt', 'breitengrad', 'laengengrad', 'gelaende_breite_m', 'gelaende_tiefe_m']
+    .map((n) => [n, feld(formular, n)]));
+  eingabe.kuerzel = eingabe.kuerzel.toUpperCase();
+  if (verboten) return { fehler: { allgemein: verboten }, eingabe };
+  const fehler = {};
+  if (eingabe.name.length < 3 || eingabe.name.length > 100) fehler.name = t('Bitte einen Namen mit 3 bis 100 Zeichen angeben.');
+  if (!/^[A-Z]{2,5}$/.test(eingabe.kuerzel)) fehler.kuerzel = t('2 bis 5 Buchstaben, z. B. HAM.');
+  if (!eingabe.stadt) fehler.stadt = t('Bitte die Stadt angeben.');
+  if (!eingabe.adresse) fehler.adresse = t('Bitte die Adresse angeben.');
+  if (!eingabe.schwerpunkt) fehler.schwerpunkt = t('Bitte angeben, was dort gefertigt wird.');
+  const breite = kommazahl(eingabe.breitengrad), laenge = kommazahl(eingabe.laengengrad);
+  if (breite === null || breite < -90 || breite > 90) fehler.breitengrad = t('Breitengrad zwischen −90 und 90, z. B. 48,21.');
+  if (laenge === null || laenge < -180 || laenge > 180) fehler.laengengrad = t('Längengrad zwischen −180 und 180, z. B. 9,03.');
+  const gb = kommazahl(eingabe.gelaende_breite_m || '250'), gt = kommazahl(eingabe.gelaende_tiefe_m || '160');
+  if (gb === null || gb < 50 || gb > 2000) fehler.gelaende_breite_m = t('Zwischen 50 und 2000 m.');
+  if (gt === null || gt < 50 || gt > 2000) fehler.gelaende_tiefe_m = t('Zwischen 50 und 2000 m.');
+  const [land] = await sql`SELECT kuerzel FROM land WHERE kuerzel = ${eingabe.land_kuerzel}`;
+  if (!land) fehler.land_kuerzel = t('Bitte ein Land auswählen.');
+  if (!fehler.kuerzel || !fehler.name) {
+    const doppelt = await sql`SELECT kuerzel, name FROM standort WHERE kuerzel = ${eingabe.kuerzel} OR lower(name) = lower(${eingabe.name})`;
+    if (doppelt.some((d) => d.kuerzel === eingabe.kuerzel)) fehler.kuerzel = t('Dieses Kürzel ist schon vergeben.');
+    if (doppelt.some((d) => d.name.toLowerCase() === eingabe.name.toLowerCase())) fehler.name = t('Ein Werk mit diesem Namen gibt es schon.');
+  }
+  if (Object.keys(fehler).length > 0) return { fehler, eingabe };
+
+  await sql`
+    INSERT INTO standort (kuerzel, name, stadt, adresse, schwerpunkt, breitengrad, laengengrad, gelaende_breite_m, gelaende_tiefe_m, land_kuerzel)
+    VALUES (${eingabe.kuerzel}, ${eingabe.name}, ${eingabe.stadt}, ${eingabe.adresse}, ${eingabe.schwerpunkt}, ${breite}, ${laenge}, ${gb}, ${gt}, ${eingabe.land_kuerzel})`;
+  await flash('erfolg', t('Werk „{name}“ angelegt. Als Nächstes eine Halle anlegen.', { name: eingabe.name }));
+  revalidatePath('/', 'layout');
+  redirect(`/anlegen?art=halle&werk=${eingabe.kuerzel.toLowerCase()}`);
+}
+
+export async function halleAnlegen(vorherigerZustand, formular) {
+  const { t, verboten } = await anlegenErlaubt();
+  const eingabe = Object.fromEntries(['standort_id', 'kuerzel', 'bezeichnung', 'nutzung', 'breite_m', 'tiefe_m'].map((n) => [n, feld(formular, n)]));
+  eingabe.kuerzel = eingabe.kuerzel.toUpperCase();
+  if (verboten) return { fehler: { allgemein: verboten }, eingabe };
+  const fehler = {};
+  const standortId = ganzzahl(eingabe.standort_id);
+  const [werk] = standortId ? await sql`SELECT id, kuerzel, gelaende_breite_m AS b, gelaende_tiefe_m AS t FROM standort WHERE id = ${standortId}` : [];
+  if (!werk) fehler.standort_id = t('Bitte ein Werk auswählen.');
+  if (!/^[A-Z0-9-]{1,10}$/.test(eingabe.kuerzel)) fehler.kuerzel = t('1 bis 10 Zeichen, z. B. H5.');
+  if (eingabe.bezeichnung.length < 3 || eingabe.bezeichnung.length > 100) fehler.bezeichnung = t('Bitte eine Bezeichnung mit 3 bis 100 Zeichen angeben.');
+  const b = kommazahl(eingabe.breite_m), tief = kommazahl(eingabe.tiefe_m);
+  if (b === null || b < 15 || b > 200) fehler.breite_m = t('Zwischen 15 und 200 m.');
+  if (tief === null || tief < 10 || tief > 150) fehler.tiefe_m = t('Zwischen 10 und 150 m.');
+  if (werk && !fehler.kuerzel) {
+    const [doppelt] = await sql`SELECT 1 FROM gebaeude WHERE standort_id = ${werk.id} AND kuerzel = ${eingabe.kuerzel}`;
+    if (doppelt) fehler.kuerzel = t('Dieses Kürzel gibt es in dem Werk schon.');
+  }
+  if (Object.keys(fehler).length > 0) return { fehler, eingabe };
+
+  // Freien Platz auf dem Gelände suchen (15 m Rand, 10 m Abstand); sonst unten anbauen und das Gelände vergrößern
+  const hallen = (await sql`SELECT lage_x_m AS x, lage_y_m AS y, breite_m AS b, tiefe_m AS t FROM gebaeude WHERE standort_id = ${werk.id}`).map((h) => ({ x: Number(h.x), y: Number(h.y), b: Number(h.b), t: Number(h.t) }));
+  let platz = freiePosition(Number(werk.b), Number(werk.t), hallen, b, tief, 10, 15);
+  let neueBreite = Number(werk.b), neueTiefe = Number(werk.t);
+  if (!platz) {
+    platz = { x: 15, y: Math.max(15, ...hallen.map((h) => h.y + h.t + 10)) };
+    neueTiefe = Math.max(neueTiefe, platz.y + tief + 15);
+    neueBreite = Math.max(neueBreite, b + 30);
+  }
+  const bereiche = [{ name: eingabe.nutzung || t('Fertigung'), x: 0, y: 0, b, t: tief }];
+  const [halle] = await sql.begin(async (tx) => {
+    if (neueBreite !== Number(werk.b) || neueTiefe !== Number(werk.t)) {
+      await tx`UPDATE standort SET gelaende_breite_m = ${neueBreite}, gelaende_tiefe_m = ${neueTiefe} WHERE id = ${werk.id}`;
+    }
+    return tx`
+      INSERT INTO gebaeude (standort_id, kuerzel, bezeichnung, lage_x_m, lage_y_m, breite_m, tiefe_m, bereiche)
+      VALUES (${werk.id}, ${eingabe.kuerzel}, ${eingabe.bezeichnung}, ${platz.x}, ${platz.y}, ${b}, ${tief}, ${sql.json(bereiche)})
+      RETURNING id`;
+  });
+  await flash('erfolg', t('Halle „{name}“ angelegt.', { name: eingabe.bezeichnung }));
+  revalidatePath('/', 'layout');
+  redirect(`/anlegen?art=maschine&halle=${halle.id}`);
+}
+
+export async function maschineAnlegen(vorherigerZustand, formular) {
+  const { t, verboten } = await anlegenErlaubt();
+  const eingabe = Object.fromEntries(['gebaeude_id', 'bezeichnung', 'typ', 'baujahr', 'anlagennummer'].map((n) => [n, feld(formular, n)]));
+  eingabe.anlagennummer = eingabe.anlagennummer.toUpperCase();
+  if (verboten) return { fehler: { allgemein: verboten }, eingabe };
+  const fehler = {};
+  const gebaeudeId = ganzzahl(eingabe.gebaeude_id);
+  const [halle] = gebaeudeId ? await sql`
+    SELECT g.id, g.kuerzel, g.breite_m, g.tiefe_m, g.bereiche, st.kuerzel AS werk
+    FROM gebaeude g JOIN standort st ON st.id = g.standort_id WHERE g.id = ${gebaeudeId}` : [];
+  if (!halle) fehler.gebaeude_id = t('Bitte eine Halle auswählen.');
+  if (eingabe.bezeichnung.length < 3 || eingabe.bezeichnung.length > 100) fehler.bezeichnung = t('Bitte eine Bezeichnung mit 3 bis 100 Zeichen angeben.');
+  if (!MASCHINEN_SYMBOLE[eingabe.typ]) fehler.typ = t('Bitte einen Maschinentyp auswählen.');
+  const baujahr = ganzzahl(eingabe.baujahr);
+  if (baujahr === null || baujahr < 1950 || baujahr > new Date().getFullYear()) fehler.baujahr = t('Baujahr zwischen 1950 und heute.');
+  if (eingabe.anlagennummer && !/^[A-Z0-9-]{3,20}$/.test(eingabe.anlagennummer)) fehler.anlagennummer = t('3 bis 20 Zeichen (Buchstaben, Ziffern, Bindestrich).');
+  if (Object.keys(fehler).length > 0) return { fehler, eingabe };
+
+  // Anlagennummer: angegeben oder automatisch WERK-HALLE-NN (nächste freie Nummer)
+  const vorhanden = await sql`SELECT anlagennummer, pos_x_m AS x, pos_y_m AS y, breite_m AS b, tiefe_m AS t FROM maschine WHERE gebaeude_id = ${halle.id}`;
+  let nummer = eingabe.anlagennummer;
+  if (!nummer) {
+    const vorne = `${halle.werk}-${halle.kuerzel}-`;
+    for (let n = 1; n < 100 && !nummer; n += 1) {
+      const kandidat = `${vorne}${String(n).padStart(2, '0')}`;
+      const [belegt] = await sql`SELECT 1 FROM maschine WHERE anlagennummer = ${kandidat}`;
+      if (!belegt) nummer = kandidat;
+    }
+  } else {
+    const [belegt] = await sql`SELECT 1 FROM maschine WHERE anlagennummer = ${nummer}`;
+    if (belegt) return { fehler: { anlagennummer: t('Diese Anlagennummer ist schon vergeben.') }, eingabe };
+  }
+  // Freier Platz im Hauptbereich der Halle (4 m Rand, 3 m Abstand – Platz für Gang und Bedienung)
+  const masse = MASCHINEN_VORGABEN[eingabe.typ];
+  const haupt = (halle.bereiche ?? [])[0] ?? { x: 0, y: 0, b: Number(halle.breite_m), t: Number(halle.tiefe_m) };
+  const belegt = vorhanden.map((m) => ({ x: Number(m.x) - haupt.x, y: Number(m.y) - haupt.y, b: Number(m.b), t: Number(m.t) }));
+  const platz = freiePosition(haupt.b, haupt.t, belegt, masse.b, masse.t, 3, 4);
+  if (!platz) return { fehler: { gebaeude_id: t('In dieser Halle ist kein Platz mehr für diese Maschine.') }, eingabe };
+
+  const [maschine] = await sql`
+    INSERT INTO maschine (gebaeude_id, anlagennummer, bezeichnung, typ, baujahr, pos_x_m, pos_y_m, breite_m, tiefe_m, kosten_pro_stunde)
+    VALUES (${halle.id}, ${nummer}, ${eingabe.bezeichnung}, ${eingabe.typ}, ${baujahr}, ${haupt.x + platz.x}, ${haupt.y + platz.y}, ${masse.b}, ${masse.t}, ${masse.kosten})
+    RETURNING id`;
+  await flash('erfolg', t('Maschine {nummer} angelegt.', { nummer }));
+  revalidatePath('/', 'layout');
+  redirect(`/maschinen/${maschine.id}`);
+}
+
+export async function personAnlegen(vorherigerZustand, formular) {
+  const { t, verboten } = await anlegenErlaubt();
+  const eingabe = Object.fromEntries(['name', 'rolle', 'standort_id', 'qualifikation', 'schicht'].map((n) => [n, feld(formular, n)]));
+  if (verboten) return { fehler: { allgemein: verboten }, eingabe };
+  const fehler = {};
+  if (eingabe.name.length < 3 || eingabe.name.length > 100) fehler.name = t('Bitte einen Namen mit 3 bis 100 Zeichen angeben.');
+  if (!['Produktion', 'Schichtleitung', 'Instandhaltung'].includes(eingabe.rolle)) fehler.rolle = t('Bitte eine Rolle auswählen.');
+  const standortId = ganzzahl(eingabe.standort_id);
+  const [werk] = standortId ? await sql`SELECT id FROM standort WHERE id = ${standortId}` : [];
+  if (!werk) fehler.standort_id = t('Bitte ein Werk auswählen.');
+  const technik = eingabe.rolle === 'Instandhaltung';
+  if (technik && !QUALIFIKATIONEN.includes(eingabe.qualifikation)) fehler.qualifikation = t('Bitte eine Qualifikation auswählen.');
+  if (technik && !SCHICHTEN.includes(eingabe.schicht)) fehler.schicht = t('Bitte eine Schicht auswählen.');
+  if (!fehler.name) {
+    const [doppelt] = await sql`SELECT 1 FROM person WHERE lower(name) = lower(${eingabe.name})`;
+    if (doppelt) fehler.name = t('Diese Person gibt es schon.');
+  }
+  if (Object.keys(fehler).length > 0) return { fehler, eingabe };
+
+  // Instandhaltung: zuerst den Techniker anlegen, damit man der Person Aufträge zuweisen kann
+  await sql.begin(async (tx) => {
+    const [tech] = technik ? await tx`
+      INSERT INTO techniker (standort_id, name, qualifikation, schicht) VALUES (${werk.id}, ${eingabe.name}, ${eingabe.qualifikation}, ${eingabe.schicht})
+      RETURNING id` : [null];
+    await tx`INSERT INTO person (name, rolle, standort_id, techniker_id) VALUES (${eingabe.name}, ${eingabe.rolle}, ${werk.id}, ${tech?.id ?? null})`;
+  });
+  await flash('erfolg', t('{name} angelegt.', { name: eingabe.name }));
+  revalidatePath('/', 'layout');
+  redirect('/mitarbeiter');
 }

@@ -42,7 +42,7 @@ export default async function KartenSeite({ searchParams }) {
     <>
       <div className="seitenkopf">
         <h1>{t('Störungskarte')}</h1>
-        <p>{t('{n} Werke in {m} Ländern – Land anklicken, um hineinzuzoomen.', { n: standorte.length, m: anzahlLaender })}</p>
+        <p>{t('{n} Werke in {m} Ländern', { n: standorte.length, m: anzahlLaender })}</p>
       </div>
 
       <KartenExplorer daten={daten} adresseMitfuehren

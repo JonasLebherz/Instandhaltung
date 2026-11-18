@@ -627,13 +627,15 @@ export default function KartenExplorer({
   const schluessel = schluesselVon(ebene);
   const schrittNr = { welt: 1, land: 2, werk: 3, gebaeude: 4 }[stufeName];
   const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? (land ? t(land.name) : t('Weltweit'));
-  const hinweis = t(modus === 'auswahl'
-    ? { welt: T('In welchem Land?'), land: T('In welchem Werk?'), werk: T('In welchem Gebäude?'), gebaeude: T('An welcher Maschine?') }[stufeName]
+  const hinweis = modus === 'auswahl'
+    ? t({ welt: T('In welchem Land?'), land: T('In welchem Werk?'), werk: T('In welchem Gebäude?'), gebaeude: T('An welcher Maschine?') }[stufeName])
     : {
-      welt: T('Land anklicken zum Hineinzoomen'), land: T('Werk anklicken zum Hineinzoomen'),
-      werk: raum ? T('Halle anklicken · Mausrad zum Zoomen') : T('Gebäude anklicken für den Grundriss'),
-      gebaeude: raum ? T('Maschine anklicken · Mausrad zum Zoomen') : T('Maschine anklicken für Details'),
-    }[stufeName]);
+      // Statt Bedienhinweisen eine Zahl zur Ebene (Länder, Werke, Gebäude, Maschinen)
+      welt: () => t('{n} Länder', { n: laender.length }),
+      land: () => t('{n} Werke', { n: standorte.filter((st) => st.land === land?.kuerzel).length }),
+      werk: () => t('{n} Gebäude', { n: gebaeude.filter((g) => g.standort_id === standort?.id).length }),
+      gebaeude: () => t('{n} Maschinen', { n: maschinen.filter((m) => m.gebaeude_id === aktuellesGebaeude?.id).length }),
+    }[stufeName]?.();
 
   const buehne = (
     <div className="explorer-buehne-rahmen">

@@ -324,7 +324,7 @@ function Zeitachse({ start, heute, termineZwischen, gewaehlt, onTag }) {
         })}
       </div>
       {sortiert.length === 0 && <p className="leer">{t('Keine Wartungen in diesem Zeitraum.')}</p>}
-      {sortiert.length > MAX_ZEILEN && <p className="klein mt-2 mb-0">{t('{n} weitere Maschinen – oben ein Werk wählen, um alle zu sehen.', { n: sortiert.length - MAX_ZEILEN })}</p>}
+      {sortiert.length > MAX_ZEILEN && <p className="klein mt-2 mb-0">{t('+ {n} weitere Maschinen', { n: sortiert.length - MAX_ZEILEN })}</p>}
     </div>
   );
 }

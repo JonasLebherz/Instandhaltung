@@ -233,7 +233,7 @@ export default async function Uebersicht() {
             <span className="person-hinweis-symbol" aria-hidden="true"><i className="bi bi-person-badge" /></span>
             <div className="flex-grow-1">
               <h2 className="abschnitt-titel mb-1">{t('Dir zugewiesene Aufgaben')}</h2>
-              <p className="klein mb-0">{t('Wähle eine Person aus dem Unternehmen – dann siehst du hier ihre Aufgaben und arbeitest in ihrer Rolle.')}</p>
+              <p className="klein mb-0">{t('Keine Person gewählt.')}</p>
             </div>
             <PersonWaehlenKnopf className="btn btn-sekundaer">{t('Person wählen …')}</PersonWaehlenKnopf>
           </div>

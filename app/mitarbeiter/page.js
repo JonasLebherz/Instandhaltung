@@ -52,7 +52,6 @@ export default async function MitarbeiterSeite() {
     <>
       <div className="seitenkopf">
         <h1>{t('Mitarbeiter')}</h1>
-        <p>{t('Wer im Team arbeitet, wie ausgelastet die Instandhaltung ist – und direkt Nachrichten schreiben.')}</p>
       </div>
 
       <div className="row g-4 mb-2">

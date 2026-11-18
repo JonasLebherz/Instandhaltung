@@ -393,6 +393,10 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                 <button type="button" role="menuitem" onClick={() => { setFenster(null); setPersonWahl(true); }}>
                   <i className="bi bi-person-badge" /> {person ? t('Person wechseln …') : t('Person wählen …')}
                 </button>
+                {/* Neu anlegen: Werk, Halle, Maschine oder Mitarbeiter (app/anlegen) */}
+                <Link href="/anlegen" role="menuitem" className="menue-link menue-anlegen" prefetch={false} onClick={() => setFenster(null)}>
+                  <i className="bi bi-plus-lg" /> {t('Neu anlegen')}
+                </Link>
                 {/* Vollbildmodus: Karte ohne Seitenleiste, rechts die offenen Aufträge der Ebene (app/vollbild) */}
                 <Link href="/vollbild" role="menuitem" className="menue-link menue-vollbild" prefetch={false} onClick={() => setFenster(null)}>
                   <i className="bi bi-arrows-fullscreen" /> {t('Vollbildmodus')}

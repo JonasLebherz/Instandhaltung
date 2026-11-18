@@ -1,36 +1,28 @@
 'use client';
 /**
- * app/datenbasis/Datenmodell.js – Tabellen und Beziehungen als Diagramm
+ * app/datenbasis/Datenmodell.js – das Datenmodell als Liniennetzplan
  *
- * Jede Tabelle ist eine Karte, farbig nach Thema (Werke & Maschinen, Störungen & Aufträge,
- * Personen, Ersatzteile). Zur besseren Übersicht stehen zuerst nur die Schlüssel darin
- * („Alle Spalten“ zeigt den Rest):
- *   Schlüssel-Symbol = Primärschlüssel, Ketten-Symbol = Fremdschlüssel (Verweis)
- * Die Linien zeigen die Fremdschlüssel: von der Spalte (z. B. maschine.gebaeude_id)
- * zur Spalte, auf die sie verweist (gebaeude.id). Fährt man über eine Tabelle,
- * werden ihre Beziehungen hervorgehoben.
- *
- * Klick auf eine Tabelle (oder View) öffnet darunter die Details mit allen
- * Spalten und einer Vorschau der Datensätze (25 je Seite, über
- * /api/datenbasis/<tabelle>).
- *
- * Die Linien werden nach dem Anzeigen aus den echten Positionen der Karten
- * berechnet – und neu, wenn sich die Fenstergröße ändert.
+ * Jede Tabelle ist eine Station, jeder Fremdschlüssel eine Strecke zur Tabelle, auf die er verweist
+ * (z. B. maschine → gebaeude). Die Strecken verlaufen wie auf einem U-Bahn-Plan nur waagerecht,
+ * senkrecht und im 45°-Winkel; zwischen den Stationsreihen liegen „Fahrspuren“, damit keine Strecke
+ * durch eine fremde Station läuft. Farbe = Thema der verweisenden Tabelle, Größe der Station =
+ * Zahl der Datensätze. Darüberfahren hebt die Strecken der Station hervor, Klick öffnet darunter
+ * Spalten und Datensätze (über /api/datenbasis/<tabelle>).
  */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 import { datumZeit } from '@/lib/format';
 
-// Platz jeder Tabelle im Diagramm (Spalte, Zeile) – so laufen die Linien ohne Kreuzungen.
-// Neue Tabellen, die hier fehlen, werden automatisch hinten angefügt.
+// Lage jeder Tabelle im Plan (x, y in Rastereinheiten, immer gerade Zahlen; ungerade = Fahrspuren).
+// Neue Tabellen, die hier fehlen, kommen in eine weitere Reihe unten.
 const PLATZ = {
-  standort: [0, 0], gebaeude: [1, 0], maschine: [2, 0], stoermeldung: [3, 0],
-  land: [0, 1], techniker: [1, 1], person: [2, 1], wartungsauftrag: [3, 1],
-  bestellung: [0, 2], ersatzteil: [1, 2], auftrag_ersatzteil: [2, 2], auftrag_verlauf: [3, 2],
-  wartungsplan: [0, 3], wartung_durchfuehrung: [1, 3], nachricht: [2, 3], stoermeldung_foto: [3, 3],
-  lagerbestand: [1, 4],
+  land: [0, 0], standort: [2, 0], gebaeude: [4, 0], maschine: [6, 0], wartungsplan: [8, 0], wartung_durchfuehrung: [10, 0],
+  bestellung: [0, 2], techniker: [2, 2], person: [4, 2], stoermeldung: [6, 2], stoermeldung_foto: [8, 2], nachricht: [10, 2],
+  lagerbestand: [0, 4], ersatzteil: [2, 4], auftrag_ersatzteil: [4, 4], wartungsauftrag: [6, 4], auftrag_verlauf: [8, 4],
 };
+const RX = 104, RY = 78, RAND = 60, RAND_X = 100;   // Pixel je Rastereinheit, Rand (seitlich breiter für lange Namen)
+const px = ([x, y]) => [RAND_X + x * RX, RAND + 20 + y * RY];
 
 // Thema jeder Tabelle (Farbe der Karte und Legende)
 const GRUPPEN = [
@@ -51,170 +43,134 @@ const VIEW_TEXTE = {
   v_stoerung_details: T('Alle Störungen mit Auftrag, Maschine und Ort'),
 };
 
+/**
+ * Verlauf einer Strecke von a nach b (Rasterpunkte) im U-Bahn-Stil. versatz (px) schiebt die Strecke
+ * auf der Fahrspur etwas zur Seite, damit parallele Strecken nebeneinander liegen statt übereinander.
+ */
+function strecke(a, b, versatz) {
+  const [x1, y1] = a, [x2, y2] = b;
+  const dx = x2 - x1, dy = y2 - y1, sx = Math.sign(dx) || 1, sy = Math.sign(dy) || -1;
+  let punkte;
+  if ((dy === 0 && Math.abs(dx) === 2) || (dx === 0 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 2)) {
+    punkte = [a, b];                                           // Nachbarn: gerade bzw. diagonal
+  } else if (dy === 0) {
+    punkte = [a, [x1 + sx, y1 - 1, 'h'], [x2 - sx, y1 - 1, 'h'], b];   // gleiche Reihe: über die Spur darüber
+  } else if (Math.abs(dy) === 2) {
+    punkte = [a, [x1 + sx, y1 + sy, 'h'], [x2 - sx, y1 + sy, 'h'], b];
+  } else {
+    const xs = dx === 0 ? x1 + 1 : x2 - sx;                    // senkrecht auf einer Spur zwischen zwei Spalten
+    punkte = [a, [x1 + (dx === 0 ? 1 : sx), y1 + sy, 'h'], [xs, y1 + sy, 'hv'], [xs, y2 - sy, 'v'], b];
+  }
+  return punkte.map(([x, y, art], i) => {
+    const [X, Y] = px([x, y]);
+    const o = art?.includes('h') ? [0, versatz] : art === 'v' ? [versatz, 0] : [0, 0];
+    return `${i === 0 ? 'M' : 'L'} ${X + (art === 'hv' ? versatz : o[0])} ${Y + o[1]}`;
+  }).join(' ');
+}
+
 export default function Datenmodell({ tabellen, wertelisten }) {
   const t = useT();
-  const rahmenRef = useRef(null);
   const detailRef = useRef(null);
-  const [linien, setLinien] = useState([]);
-  const [hervor, setHervor] = useState(null);     // Tabelle unter der Maus
+  const [hervor, setHervor] = useState(null);     // Station unter der Maus
   const [gewaehlt, setGewaehlt] = useState(null); // angeklickte Tabelle/View
-  const [alle, setAlle] = useState(false);        // alle Spalten statt nur der Schlüssel
 
   const nurTabellen = tabellen.filter((x) => x.art === 'tabelle');
   const views = tabellen.filter((x) => x.art === 'view');
 
-  // Plätze vergeben: bekannte aus PLATZ, unbekannte in weitere Zeilen
+  // Lage vergeben: bekannte aus PLATZ, unbekannte in eine neue Reihe unten
   let frei = 0;
-  const platzVon = Object.fromEntries(nurTabellen.map((tab) => {
+  const lage = Object.fromEntries(nurTabellen.map((tab) => {
     if (PLATZ[tab.name]) return [tab.name, PLATZ[tab.name]];
-    const platz = [frei % 4, 3 + Math.floor(frei / 4)];
+    const l = [(frei % 6) * 2, 6 + Math.floor(frei / 6) * 2];
     frei += 1;
-    return [tab.name, platz];
+    return [tab.name, l];
   }));
+  const maxX = Math.max(...Object.values(lage).map((l) => l[0]));
+  const maxY = Math.max(...Object.values(lage).map((l) => l[1]));
+  const breite = RAND_X * 2 + maxX * RX, hoehe = RAND * 2 + 40 + maxY * RY;
 
-  // Alle Fremdschlüssel: { von: tabelle, spalte, nach: tabelle, zielSpalte }
-  const beziehungen = nurTabellen.flatMap((tab) => tab.spalten.filter((s) => s.fk)
-    .map((s) => ({ von: tab.name, spalte: s.name, nach: s.fk.tabelle, zielSpalte: s.fk.spalte })));
+  // Strecken = Fremdschlüssel (Selbstverweise und Ziele außerhalb des Plans weglassen)
+  const strecken = nurTabellen.flatMap((tab) => tab.spalten.filter((s) => s.fk && lage[s.fk.tabelle] && s.fk.tabelle !== tab.name)
+    .map((s) => ({ von: tab.name, spalte: s.name, nach: s.fk.tabelle })));
+  // Strecken mit gleicher Fahrspur bekommen einen kleinen seitlichen Versatz
+  const zaehler = {};
+  const mitVersatz = strecken.map((s) => {
+    const schl = `${Math.min(lage[s.von][1], lage[s.nach][1])}`;
+    const n = (zaehler[schl] = (zaehler[schl] ?? 0) + 1);
+    return { ...s, d: strecke(lage[s.von], lage[s.nach], ((n % 5) - 2) * 4) };
+  });
 
-  /* ---------- Linien aus den Positionen der Spalten berechnen ---------- */
-  useLayoutEffect(() => {
-    const rahmen = rahmenRef.current;
-    if (!rahmen) return undefined;
+  const aktiv = hervor ?? gewaehlt;
+  const betroffen = (s) => aktiv && (s.von === aktiv || s.nach === aktiv);
+  const nachbar = (name) => !aktiv || name === aktiv || strecken.some((s) => (s.von === aktiv && s.nach === name) || (s.nach === aktiv && s.von === name));
+  const groesse = (anzahl) => 9 + Math.min(11, Math.log10((anzahl ?? 0) + 1) * 3.2);
 
-    function berechnen() {
-      const box = rahmen.getBoundingClientRect();
-      // Auf schmalen Bildschirmen stehen die Tabellen untereinander – dann keine Linien
-      if (window.matchMedia('(max-width: 991.98px)').matches) { setLinien([]); return; }
-      const stelle = (tabelle, spalte) => rahmen.querySelector(`[data-spalte="${tabelle}.${spalte}"]`)?.getBoundingClientRect();
-      setLinien(beziehungen.map((b) => {
-        const a = stelle(b.von, b.spalte);
-        const z = stelle(b.nach, b.zielSpalte);
-        if (!a || !z) return null;
-        const y1 = a.top + a.height / 2 - box.top;
-        const y2 = z.top + z.height / 2 - box.top;
-        let d;
-        if (Math.abs(a.left - z.left) < 20) {
-          // gleiche Spalte im Diagramm: Bogen links außen herum
-          const x = a.left - box.left;
-          d = `M ${x} ${y1} C ${x - 34} ${y1}, ${x - 34} ${y2}, ${x} ${y2}`;
-        } else if (z.left > a.left) {
-          const x1 = a.right - box.left; const x2 = z.left - box.left; const dx = Math.max(30, (x2 - x1) / 2);
-          d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
-        } else {
-          const x1 = a.left - box.left; const x2 = z.right - box.left; const dx = Math.max(30, (x1 - x2) / 2);
-          d = `M ${x1} ${y1} C ${x1 - dx} ${y1}, ${x2 + dx} ${y2}, ${x2} ${y2}`;
-        }
-        return { ...b, d };
-      }).filter(Boolean));
-    }
-
-    berechnen();
-    // Die Karten gleiten beim Öffnen ein – danach noch einmal genau messen
-    const spaeter = setTimeout(berechnen, 900);
-    const beobachter = new ResizeObserver(berechnen);
-    beobachter.observe(rahmen);
-    return () => { clearTimeout(spaeter); beobachter.disconnect(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabellen, alle]);
-
-  function waehlen(name) {
-    setGewaehlt(gewaehlt === name ? null : name);
-  }
-  // Details sichtbar machen, sobald eine Tabelle gewählt wurde
+  function waehlen(name) { setGewaehlt(gewaehlt === name ? null : name); }
   useEffect(() => {
     if (gewaehlt) detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [gewaehlt]);
 
-  const aktiv = hervor ?? gewaehlt;
-  const verbunden = (name) => !aktiv || name === aktiv || beziehungen.some((b) => (b.von === aktiv && b.nach === name) || (b.nach === aktiv && b.von === name));
-
   return (
     <>
-      <section className="karte" style={{ '--i': 5 }}>
+      <section className="karte netzplan-karte" style={{ '--i': 5 }}>
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">{t('Datenmodell')}</h2>
-          <button type="button" className="btn btn-sekundaer btn-klein er-alle" aria-pressed={alle} onClick={() => setAlle(!alle)}>
-            <i className={`bi ${alle ? 'bi-arrows-collapse' : 'bi-arrows-expand'}`} aria-hidden="true" /> {alle ? t('Nur Schlüssel') : t('Alle Spalten')}
-          </button>
-        </div>
-        <p className="text-leise mb-3">{t('Jeder Kasten ist eine Tabelle. Die Linien zeigen, welche Tabelle auf welche verweist – z. B. gehört jede Maschine zu einem Gebäude. Tabelle anklicken für alle Spalten und Daten.')}</p>
-        <div className="er-legende klein">
-          {GRUPPEN.map((g) => <span key={g.id} className={`er-gruppe gruppe-${g.id}`}><span className="er-gruppe-farbe" aria-hidden="true" />{t(g.name)}</span>)}
-        </div>
-        <div className="er-legende klein">
-          <span><i className="bi bi-key-fill er-pk" aria-hidden="true" /> {t('Primärschlüssel')}</span>
-          <span><i className="bi bi-link-45deg er-fk" aria-hidden="true" /> {t('Fremdschlüssel (Verweis auf andere Tabelle)')}</span>
-          <span><i className="bi bi-shield-lock" aria-hidden="true" /> {t('Zeilensicherheit (RLS) aktiv')}</span>
+          <div className="netz-legende klein">
+            {GRUPPEN.map((g) => <span key={g.id} className={`gruppe-${g.id}`}><i aria-hidden="true" />{t(g.name)}</span>)}
+          </div>
         </div>
 
-        <div className="er-diagramm" ref={rahmenRef}>
-          <svg className="er-linien" aria-hidden="true">
-            {linien.map((l) => {
-              const an = aktiv && (l.von === aktiv || l.nach === aktiv);
-              return <path key={`${l.von}.${l.spalte}`} d={l.d} className={`er-linie${an ? ' aktiv' : aktiv ? ' gedimmt' : ''}`} />;
+        <div className="netzplan-rahmen">
+          <svg className="netzplan" viewBox={`0 0 ${breite} ${hoehe}`} style={{ minWidth: breite * 0.72 }} role="img" aria-label={t('Datenmodell')}>
+            <g className="netz-strecken">
+              {mitVersatz.map((s) => (
+                <path key={`${s.von}.${s.spalte}`} d={s.d}
+                      className={`netz-strecke gruppe-${gruppeVon(s.von)}${betroffen(s) ? ' aktiv' : aktiv ? ' gedimmt' : ''}`}>
+                  <title>{`${s.von}.${s.spalte} → ${s.nach}`}</title>
+                </path>
+              ))}
+            </g>
+            {nurTabellen.map((tab) => {
+              const [X, Y] = px(lage[tab.name]);
+              const r = groesse(tab.anzahl);
+              return (
+                <g key={tab.name} className={`netz-station gruppe-${gruppeVon(tab.name)}${gewaehlt === tab.name ? ' gewaehlt' : ''}${nachbar(tab.name) ? '' : ' gedimmt'}`}
+                   data-tabelle={tab.name} transform={`translate(${X} ${Y})`} tabIndex={0} role="button" aria-pressed={gewaehlt === tab.name}
+                   aria-label={`${tab.name}, ${tab.anzahl ?? 0} ${t('Datensätze')}`}
+                   onClick={() => waehlen(tab.name)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); waehlen(tab.name); } }}
+                   onMouseEnter={() => setHervor(tab.name)} onMouseLeave={() => setHervor(null)}
+                   onFocus={() => setHervor(tab.name)} onBlur={() => setHervor(null)}>
+                  <circle r={r + 10} className="netz-flaeche" />
+                  <circle r={r} className="netz-ring" />
+                  <text y={r + 18} className="netz-name">{tab.name}</text>
+                  <text y={r + 33} className="netz-anzahl">{(tab.anzahl ?? 0).toLocaleString(t.sprache === 'en' ? 'en-US' : 'de-DE')}</text>
+                </g>
+              );
             })}
           </svg>
-          {nurTabellen.map((tab, i) => {
-            const [spalte, zeile] = platzVon[tab.name];
-            // Ohne „Alle Spalten“ nur Primär- und Fremdschlüssel (die Linien brauchen sie)
-            const sichtbar = alle ? tab.spalten : tab.spalten.filter((s) => s.pk || s.fk);
-            const weitere = tab.spalten.length - sichtbar.length;
-            return (
-              <button key={tab.name} type="button"
-                      className={`er-tabelle gruppe-${gruppeVon(tab.name)}${gewaehlt === tab.name ? ' gewaehlt' : ''}${verbunden(tab.name) ? '' : ' gedimmt'}`}
-                      style={{ gridColumn: spalte + 1, gridRow: zeile + 1, '--i': i }}
-                      onClick={() => waehlen(tab.name)}
-                      onMouseEnter={() => setHervor(tab.name)} onMouseLeave={() => setHervor(null)}
-                      onFocus={() => setHervor(tab.name)} onBlur={() => setHervor(null)}
-                      aria-pressed={gewaehlt === tab.name}>
-                <span className="er-kopf">
-                  <i className="bi bi-table" aria-hidden="true" />
-                  <span className="er-name">{tab.name}</span>
-                  {tab.rls && <i className="bi bi-shield-lock er-rls" title={t('Zeilensicherheit (RLS) aktiv')} />}
-                  <span className="er-anzahl" title={t('Datensätze')}>{tab.anzahl ?? '–'}</span>
-                </span>
-                <span className="er-spalten">
-                  {sichtbar.map((s) => (
-                    <span key={s.name} className="er-spalte" data-spalte={`${tab.name}.${s.name}`}>
-                      <span className="er-symbol" aria-hidden="true">
-                        {s.pk ? <i className="bi bi-key-fill er-pk" /> : s.fk ? <i className="bi bi-link-45deg er-fk" /> : null}
-                      </span>
-                      <span className="er-spaltenname">{s.name}</span>
-                      {s.fk && <span className="er-ziel">→ {s.fk.tabelle}</span>}
-                      <span className="er-typ">{s.typ}</span>
-                    </span>
-                  ))}
-                  {weitere > 0 && <span className="er-weitere">{t('+ {n} weitere Spalten', { n: weitere })}</span>}
-                </span>
-                {tab.beschreibung && <span className="er-text">{t(tab.beschreibung)}</span>}
-              </button>
-            );
-          })}
         </div>
 
-        {/* Views: gespeicherte Abfragen, z. B. Kennzahlen je Maschine */}
-        <h3 className="er-zwischentitel">{t('Views (fertige Auswertungen)')}</h3>
-        <div className="er-views">
-          {views.map((v) => (
-            <button key={v.name} type="button" className={`er-view${gewaehlt === v.name ? ' gewaehlt' : ''}`} onClick={() => waehlen(v.name)}
-                    aria-pressed={gewaehlt === v.name}>
-              <span className="er-kopf"><i className="bi bi-eye" aria-hidden="true" /><span className="er-name">{v.name}</span></span>
-              <span className="er-text">{VIEW_TEXTE[v.name] ? t(VIEW_TEXTE[v.name]) : t('{n} Spalten', { n: v.spalten.length })}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Wertelisten (ENUM-Typen) */}
-        <h3 className="er-zwischentitel">{t('Wertelisten')}</h3>
-        <div className="er-wertelisten">
-          {wertelisten.map((w) => (
-            <div key={w.typ} className="er-werteliste">
-              <span className="er-name">{w.typ}</span>
-              <span className="d-flex flex-wrap gap-1">
-                {w.werte.map((wert) => <span key={wert} className="er-wert" title={wert}>{t(wert)}</span>)}
-              </span>
-            </div>
-          ))}
+        <div className="netz-unten">
+          <div>
+            <h3 className="er-zwischentitel">{t('Views')}</h3>
+            <ul className="netz-liste">
+              {views.map((v) => (
+                <li key={v.name}>
+                  <button type="button" className={gewaehlt === v.name ? 'gewaehlt' : ''} onClick={() => waehlen(v.name)} aria-pressed={gewaehlt === v.name}>
+                    <code>{v.name}</code><span>{VIEW_TEXTE[v.name] ? t(VIEW_TEXTE[v.name]) : t('{n} Spalten', { n: v.spalten.length })}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="er-zwischentitel">{t('Wertelisten')}</h3>
+            <ul className="netz-liste netz-werte">
+              {wertelisten.map((w) => (
+                <li key={w.typ}><code>{w.typ}</code><span>{w.werte.map((wert) => t(wert)).join(' · ')}</span></li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 

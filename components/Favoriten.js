@@ -124,7 +124,7 @@ export default function Favoriten({ onOeffnen, person }) {
       </div>
       {alle.length === 0 ? (
         <p className="favoriten-leer">
-          <i className="bi bi-pin-angle" aria-hidden="true" /> {t('Ansicht in der Karte mit dem Pin anheften')}
+          <i className="bi bi-pin-angle" aria-hidden="true" /> {t('Noch keine Favoriten')}
         </p>
       ) : (
         <ul>

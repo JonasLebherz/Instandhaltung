@@ -41,7 +41,7 @@ export default async function MaschinenUebersicht() {
     <>
       <div className="seitenkopf">
         <h1>{t('Maschinen')}</h1>
-        <p>{t('{n} Maschinen – anklicken für Kennzahlen und Historie.', { n: maschinen.length })}</p>
+        <p>{t('{n} Maschinen', { n: maschinen.length })}</p>
       </div>
       <MaschinenListe maschinen={maschinen} />
     </>

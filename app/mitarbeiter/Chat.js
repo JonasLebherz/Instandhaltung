@@ -103,7 +103,7 @@ export default function Chat({ ich, personen, mit, onMit }) {
         <h2 className="abschnitt-titel">{t('Nachrichten')}</h2>
         <div className="chat-leer">
           <i className="bi bi-chat-square-text" aria-hidden="true" />
-          <p>{t('Wähle zuerst, als welche Person du arbeitest – dann kannst du dem Team schreiben.')}</p>
+          <p>{t('Keine Person gewählt.')}</p>
           <PersonWaehlenKnopf>{t('Person wählen')}</PersonWaehlenKnopf>
         </div>
       </section>

@@ -71,7 +71,7 @@ export default function LagerAnsicht({ werke, werk, teile, verteilung, start, da
     <div className="seitenkopf lager-kopf">
       <div>
         <h1>{t('Lager')}</h1>
-        <p>{werk ? t('Ersatzteillager im {werk} ({stadt}). Fach anklicken für Details und Bestellungen.', { werk: werk.name, stadt: werk.stadt })
+        <p>{werk ? `${werk.name} · ${werk.stadt}`
           : t('Jedes Werk hat sein eigenes Ersatzteillager. Werk wählen für das Regal.')}</p>
       </div>
       <div className="lager-werkwahl">
@@ -90,7 +90,7 @@ export default function LagerAnsicht({ werke, werk, teile, verteilung, start, da
         <section className="karte" style={{ '--i': 1 }}>
           <div className="karte-kopf">
             <h2 className="abschnitt-titel mb-0">{t('Lager aller Werke')}</h2>
-            <span className="klein">{t('{n} Fächer unter Mindestbestand · Werk anklicken für das Regal', { n: gesamtUnter })}</span>
+            <span className="klein">{t('{n} Fächer unter Mindestbestand', { n: gesamtUnter })}</span>
           </div>
           <div className="lager-werke">
             {werke.map((w) => (
