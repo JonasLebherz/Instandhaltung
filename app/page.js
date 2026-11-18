@@ -59,7 +59,7 @@ function aufgabenDerPerson(person) {
 
 /** Überschrift und Leertext des Abschnitts je Rolle */
 const AUFGABEN_TEXTE = {
-  Instandhaltung: { titel: T('Dir zugewiesene Aufgaben'), leer: T('Dir ist gerade kein offener Auftrag zugewiesen.') },
+  Instandhaltung: { titel: T('Zugewiesene Aufgaben'), leer: T('Dir ist gerade kein offener Auftrag zugewiesen.') },
   Schichtleitung: { titel: T('Aufgaben in deinem Werk'), leer: T('In deinem Werk ist gerade alles erledigt.') },
   Produktion: { titel: T('Offene Störungen in deinem Werk'), leer: T('In deinem Werk gibt es gerade keine offenen Störungen.') },
 };
@@ -232,7 +232,7 @@ export default async function Uebersicht() {
           <div className="person-hinweis">
             <span className="person-hinweis-symbol" aria-hidden="true"><i className="bi bi-person-badge" /></span>
             <div className="flex-grow-1">
-              <h2 className="abschnitt-titel mb-1">{t('Dir zugewiesene Aufgaben')}</h2>
+              <h2 className="abschnitt-titel mb-1">{t('Zugewiesene Aufgaben')}</h2>
               <p className="klein mb-0">{t('Keine Person gewählt.')}</p>
             </div>
             <PersonWaehlenKnopf className="btn btn-sekundaer">{t('Person wählen …')}</PersonWaehlenKnopf>

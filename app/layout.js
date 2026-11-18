@@ -11,6 +11,7 @@ import './globals.css';
 
 import Seitenleiste from '@/components/Seitenleiste';
 import FlashMeldungen from '@/components/FlashMeldungen';
+import Suche from '@/components/Suche';
 import { PRODUKTNAME } from '@/components/Logo';
 import { SpracheProvider } from '@/components/SpracheKontext';
 import { aktuellerBenutzer } from '@/lib/auth';
@@ -100,6 +101,8 @@ export default async function RootLayout({ children }) {
         {benutzer ? (
           <>
             <Seitenleiste benutzer={benutzer} person={person} ansicht={ansicht} />
+            {/* Suchfenster über die ganze App (Strg+K) */}
+            <Suche />
             {/* Inhalt rechts neben der Seitenleiste (Abstand: siehe .app-rahmen in globals.css) */}
             <div className="app-rahmen">
               <main className="container app-main">

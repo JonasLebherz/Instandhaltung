@@ -1,6 +1,11 @@
 /* Zuerst Bootstrap und die Symbole – alles danach überschreibt sie */
 @import "bootstrap/dist/css/bootstrap.min.css";
 @import "bootstrap-icons/font/bootstrap-icons.min.css";
+/* Schrift IBM Plex Sans – liegt mit im Projekt (keine Anfrage an Google), technisch-sachlich statt der üblichen Vorlagen-Schriften */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
 
 /*
  * app/globals.css – Eigenes Design der Anwendung
@@ -71,13 +76,15 @@
     --orange-bg: #fff1e0;  --orange: #a64a00;
     --rot-bg: #fde8e7;     --rot: #c4281c;
     --blau-bg: #e8f1fc;    --blau: #0060c0;
+    /* Störung melden: Signalgelb nur als Akzent (Balken, Rahmen), Schrift bleibt dunkelgrau */
+    --melde: #f2b300; --melde-tint: #fdf7e1; --melde-rand: #e6c75a; --melde-marke: #3a3a3c;
     --lila-bg: #f1ebfb;    --lila: #6e3fc4;
     --grau-bg: #ececf0;    --grau: #515154;
 
     /* Formen & Bewegung */
-    --radius-karte: 22px;
-    --radius-feld: 12px;
-    --schatten: 0 1px 2px rgba(0, 0, 0, .03), 0 8px 32px rgba(31, 38, 64, .07);
+    --radius-karte: 12px;
+    --radius-feld: 8px;
+    --schatten: 0 1px 2px rgba(0, 0, 0, .04), 0 2px 10px rgba(31, 38, 64, .04);
     --schatten-hover: 0 2px 6px rgba(0, 0, 0, .05), 0 18px 44px rgba(31, 38, 64, .12);
     --uebergang: .25s cubic-bezier(.2, .8, .2, 1);
     --weich: cubic-bezier(.2, .8, .2, 1);
@@ -138,10 +145,11 @@
     --orange-bg: rgba(255, 159, 10, .16); --orange: #ff9f0a;
     --rot-bg: rgba(255, 69, 58, .17);     --rot: #ff6961;
     --blau-bg: rgba(10, 132, 255, .18);   --blau: #64b5ff;
+    --melde: #f5c400; --melde-tint: rgba(245, 196, 0, .09); --melde-rand: rgba(245, 196, 0, .4); --melde-marke: #e5e5e8;
     --lila-bg: rgba(191, 90, 242, .18);   --lila: #d08cff;
     --grau-bg: rgba(142, 142, 147, .2);   --grau: #c7c7cc;
 
-    --schatten: 0 8px 32px rgba(0, 0, 0, .45);
+    --schatten: 0 2px 10px rgba(0, 0, 0, .35);
     --schatten-hover: 0 16px 44px rgba(0, 0, 0, .6);
 
 
@@ -172,7 +180,7 @@
  * ================================================================== */
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--hintergrund);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
@@ -323,7 +331,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 /* Sprechblase der eingeklappten Leiste (siehe tippZeigen in Seitenleiste.js) */
 .leiste-tipp {
     position: fixed; z-index: 1100; transform: translateY(-50%); pointer-events: none; white-space: nowrap;
-    padding: 6px 12px; border-radius: 10px; font-size: .85rem; font-weight: 500;
+    padding: 6px 12px; border-radius: 7px; font-size: .85rem; font-weight: 500;
     background: var(--karte-solid); color: var(--text); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
     animation: tipp-ein .15s var(--weich) backwards;
 }
@@ -346,7 +354,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     min-height: 44px;
     padding: 0 10px;
     border: 0;
-    border-radius: 13px;
+    border-radius: 8px;
     background: transparent;
     color: var(--text-leise);
     font-size: .95rem;
@@ -431,7 +439,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 /* Eigener, leicht abgesetzter Bereich, eingerückt unter dem Eintrag „Störungskarte“ */
 .favoriten {
     margin: 4px 0 6px 14px; padding: 4px;
-    border-radius: 14px; background: var(--fuellung); box-shadow: inset 0 0 0 1px var(--linie);
+    border-radius: 9px; background: var(--fuellung); box-shadow: inset 0 0 0 1px var(--linie);
 }
 .favoriten-titel {
     display: flex; align-items: center; justify-content: space-between;
@@ -444,7 +452,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
 .favoriten-leer { margin: 0 8px 6px 10px; font-size: .75rem; line-height: 1.3; color: var(--text-leise); }
 .favoriten ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
 .favorit { position: relative; }
-.favorit-link { min-height: 38px; padding-left: 6px; padding-right: 34px; gap: 8px; font-size: .86rem; border-radius: 10px; }
+.favorit-link { min-height: 38px; padding-left: 6px; padding-right: 34px; gap: 8px; font-size: .86rem; border-radius: 7px; }
 .favorit-link .leiste-symbol { flex-basis: 26px; height: 26px; }
 .favorit-symbol {
     width: 24px; height: 24px; border-radius: 7px;
@@ -527,7 +535,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
         top: 50%;
         flex: none;
         padding: 6px 12px;
-        border-radius: 10px;
+        border-radius: 7px;
         background: var(--karte-solid);
         border: 1px solid var(--linie);
         box-shadow: var(--schatten-hover);
@@ -561,7 +569,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     :root:not([data-leiste="auf"]) .favorit-bearbeiten {
         /* fest im Fenster neben der Leiste – die scrollende Mitte würde ein absolut gesetztes Feld abschneiden */
         position: fixed; left: calc(var(--leiste-b) + 16px); top: var(--oben, 50%); transform: translateY(-50%); width: 240px; z-index: 1100;
-        padding: 4px; border-radius: 12px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
+        padding: 4px; border-radius: 8px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
     }
     :root:not([data-leiste="auf"]) .favorit-bearbeiten .leiste-symbol { display: none; }
 }
@@ -579,7 +587,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
         display: flex; align-items: center; justify-content: space-between;
         margin: 8px 8px 0;
         padding: 8px 8px 8px 12px;
-        border-radius: 20px;
+        border-radius: 12px;
         background: var(--karte-erhoeht);
         backdrop-filter: var(--glas-unschaerfe);
         -webkit-backdrop-filter: var(--glas-unschaerfe);
@@ -590,7 +598,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     /* Seitenleiste fährt von links herein */
     .seitenleiste {
         top: 8px; bottom: 8px; left: 8px;
-        border-radius: 20px;
+        border-radius: 12px;
         border: 1px solid var(--glas-rand);
         box-shadow: var(--glas-kante), var(--schatten-hover);
         background: color-mix(in srgb, var(--karte-solid) 90%, transparent);
@@ -651,7 +659,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     backdrop-filter: var(--glas-unschaerfe);
     -webkit-backdrop-filter: var(--glas-unschaerfe);
     border: 1px solid var(--glas-rand);
-    border-radius: 16px;
+    border-radius: 10px;
     box-shadow: var(--glas-kante), var(--schatten-hover);
     padding: 6px;
     z-index: 1030;
@@ -676,7 +684,7 @@ a:hover { color: var(--akzent-hover); text-decoration: underline; }
     background: transparent;
     color: var(--text);
     padding: 9px 10px;
-    border-radius: 9px;
+    border-radius: 6px;
     font-size: .95rem;
     text-align: left;
     transition: background-color var(--uebergang);
@@ -810,7 +818,7 @@ a.karte:hover {
 .info-knopf::after { content: ""; position: absolute; inset: -8px; }
 .abschnitt-titel .info-knopf { vertical-align: 3px; }
 .info-fenster {
-    position: fixed; z-index: 1200; padding: 14px 16px; border-radius: 14px;
+    position: fixed; z-index: 1200; padding: 14px 16px; border-radius: 9px;
     background: var(--karte-erhoeht); backdrop-filter: var(--glas-unschaerfe); -webkit-backdrop-filter: var(--glas-unschaerfe);
     border: 1px solid var(--glas-rand); box-shadow: var(--glas-kante), var(--schatten-hover);
     font-size: .85rem; color: var(--text); animation: aufklappen .16s var(--weich);
@@ -978,7 +986,7 @@ a.karte:hover {
 .prio-ampel { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 6px 0; }
 .prio-ampel input { position: absolute; opacity: 0; pointer-events: none; }
 .prio-saeule {
-    position: absolute; left: 8px; top: 0; bottom: 0; width: 60px; border-radius: 18px;
+    position: absolute; left: 8px; top: 0; bottom: 0; width: 60px; border-radius: 10px;
     background: var(--raum-maschine-dunkel); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
 }
 .prio-ampel label, .prio-zeile-gruen {
@@ -1086,7 +1094,7 @@ a.karte:hover {
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    border-radius: 14px;
+    border-radius: 9px;
     padding: 14px 16px 14px 18px;
     margin-bottom: 24px;
     font-weight: 500;
@@ -1417,7 +1425,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     transform: translate(-50%, 4px);
     min-width: 190px;
     padding: 10px 12px;
-    border-radius: 12px;
+    border-radius: 8px;
     background: var(--karte-erhoeht);
     backdrop-filter: var(--glas-unschaerfe);
     border: 1px solid var(--glas-rand);
@@ -1470,7 +1478,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     align-items: center;
     gap: 2px;
     padding: 6px;
-    border-radius: 10px;
+    border-radius: 7px;
     border: 1px solid var(--glas-rand);
     background: var(--karte-erhoeht);
     backdrop-filter: var(--glas-unschaerfe);
@@ -1597,7 +1605,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     width: 100%;
     display: flex; align-items: center; gap: 12px;
     padding: 12px 14px;
-    border-radius: 14px;
+    border-radius: 9px;
     border: 1px solid transparent;
     background: var(--fuellung);
     color: var(--text);
@@ -1618,19 +1626,19 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 
 .detail-kopf { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
 .detail-symbol {
-    width: 46px; height: 46px; flex: 0 0 46px; border-radius: 14px;
+    width: 46px; height: 46px; flex: 0 0 46px; border-radius: 9px;
     display: grid; place-items: center; font-size: 1.3rem;
     background: var(--stufe-bg); color: var(--stufe);
 }
 .mini-kennzahlen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
-.mini-kennzahlen div { background: var(--fuellung); border-radius: 12px; padding: 10px; text-align: center; }
+.mini-kennzahlen div { background: var(--fuellung); border-radius: 8px; padding: 10px; text-align: center; }
 .mini-kennzahlen strong { display: block; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
 .mini-kennzahlen span { font-size: .75rem; color: var(--text-leise); }
 
 /* Gewählte Maschine über dem Meldeformular */
 .auswahl-chip {
     display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    padding: 10px 14px; border-radius: 14px; background: var(--akzent-zart); color: var(--text); margin-bottom: 18px;
+    padding: 10px 14px; border-radius: 9px; background: var(--akzent-zart); color: var(--text); margin-bottom: 18px;
 }
 
 /* ---------- Zoom-Karte (components/karten/KartenExplorer.js) ---------- */
@@ -1656,7 +1664,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     position: relative;
     height: var(--buehne-h);
     overflow: hidden;
-    border-radius: 16px;
+    border-radius: 10px;
     background:
         radial-gradient(120% 90% at 50% 0%, var(--zeile-hover), transparent 70%),
         color-mix(in srgb, var(--karte-solid) 22%, transparent);
@@ -1735,7 +1743,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 
 .explorer-karte .karten-legende { margin: 12px 6px 2px; }
 .explorer-seite .abschnitt-titel { font-size: 1.1rem; }
-.ort-zeile { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; background: var(--fuellung); }
+.ort-zeile { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 9px; background: var(--fuellung); }
 
 @media (max-width: 767.98px) {
     .explorer-karte { padding: 10px; }
@@ -1762,88 +1770,56 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .leiste-laden.aktiv { opacity: 1; animation: drehen .7s linear infinite; transition: opacity .2s ease .15s; }
 
 /* =====================================================================
- * 5. Störung melden – bewusst anders als die Störungskarte
- *    (warmer Orange-Ton, Schritt-Leiste, keine Störungszahlen)
+ * 5. Störung melden – bewusst anders als die Störungskarte:
+ *    Signalgelb als schmaler Akzent (wie Warnmarkierungen in der Halle),
+ *    Schritt-Leiste als Fortschrittsbalken, keine Störungszahlen
  * ================================================================== */
 
-.seitenkopf-melden { display: flex; align-items: center; gap: 18px; }
-.melde-symbol {
-    width: 58px; height: 58px; flex: 0 0 58px;
-    border-radius: 18px;
-    display: grid; place-items: center;
-    font-size: 1.6rem;
-    color: #fff;
-    background: linear-gradient(155deg, color-mix(in srgb, var(--orange) 65%, #fff), var(--orange));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 6px 18px color-mix(in srgb, var(--orange) 35%, transparent);
-}
-
-/* Schritt-Leiste: 1 Werk → 2 Gebäude → 3 Maschine → 4 Beschreibung */
+/* Schritt-Leiste: oben je Schritt ein Balken (erledigt dunkel, aktuell gelb, offen hell), darunter Nummer und Name */
 .melde-schritte {
-    list-style: none; margin: 0 0 16px; padding: 6px;
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
-    border-radius: 18px;
-    background: var(--orange-bg);
-    counter-reset: schritt;
+    list-style: none; margin: 0 0 14px; padding: 0;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
 }
 .melde-schritte li > div, .melde-schritte li > button {
     width: 100%; height: 100%;
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px;
-    border: 0; border-radius: 13px;
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 9px 2px 4px;
+    border: 0; border-top: 4px solid var(--linie); border-radius: 0;
     background: transparent;
     color: var(--text-leise);
     text-align: left;
-    transition: background-color var(--uebergang);
 }
-.melde-schritte li > button:hover { background: var(--karte-erhoeht); }
-.melde-schritte .schritt-aktiv > div { background: var(--karte-solid); color: var(--text); box-shadow: 0 2px 8px rgba(31, 38, 64, .1); }
-/* Langer Name (z. B. „Beschreibung“) in schmalen Spalten: mit … kürzen statt über den Rand zu laufen */
-.melde-schritte .schritt-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.schritt-nr {
-    width: 28px; height: 28px; flex: 0 0 28px;
-    border-radius: 50%;
-    display: grid; place-items: center;
-    font-weight: 700; font-size: .85rem;
-    background: var(--fuellung-hover); color: var(--text-leise);
-}
-.schritt-aktiv .schritt-nr { background: var(--orange); color: #fff; }
-.schritt-fertig .schritt-nr { background: var(--gruen); color: #fff; }
-.schritt-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
-.schritt-name { font-weight: 600; font-size: .9rem; }
-.schritt-fertig .schritt-name { color: var(--text); }
+.melde-schritte .schritt-fertig > button { border-top-color: var(--melde-marke); cursor: pointer; }
+.melde-schritte .schritt-fertig > button:hover .schritt-name { text-decoration: underline; }
+.melde-schritte .schritt-aktiv > div { border-top-color: var(--melde); color: var(--text); }
+.schritt-nr { flex: none; font-size: .75rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-leise); }
+.schritt-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; overflow: hidden; }
+.schritt-name { font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.schritt-fertig .schritt-name, .schritt-aktiv .schritt-name { color: var(--text); }
 .schritt-wert { font-size: .75rem; color: var(--text-leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Karte beim Melden: warmer Hintergrund, Ortsmarken statt Störungszahlen */
-.stufe-neutral { --stufe: var(--orange); --stufe-bg: var(--orange-bg); }
-.explorer-melden .explorer-buehne {
-    background:
-        radial-gradient(120% 90% at 50% 0%, var(--orange-bg), transparent 75%),
-        var(--fuellung);
-    border-color: color-mix(in srgb, var(--orange) 22%, var(--linie));
-}
-.explorer-melden .explorer-karte { border-color: color-mix(in srgb, var(--orange) 25%, var(--glas-rand)); }
+/* Karte beim Melden: neutrale Bühne mit gelber Kante, Ortsmarken in Dunkelgrau statt Störungsfarben */
+.stufe-neutral { --stufe: var(--melde-marke); --stufe-bg: var(--melde-tint); }
+.explorer-melden .explorer-buehne { box-shadow: inset 0 3px 0 var(--melde); }
 .explorer-melden .plan-maschine.stufe-neutral { border-color: var(--glas-rand); }
 .explorer-melden .plan-maschine:hover, .explorer-melden .plan-maschine:focus-visible {
-    border-color: var(--orange);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 25%, transparent), 0 8px 20px rgba(31, 38, 64, .18);
+    border-color: var(--melde);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--melde) 35%, transparent), 0 6px 14px rgba(31, 38, 64, .14);
 }
-.explorer-melden .plan-maschine:hover i { color: var(--orange); }
-.explorer-melden .plan-gebaeude:hover, .explorer-melden .plan-gebaeude:focus-visible { border-color: var(--orange); }
-.explorer-melden .ort-liste button:hover { background: var(--orange-bg); }
+.explorer-melden .plan-gebaeude:hover, .explorer-melden .plan-gebaeude:focus-visible { border-color: var(--melde); }
+.explorer-melden .ort-liste button:hover { background: var(--melde-tint); }
+/* Nummer des Schritts im Kopf der Bühne: kleines gelbes Schild mit dunkler Ziffer */
 .buehne-schritt {
-    width: 34px; height: 34px; flex: 0 0 34px;
-    border-radius: 50%;
+    min-width: 28px; height: 28px; padding: 0 6px; flex: none;
+    border-radius: 6px;
     display: grid; place-items: center;
-    font-weight: 700;
-    color: #fff; background: var(--orange);
+    font-weight: 700; font-size: .85rem; font-variant-numeric: tabular-nums;
+    color: #1d1d1f; background: var(--melde);
 }
-.explorer-melden .auswahl-chip { background: var(--orange-bg); }
+.explorer-melden .auswahl-chip { background: var(--melde-tint); }
 
 @media (max-width: 767.98px) {
-    .seitenkopf-melden { gap: 14px; }
-    .melde-symbol { width: 46px; height: 46px; flex-basis: 46px; font-size: 1.25rem; border-radius: 14px; }
-    /* Auf dem Handy: nur Nummern, der aktuelle Schritt mit Namen */
-    .melde-schritte { grid-template-columns: repeat(5, auto); justify-content: start; }
+    /* Auf dem Handy: nur der aktuelle Schritt mit Namen, die anderen nur als Balken mit Nummer */
     .melde-schritte li:not(.schritt-aktiv) .schritt-text { display: none; }
 }
 
@@ -1893,7 +1869,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     position: relative;
     display: flex; flex-direction: column; gap: 12px;
     padding: 14px 16px;
-    border-radius: 16px;
+    border-radius: 10px;
     border: 1px solid transparent;
     background: var(--fuellung);
     color: var(--text);
@@ -1980,7 +1956,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
     min-width: 0;
     display: flex; flex-direction: column;
     padding: 0;
-    border-radius: 14px;
+    border-radius: 9px;
     border: 1px solid var(--glas-rand);
     background: var(--karte-solid);
     color: var(--text);
@@ -2036,7 +2012,7 @@ body > .seiten-einstieg { flex: 1; display: flex; flex-direction: column; }
 .er-view .er-kopf > .bi { color: var(--lila); }
 .er-view .er-text { border-top: 0; padding-top: 8px; }
 .er-wertelisten { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
-.er-werteliste { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--fuellung); }
+.er-werteliste { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--fuellung); }
 .er-wert { font-size: .72rem; padding: 1px 8px; border-radius: 999px; background: var(--karte-solid); border: 1px solid var(--linie); }
 
 .er-detail .abschnitt-titel { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -2120,7 +2096,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .person-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
 .person-knopf {
     display: flex; align-items: center; gap: 10px; text-align: left;
-    padding: 8px 10px; border-radius: 12px;
+    padding: 8px 10px; border-radius: 8px;
     border: 1px solid transparent; background: var(--fuellung); color: var(--text);
     transition: background-color var(--uebergang), border-color var(--uebergang);
 }
@@ -2140,12 +2116,12 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* ---------- Übersicht: Aufgaben der Person ---------- */
 .person-hinweis { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .person-hinweis-symbol {
-    width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+    width: 44px; height: 44px; border-radius: 9px; display: grid; place-items: center;
     font-size: 1.3rem; color: var(--akzent); background: var(--akzent-zart);
 }
 .aufgaben-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
 .aufgabe {
-    display: block; height: 100%; padding: 12px 14px; border-radius: 14px;
+    display: block; height: 100%; padding: 12px 14px; border-radius: 9px;
     background: var(--fuellung); color: var(--text); text-decoration: none;
     transition: background-color var(--uebergang), transform var(--uebergang);
 }
@@ -2176,7 +2152,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
     margin: 0; padding: 6px; list-style: none;
     background: var(--karte-solid);
     border: 1px solid var(--glas-rand);
-    border-radius: 14px;
+    border-radius: 9px;
     box-shadow: var(--glas-kante), var(--schatten-hover);
     animation: aufklappen .16s var(--weich);
     transform-origin: top left;
@@ -2189,7 +2165,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .auswahl-liste ul { list-style: none; margin: 0; padding: 0; }
 .auswahl-liste [role="option"] {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px; border-radius: 9px; cursor: pointer;
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
     color: var(--text); font-size: .95rem;
 }
 .auswahl-liste [role="option"].aktiv { background: var(--fuellung); }
@@ -2211,7 +2187,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* Legende der Ampelfarben in der 3D-Ansicht (unten rechts; unten links steht die Ortszeit) */
 .raum-legende {
     position: absolute; right: 12px; bottom: 12px; z-index: 3; display: flex; flex-direction: column; gap: 3px;
-    padding: 8px 12px; border-radius: 12px; font-size: .75rem; line-height: 1.3; color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: .75rem; line-height: 1.3; color: var(--text);
     background: var(--karte-erhoeht); border: 1px solid var(--glas-rand); box-shadow: 0 4px 14px rgba(31, 38, 64, .14);
     pointer-events: none;
 }
@@ -2295,7 +2271,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 @keyframes pin-setzen { from { transform: translateY(-6px) rotate(-20deg); } to { transform: none; } }
 .karten-hinweis {
     position: absolute; top: 62px; right: 14px; z-index: 6; max-width: min(320px, calc(100% - 28px));
-    padding: 7px 12px; border-radius: 12px; font-size: .82rem;
+    padding: 7px 12px; border-radius: 8px; font-size: .82rem;
     background: var(--karte-solid); color: var(--text); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
     animation: hinweis-ein .2s var(--weich) backwards;
 }
@@ -2358,7 +2334,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .ampel-rot { color: var(--rot); } .ampel-orange { color: var(--orange); } .ampel-blau { color: var(--blau); } .ampel-gruen { color: var(--gruen); }
 /* 3D-Modell der Maschine im Infofenster */
 .maschine-detail-3d {
-    position: relative; height: 230px; margin: 0 0 14px; border-radius: 14px; overflow: hidden;
+    position: relative; height: 230px; margin: 0 0 14px; border-radius: 9px; overflow: hidden;
     background: radial-gradient(70% 60% at 50% 40%, var(--karte-erhoeht), var(--fuellung));
     border: 1px solid var(--linie);
 }
@@ -2368,7 +2344,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .favorit-kachel-stern { color: var(--akzent); font-size: .85em; }
 .favorit-kachel-leer {
     width: 100%; min-height: 150px; display: grid; place-items: center; align-content: center; gap: 4px;
-    border: 1.5px dashed var(--linie); border-radius: 16px; background: transparent; color: var(--text-leise);
+    border: 1.5px dashed var(--linie); border-radius: 10px; background: transparent; color: var(--text-leise);
     transition: background-color var(--uebergang), border-color var(--uebergang);
 }
 .favorit-kachel-leer:hover { background: var(--fuellung); border-color: var(--text-leise); color: var(--text); }
@@ -2392,9 +2368,9 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .link-knopf:hover { text-decoration: underline; }
 .eigenes-werk-hinweis {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 12px;
-    border-radius: 12px; font-size: .88rem; background: var(--orange-bg); color: var(--text);
+    border-radius: 8px; font-size: .88rem; background: var(--melde-tint); color: var(--text); border: 1px solid var(--melde-rand);
 }
-.eigenes-werk-hinweis i { color: var(--orange); }
+.eigenes-werk-hinweis i { color: var(--text-leise); }
 .eigenes-abzeichen { color: var(--text); background: var(--fuellung); }
 
 /* ---------- Maschinen-Seite und -Liste ---------- */
@@ -2420,7 +2396,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .historie-eintrag.offen::before { border-color: var(--orange); background: var(--orange); }
 .historie-eintrag a {
     display: grid; grid-template-columns: 130px minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
-    padding: 10px 12px; border-radius: 12px; color: var(--text);
+    padding: 10px 12px; border-radius: 8px; color: var(--text);
 }
 .historie-eintrag a:hover { background: var(--fuellung); text-decoration: none; color: var(--text); }
 .historie-datum { font-size: .82rem; color: var(--text-leise); font-variant-numeric: tabular-nums; }
@@ -2515,7 +2491,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .chat-wann { flex: none; font-size: .75rem; color: var(--text-leise); white-space: nowrap; }
 .chat-liste button {
     width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
-    padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text);
+    padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text);
     transition: background-color var(--uebergang);
 }
 .chat-liste button:hover, .chat-liste button:focus-visible { background: var(--fuellung); }
@@ -2536,16 +2512,16 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .chat-tag { align-self: center; font-size: .7rem; color: var(--text-leise); padding: 2px 10px; border-radius: 999px; background: var(--fuellung); margin: 6px 0; }
 .chat-blase {
     align-self: flex-start; max-width: 82%;
-    padding: 8px 12px; border-radius: 16px 16px 16px 4px;
+    padding: 8px 12px; border-radius: 10px 16px 16px 4px;
     background: var(--karte-solid); border: 1px solid var(--linie);
     display: flex; flex-direction: column; gap: 2px;
     animation: hochgleiten .25s var(--weich) backwards;
 }
-.chat-blase.meine { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: var(--akzent-flaeche); border-color: transparent; color: var(--akzent-text); }
+.chat-blase.meine { align-self: flex-end; border-radius: 10px 16px 4px 16px; background: var(--akzent-flaeche); border-color: transparent; color: var(--akzent-text); }
 .chat-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.4; }
 .chat-zeit { align-self: flex-end; font-size: .66rem; opacity: .7; display: inline-flex; gap: 4px; align-items: center; }
 .chat-eingabe { display: flex; gap: 8px; align-items: flex-end; padding-top: 12px; border-top: 1px solid var(--linie); }
-.chat-eingabe textarea { resize: none; min-height: 40px; max-height: 120px; field-sizing: content; border-radius: 20px; padding: 8px 14px; }
+.chat-eingabe textarea { resize: none; min-height: 40px; max-height: 120px; field-sizing: content; border-radius: 12px; padding: 8px 14px; }
 .chat-senden { flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
 
 /* =====================================================================
@@ -2563,7 +2539,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .kalender { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .kalender-wochentag { font-size: .72rem; font-weight: 600; color: var(--text-leise); text-align: center; padding-bottom: 2px; text-transform: uppercase; letter-spacing: .03em; }
 .kalender-tag {
-    min-height: 76px; padding: 6px 8px; border-radius: 12px; border: 1px solid var(--linie);
+    min-height: 76px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--linie);
     background: var(--karte-solid); color: var(--text); text-align: left;
     display: flex; flex-direction: column; justify-content: space-between; gap: 4px;
     transition: border-color var(--uebergang), box-shadow var(--uebergang), transform var(--uebergang);
@@ -2576,11 +2552,11 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .kalender-marken { display: flex; gap: 4px; flex-wrap: wrap; }
 .kal-marke { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 999px; color: #fff; font-size: .6875rem; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
 .wartung-eintraege { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.wartung-eintrag { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 12px; background: var(--fuellung); border-left: 3px solid var(--orange); }
+.wartung-eintrag { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 8px; background: var(--fuellung); border-left: 3px solid var(--orange); }
 .wartung-eintrag.art-ueberfaellig { border-left-color: var(--rot); }
 .wartung-eintrag.art-erledigt { border-left-color: var(--gruen); }
 .wartung-eintrag.art-geplant { border-left-color: var(--linie); }
-.wartung-symbol { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--karte-solid); color: var(--akzent); }
+.wartung-symbol { flex: none; width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; background: var(--karte-solid); color: var(--akzent); }
 .wartung-eintrag { min-width: 0; }
 .wartung-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; overflow-wrap: anywhere; }
 .wartung-text strong { font-weight: 600; font-size: .9rem; }
@@ -2597,7 +2573,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .liste-breit .wartung-eintraege { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 @media (max-width: 575.98px) {
     .kalender { gap: 3px; }
-    .kalender-tag { min-height: 54px; padding: 4px; border-radius: 9px; }
+    .kalender-tag { min-height: 54px; padding: 4px; border-radius: 6px; }
     .kalender-zahl { min-width: 22px; height: 22px; font-size: .74rem; padding: 0 4px; }
     .kal-marke { min-width: 8px; width: 8px; height: 8px; padding: 0; font-size: 0; }
 }
@@ -2611,7 +2587,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* Etikett: immer hell (wird gedruckt), klare Hierarchie – Kopfband, QR groß, Anlagennummer groß */
 .qr-etikett {
     display: flex; flex-direction: column; overflow: hidden; break-inside: avoid;
-    border-radius: 14px; background: var(--qr-hell); color: var(--qr-dunkel);
+    border-radius: 9px; background: var(--qr-hell); color: var(--qr-dunkel);
     border: 1px solid #d9dce1; box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
 }
 .qr-band {
@@ -2653,7 +2629,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
  * ================================================================== */
 .foto-vorschauen, .foto-reihe { display: flex; gap: 10px; flex-wrap: wrap; }
 .foto-reihe { margin-bottom: 12px; }
-.foto-vorschau, .foto-klein, .foto-hinzu { position: relative; width: 104px; height: 104px; border-radius: 12px; overflow: hidden; flex: none; }
+.foto-vorschau, .foto-klein, .foto-hinzu { position: relative; width: 104px; height: 104px; border-radius: 8px; overflow: hidden; flex: none; }
 .foto-vorschau img, .foto-klein img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .foto-klein { padding: 0; border: 1px solid var(--linie); background: var(--fuellung); cursor: zoom-in; transition: transform var(--uebergang); }
 .foto-klein:hover { transform: scale(1.03); }
@@ -2670,7 +2646,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .foto-hinzu:hover { background: var(--akzent-zart); }
 .foto-hinzu:focus-within { outline: 2px solid var(--akzent); outline-offset: 2px; }
 .foto-gross { position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, .82); display: grid; place-items: center; padding: 24px; cursor: zoom-out; animation: einblenden .2s ease backwards; }
-.foto-gross img { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+.foto-gross img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
 .foto-gross .rund-knopf { position: absolute; top: 16px; right: 16px; background: rgba(255, 255, 255, .9); color: #111; }
 .checkliste-stand { font-size: .8rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--fuellung); color: var(--text-leise); font-variant-numeric: tabular-nums; }
 .checkliste-stand.fertig { background: var(--gruen-bg); color: var(--gruen); }
@@ -2683,7 +2659,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .checkliste label.erledigt span { color: var(--text-leise); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-leise) 60%, transparent); }
 .checkliste .form-check-input:checked { background-color: var(--gruen); border-color: var(--gruen); }
 .chat-auftrag {
-    display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 10px; border-radius: 10px;
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 10px; border-radius: 7px;
     font-size: .8rem; font-weight: 600; background: var(--karte-solid); color: var(--akzent); text-decoration: none;
 }
 .chat-blase.meine .chat-auftrag { background: rgba(255, 255, 255, .92); color: var(--akzent); }
@@ -2699,7 +2675,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .lager-werkzeuge { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .lager-suche { max-width: 260px; }
 /* 3D-Regal von vorn (components/karten/raum/LagerRegal3D.js): Knöpfe über der Zeichenfläche */
-.regal3d { position: relative; width: 100%; min-height: 240px; border-radius: 14px; overflow: hidden; background: var(--raum-regal-wand); }
+.regal3d { position: relative; width: 100%; min-height: 240px; border-radius: 9px; overflow: hidden; background: var(--raum-regal-wand); }
 .regal3d canvas { touch-action: pan-y; }
 .regal3d-titel {
     position: absolute; transform: translate(-50%, calc(-100% - 6px)); padding: 2px 10px; border-radius: 6px;
@@ -2750,7 +2726,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .lager-fach {
     --zustand-farbe: var(--gruen);
     display: flex; flex-direction: column; gap: 4px; min-width: 0; text-align: left;
-    padding: 10px 12px; border-radius: 14px; border: 1px solid var(--linie); border-bottom: 3px solid var(--zustand-farbe);
+    padding: 10px 12px; border-radius: 9px; border: 1px solid var(--linie); border-bottom: 3px solid var(--zustand-farbe);
     background: var(--karte-solid); color: var(--text);
     transition: transform var(--uebergang), box-shadow var(--uebergang), border-color var(--uebergang);
 }
@@ -2759,7 +2735,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .lager-fach.zustand-rot { --zustand-farbe: var(--rot); background: color-mix(in srgb, var(--rot) 6%, var(--karte-solid)); }
 .lager-fach.gewaehlt { border-color: var(--akzent); box-shadow: 0 0 0 3px var(--akzent-ring); }
 .lager-fach-kopf { display: flex; align-items: center; gap: 8px; }
-.lager-fach-symbol { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--akzent-zart); color: var(--akzent); font-size: .95rem; flex: none; }
+.lager-fach-symbol { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; background: var(--akzent-zart); color: var(--akzent); font-size: .95rem; flex: none; }
 .lager-platz { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--fuellung); color: var(--text-leise); }
 .lager-bestellt { margin-left: auto; color: var(--orange); }
 .lager-fach-name { font-weight: 600; font-size: .84rem; line-height: 1.25; overflow-wrap: break-word; hyphens: auto; min-height: 2.5em; }
@@ -2777,7 +2753,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .lager-bestand { display: flex; align-items: baseline; gap: 8px; }
 .lager-bestand strong { font-size: 2.2rem; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .lager-bestand span { color: var(--text-leise); font-size: .85rem; }
-.lager-bestellung { padding: 12px; border-radius: 12px; background: var(--fuellung); font-size: .88rem; }
+.lager-bestellung { padding: 12px; border-radius: 8px; background: var(--fuellung); font-size: .88rem; }
 .lager-nachbestellen { margin-top: 8px; }
 .lager-zwischentitel { font-size: .9rem; font-weight: 600; margin: 20px 0 8px; }
 .lager-anderswo { list-style: none; margin: 0; padding: 0; }
@@ -2787,7 +2763,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* Alle Werke: Kachel je Werk */
 .lager-werke { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
 .lager-werk {
-    display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; text-decoration: none;
+    display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 9px; text-decoration: none;
     background: var(--karte-solid); color: var(--text); border: 1px solid var(--linie); border-left: 3px solid var(--gruen);
     transition: transform var(--uebergang), box-shadow var(--uebergang);
 }
@@ -2813,7 +2789,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .monitor-ort { color: var(--text-leise); font-weight: 600; font-size: .95rem; }
 .monitor-summen { display: flex; gap: 10px; margin-left: auto; }
 .monitor-summen span {
-    display: flex; flex-direction: column; align-items: center; min-width: 92px; padding: 8px 14px; border-radius: 14px;
+    display: flex; flex-direction: column; align-items: center; min-width: 92px; padding: 8px 14px; border-radius: 9px;
     background: var(--karte-solid); border: 1px solid var(--linie); font-size: .8rem; font-weight: 600; color: var(--text-leise);
 }
 .monitor-summen strong { font-size: 1.8rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -2833,7 +2809,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 .export-knopf .rund-knopf:hover, .export-knopf .rund-knopf[aria-expanded="true"] { color: var(--akzent); }
 .export-menue {
     position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 170px; padding: 6px;
-    border-radius: 12px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
+    border-radius: 8px; background: var(--karte-solid); border: 1px solid var(--linie); box-shadow: var(--schatten-hover);
     display: flex; flex-direction: column; animation: aufklappen .15s var(--weich) backwards; transform-origin: top right;
 }
 .export-menue button { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font-size: .88rem; text-align: left; }
@@ -2842,15 +2818,16 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* Export-Knopf oben rechts in einer Statistik-Karte (Karte braucht position: relative) */
 .stat-ebene .karte { position: relative; }
 .karte-export { position: absolute; top: 22px; right: 22px; z-index: 2; }
+.stat-leiste > .karte-export { top: 6px; right: 6px; padding: 0; border: 0; display: block; }
 /* Hallen-Monitor: links die Halle wie in der Störungskarte (2D-Grundriss bzw. 3D), rechts alle Maschinen */
 .monitor-schalter { position: static; }
 .monitor-halle { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; min-height: 0; }
 .monitor-halle-buehne { min-width: 0; }
 /* Höhe der Bühne kommt aus groesse="monitor" (--buehne-h) */
 .explorer-kompakt .explorer-buehne.buehne-monitor, .explorer-buehne.buehne-monitor { --buehne-h: max(420px, calc(100dvh - 190px)); }
-.monitor-halle-laden { height: max(420px, calc(100dvh - 190px)); border-radius: 20px; background: var(--fuellung); animation: pulsieren 1.4s ease-in-out infinite; }
+.monitor-halle-laden { height: max(420px, calc(100dvh - 190px)); border-radius: 12px; background: var(--fuellung); animation: pulsieren 1.4s ease-in-out infinite; }
 .monitor-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: max(420px, calc(100dvh - 190px)); }
-.monitor-zeile { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; border-radius: 14px; background: var(--karte-solid); border: 1px solid var(--linie); }
+.monitor-zeile { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; border-radius: 9px; background: var(--karte-solid); border: 1px solid var(--linie); }
 .monitor-zeile .ampel-symbol { margin-top: 3px; }
 .monitor-zeile.ampel-rot { border-left: 5px solid var(--rot); background: color-mix(in srgb, var(--rot) 8%, var(--karte-solid)); }
 .monitor-zeile.ampel-orange { border-left: 5px solid var(--orange); background: color-mix(in srgb, var(--orange) 7%, var(--karte-solid)); }
@@ -2887,7 +2864,7 @@ fieldset:disabled .form-control, fieldset:disabled .form-select { opacity: .7; }
 /* ---------- Wartungsplan: Umschalter und Zeitachse ---------- */
 .wartung-schalter { position: static; }
 .wartung-schalter button { display: inline-flex; align-items: center; gap: 6px; }
-.zeitachse-rahmen { overflow-x: auto; overscroll-behavior-x: contain; max-height: 620px; overflow-y: auto; border-radius: 12px; }
+.zeitachse-rahmen { overflow-x: auto; overscroll-behavior-x: contain; max-height: 620px; overflow-y: auto; border-radius: 8px; }
 .zeitachse { --name-b: 190px; min-width: calc(var(--name-b) + var(--tage) * 26px); display: flex; flex-direction: column; }
 .achse-zeile {
     display: grid; grid-template-columns: var(--name-b) repeat(var(--tage), minmax(26px, 1fr));
@@ -3043,7 +3020,7 @@ html[data-v3] body .fv-person a { color: #fff; font-weight: 600; }
 html[data-v3] body .fv-inhalt { max-width: 1200px; margin: 0 auto; padding: 24px; }
 html[data-v3] body .fv-inhalt h1 { font-size: 28px; margin: 0 0 16px; color: #4338ca; letter-spacing: -.01em; }
 html[data-v3] body .fv-inhalt h2 { font-size: 19px; margin: 28px 0 10px; color: #111827; }
-html[data-v3] body .fv-tabelle { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); overflow: hidden; margin-bottom: 12px; }
+html[data-v3] body .fv-tabelle { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-radius: 9px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); overflow: hidden; margin-bottom: 12px; }
 html[data-v3] body .fv-tabelle th, html[data-v3] body .fv-tabelle td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #eef0f5; vertical-align: top; }
 html[data-v3] body .fv-tabelle thead th { background: #eef2ff; color: #4338ca; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 html[data-v3] body .fv-tabelle tbody tr:hover td { background: #f9fafb; }
@@ -3053,7 +3030,7 @@ html[data-v3] body .fv-tabelle a { color: #4f46e5; font-weight: 600; }
 /* Kennzahlen als bunte Kacheln */
 html[data-v3] body .fv-kennzahlen { background: none; box-shadow: none; }
 html[data-v3] body .fv-kennzahlen tbody { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-html[data-v3] body .fv-kennzahlen tr { display: flex; flex-direction: column-reverse; background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); border-top: 4px solid #8b5cf6; }
+html[data-v3] body .fv-kennzahlen tr { display: flex; flex-direction: column-reverse; background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); border-top: 4px solid #8b5cf6; }
 html[data-v3] body .fv-kennzahlen th, html[data-v3] body .fv-kennzahlen td { border: 0; padding: 0; background: none; }
 html[data-v3] body .fv-kennzahlen th { color: #6b7280; font-size: 14px; font-weight: 500; }
 html[data-v3] body .fv-kennzahlen .fv-zahl { font-size: 32px; font-weight: 800; color: #4f46e5; }
@@ -3071,21 +3048,21 @@ html[data-v3] body .fv-rolle-produktion { background: #ffedd5; color: #c2410c; }
 html[data-v3] body .fv-rolle-schichtleitung { background: #f3e8ff; color: #7e22ce; }
 html[data-v3] body .fv-rolle-instandhaltung { background: #dbeafe; color: #1d4ed8; }
 /* Formulare und Knöpfe */
-html[data-v3] body .fv-formular { display: grid; grid-template-columns: minmax(0, 560px); gap: 6px; background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); }
+html[data-v3] body .fv-formular { display: grid; grid-template-columns: minmax(0, 560px); gap: 6px; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); }
 html[data-v3] body .fv-formular.fv-zeile { display: flex; }
 html[data-v3] body .fv-formular label { font-weight: 600; font-size: 14px; margin-top: 8px; }
-html[data-v3] body :is(.fv-formular, .fv-zeile) :is(input, select, textarea) { font: inherit; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; }
-html[data-v3] body .fv-knopf { display: inline-block; font: inherit; font-weight: 600; color: #fff; text-decoration: none; cursor: pointer; border: 0; border-radius: 10px; padding: 9px 18px; background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 4px 14px rgba(99, 102, 241, .4); }
+html[data-v3] body :is(.fv-formular, .fv-zeile) :is(input, select, textarea) { font: inherit; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 7px; background: #fff; }
+html[data-v3] body .fv-knopf { display: inline-block; font: inherit; font-weight: 600; color: #fff; text-decoration: none; cursor: pointer; border: 0; border-radius: 7px; padding: 9px 18px; background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 4px 14px rgba(99, 102, 241, .4); }
 html[data-v3] body .fv-knopf.fv-klein { padding: 5px 12px; font-size: 13px; }
-html[data-v3] body .fv-hinweis { padding: 12px 16px; border-radius: 12px; margin: 0 0 14px; }
+html[data-v3] body .fv-hinweis { padding: 12px 16px; border-radius: 8px; margin: 0 0 14px; }
 html[data-v3] body .fv-hinweis-erfolg { background: #dcfce7; color: #166534; }
 html[data-v3] body .fv-hinweis-fehler, html[data-v3] body .fv-hinweis-hinweis { background: #fee2e2; color: #991b1b; }
 html[data-v3] body .fv-gruen { color: #16a34a; }
 html[data-v3] body .fv-klein-text { font-size: 12px; color: #6b7280; }
 html[data-v3] body .fv-leer { color: #9ca3af; text-align: center; }
 /* Diagramme und eigene Karte */
-html[data-v3] body .fv-diagramm { position: relative; height: 280px; background: #fff; border-radius: 16px; padding: 12px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); margin-bottom: 12px; }
-html[data-v3] body .fv-svg-karte { width: 100%; max-width: 460px; display: block; background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); }
+html[data-v3] body .fv-diagramm { position: relative; height: 280px; background: #fff; border-radius: 10px; padding: 12px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); margin-bottom: 12px; }
+html[data-v3] body .fv-svg-karte { width: 100%; max-width: 460px; display: block; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(17, 24, 39, .08); }
 html[data-v3] body .fv-land { fill: #e0e7ff; stroke: #6366f1; stroke-width: 2; }
 html[data-v3] body .fv-punkt { fill: #22c55e; stroke: #fff; stroke-width: 3; opacity: .9; }
 html[data-v3] body .fv-punkt-hoch { fill: #ef4444; }
@@ -3107,7 +3084,7 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
 .netz-legende span { display: inline-flex; align-items: center; gap: 7px; font-weight: 500; }
 .netz-legende i { width: 22px; height: 6px; border-radius: 3px; background: var(--gruppe); }
 .netzplan-rahmen { overflow-x: auto; margin: 4px -8px 0; padding: 0 8px; }
-.netzplan { width: 100%; height: auto; display: block; font-family: "Inter", -apple-system, "Segoe UI", sans-serif; }
+.netzplan { width: 100%; height: auto; display: block; font-family: inherit; }
 .netz-strecke { fill: none; stroke: var(--gruppe); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .92; transition: opacity .2s, stroke-width .2s; }
 .netz-strecke.aktiv { opacity: 1; stroke-width: 8.5; }
 .netz-strecke.gedimmt { opacity: .12; }
@@ -3151,8 +3128,8 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
 .balken-liste li.blass { opacity: .4; }
 .balken-liste li.gewaehlt .mini-balken span { background: var(--akzent-flaeche); }
 /* Treemap: Ausfallzeit nach Ursache */
-.kachelflaeche { position: relative; height: 240px; border-radius: 12px; overflow: hidden; }
-.kachelflaeche-feld { position: absolute; border: 2px solid var(--karte-solid); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; overflow: hidden;
+.kachelflaeche { position: relative; height: 240px; border-radius: 8px; overflow: hidden; }
+.kachelflaeche-feld { position: absolute; border: 2px solid var(--karte-solid); border-radius: 7px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; overflow: hidden;
   background: color-mix(in srgb, var(--akzent-flaeche) var(--stufe), var(--karte-solid)); color: var(--akzent-text); transition: opacity .2s, filter .2s; }
 /* Helle Kacheln (kleinere Werte): dunkle Schrift, sonst zu wenig Kontrast */
 .kachelflaeche-feld.hell { color: var(--text); }
@@ -3182,7 +3159,7 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
 .stat-seite-werkzeug button:hover { color: var(--akzent); }
 .stat-seite-editor { margin-top: 14px; }
 .stat-baustein-wahl { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; margin-top: 16px; }
-.stat-baustein-wahl label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--linie); cursor: pointer; font-size: .9rem; }
+.stat-baustein-wahl label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--linie); cursor: pointer; font-size: .9rem; }
 .stat-baustein-wahl label.gewaehlt { border-color: var(--akzent); background: color-mix(in srgb, var(--akzent) 8%, transparent); }
 .stat-raster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .stat-zelle.breit { grid-column: 1 / -1; }
@@ -3193,7 +3170,7 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
    „So funktioniert die App“ als kleiner Liniennetzplan (app/datenbasis/Verbindungen.js)
    Gleiche Bildsprache wie das Datenmodell; Farbe der Strecke = Zustand (--zustand aus .status-*).
    ===================================================================== */
-.systemplan { width: 100%; min-width: 600px; height: auto; display: block; font-family: "Inter", -apple-system, "Segoe UI", sans-serif; }
+.systemplan { width: 100%; min-width: 600px; height: auto; display: block; font-family: inherit; }
 .sys-linie { fill: none; stroke: var(--zustand); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; transition: stroke .3s; }
 .sys-strecke.status-pruefe .sys-linie, .sys-strecke.status-unbekannt .sys-linie { stroke: var(--grau); opacity: .45; stroke-dasharray: 2 12; }
 .sys-zug { fill: #fff; stroke: var(--zustand); stroke-width: 2.5; }
@@ -3212,3 +3189,135 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
 .sys-hinweis strong { color: var(--text); font-weight: 600; }
 .sys-zeit { margin-left: auto; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .sys-zug { display: none; } .sys-station.status-pruefe .sys-led { animation: none; } }
+
+/* =====================================================================
+   Suche über die ganze App (components/Suche.js, Strg+K)
+   ===================================================================== */
+.suche-hintergrund { position: fixed; inset: 0; z-index: 2000; background: rgba(20, 22, 28, .32); display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; animation: einblenden .12s ease; }
+.suche-fenster { width: min(640px, 100%); max-height: 70vh; display: flex; flex-direction: column; background: var(--karte-solid); color: var(--text);
+  border: 1px solid var(--linie); border-radius: 10px; box-shadow: 0 18px 50px rgba(0, 0, 0, .22); overflow: hidden; }
+.suche-kopf { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--linie); }
+.suche-kopf > i { color: var(--text-leise); font-size: 1.05rem; }
+.suche-feld { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text); font: inherit; font-size: 1.05rem; padding: 4px 0; }
+.suche-liste { overflow-y: auto; padding: 6px 0; }
+.suche-gruppe-titel { padding: 8px 16px 4px; font-size: .75rem; font-weight: 600; color: var(--text-leise); }
+.suche-treffer { display: flex; align-items: baseline; gap: 10px; padding: 8px 16px; cursor: pointer; min-width: 0; }
+.suche-treffer > i { color: var(--text-leise); flex: none; }
+.suche-treffer[aria-selected="true"] { background: var(--fuellung-hover); box-shadow: inset 3px 0 0 var(--akzent); }
+.suche-titel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.suche-zusatz { margin-left: auto; padding-left: 12px; flex: none; max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .8rem; color: var(--text-leise); }
+.suche-leer { padding: 18px 16px; margin: 0; color: var(--text-leise); }
+.suche-fuss { display: flex; gap: 18px; padding: 8px 16px; border-top: 1px solid var(--linie); font-size: .75rem; color: var(--text-leise); }
+.suche-fenster kbd, .suche-knopf kbd, .leiste-kbd { display: inline-block; padding: 1px 5px; margin: 0 2px; border: 1px solid var(--linie); border-bottom-width: 2px; border-radius: 4px;
+  background: var(--fuellung); color: var(--text-leise); font: 600 .6875rem/1.4 inherit; font-family: inherit; box-shadow: none; }
+.leiste-suche { width: 100%; border: 0; background: none; text-align: left; margin-bottom: 6px; }
+.leiste-kbd { margin-left: auto; }
+.leiste-suche .leiste-text { display: flex; align-items: center; gap: 6px; width: 100%; }
+html[data-leiste="zu"] .leiste-kbd { display: none; }
+@media (max-width: 767.98px) { .suche-hintergrund { padding-top: 8vh; } .suche-zusatz { display: none; } .suche-fuss { display: none; } }
+
+/* =====================================================================
+   Fehlerseiten (app/not-found.js 404, app/error.js 500): sachlich, Code groß, Wege zurück
+   ===================================================================== */
+.fehlerseite { max-width: 560px; margin: 8vh auto 0; }
+.fehlerseite-code { font-size: 4.5rem; font-weight: 700; line-height: 1; letter-spacing: -.03em; color: var(--text-leise); font-variant-numeric: tabular-nums;
+  border-left: 6px solid var(--melde); padding-left: 18px; margin-bottom: 18px; }
+.fehlerseite h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 8px; }
+.fehlerseite p { color: var(--text-leise); }
+.fehlerseite-wege { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.fehlerseite-kennung { margin-top: 18px; font-size: .8rem; }
+
+/* =====================================================================
+   Arbeitsauftrag zum Drucken (app/auftraege/[id]/druck): DIN-A4-Blatt, immer schwarz auf weiß
+   (Papier – feste Farben wie bei den QR-Etiketten, auch im Dunkelmodus)
+   ===================================================================== */
+.druck-leiste { display: flex; justify-content: space-between; align-items: center; gap: 12px; max-width: 210mm; margin: 0 auto 14px; }
+.auftragsblatt { --ab-linie: #1d1d1f; --ab-leise: #5f5f64; --ab-fein: #c9c9cd;
+  width: 100%; max-width: 210mm; min-height: 297mm; margin: 0 auto 24px; padding: 12mm 13mm; background: #fff; color: #1d1d1f;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .12), 0 6px 24px rgba(0, 0, 0, .08); font-size: 10pt; line-height: 1.4; }
+.auftragsblatt .qr-code { --qr-hell: #fff; --qr-dunkel: #000; }
+.ab-kopf { display: grid; grid-template-columns: auto 1fr auto; gap: 8mm; align-items: center; padding-bottom: 4mm; border-bottom: 1.2mm solid var(--ab-linie); margin-bottom: 5mm; }
+.ab-marke { display: flex; align-items: center; gap: 2.5mm; font-weight: 700; font-size: 12pt; }
+.ab-art { font-size: 9pt; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--ab-leise); }
+.ab-nr { font-size: 22pt; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ab-klein { font-size: 8pt; color: var(--ab-leise); }
+.ab-qr { display: flex; flex-direction: column; align-items: center; gap: 1mm; width: 28mm; text-align: center; font-size: 7pt; color: var(--ab-leise); }
+.ab-qr .qr-code { width: 26mm; height: 26mm; }
+.ab-abschnitt { margin-bottom: 5mm; break-inside: avoid; }
+.ab-abschnitt h2 { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 2mm; padding-bottom: 1mm; border-bottom: .3mm solid var(--ab-linie); }
+.ab-zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+.ab-felder { display: grid; grid-template-columns: max-content 1fr; gap: 1mm 4mm; margin: 0; }
+.ab-felder dt { font-weight: 500; color: var(--ab-leise); }
+.ab-felder dd { margin: 0; }
+.ab-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ab-prio { font-weight: 700; }
+.ab-prio::before { content: ''; display: inline-block; width: 2.4mm; height: 2.4mm; border-radius: 50%; margin-right: 1.5mm; background: #888; vertical-align: 0; }
+.ab-prio-hoch::before { background: #c4281c; } .ab-prio-mittel::before { background: #d07000; } .ab-prio-niedrig::before { background: #0060c0; }
+.ab-beschreibung { margin-top: 3mm; padding: 2.5mm 3mm; border: .3mm solid var(--ab-fein); border-left: 1mm solid var(--ab-linie); white-space: pre-line; }
+.ab-figur { margin: 0; display: flex; flex-direction: column; gap: 1.5mm; }
+.ab-figur figcaption { font-size: 7.5pt; color: var(--ab-leise); }
+.ab-lage .zeichnung { height: 55mm; }
+.zeichnung { width: 100%; height: 48mm; display: block; }
+.zeichnung .z-gelaende { fill: #f4f4f5; stroke: #1d1d1f; stroke-width: 1; stroke-dasharray: 4 3; }
+.zeichnung .z-flaeche, .zeichnung .z-maschine { fill: #fff; stroke: #1d1d1f; stroke-width: .8; }
+.zeichnung .z-maschine { fill: #f2f2f3; }
+.zeichnung .z-ziel { stroke: #000; stroke-width: 2.2; }
+.zeichnung .z-ziel-umriss { fill: #f6f6f7; stroke: #000; stroke-width: 1.8; }
+.zeichnung .z-wand { fill: #fff; stroke: #000; stroke-width: 2.2; }
+.zeichnung .z-bereich { fill: none; stroke: #8e8e93; stroke-width: .7; stroke-dasharray: 3 2; }
+.zeichnung .z-mitte { stroke: #6b6b70; stroke-width: .6; stroke-dasharray: 8 2 1.5 2; }
+.zeichnung .z-hilfslinie { stroke: #1d1d1f; stroke-width: .5; }
+.zeichnung .z-masslinie { stroke: #1d1d1f; stroke-width: .7; }
+.zeichnung .z-massstab { fill: #000; stroke: #000; stroke-width: .6; }
+.zeichnung .z-massstab-hell { fill: #fff; stroke: #000; stroke-width: .6; }
+.zeichnung .z-text { fill: #1d1d1f; font-family: inherit; font-weight: 500; }
+.zeichnung .z-text-leise { fill: #6b6b70; font-weight: 400; }
+.zeichnung .z-text-ziel { font-weight: 700; paint-order: stroke; stroke: #fff; stroke-width: .25em; }
+.ab-checkliste { list-style: none; margin: 0; padding: 0; }
+.ab-checkliste li { display: flex; gap: 2.5mm; align-items: flex-start; padding: 1.1mm 0; border-bottom: .2mm solid var(--ab-fein); }
+.ab-kasten { flex: none; width: 3.6mm; height: 3.6mm; margin-top: .4mm; border: .35mm solid #000; display: grid; place-items: center; font-size: 8pt; line-height: 1; font-weight: 700; }
+.ab-tabelle { width: 100%; border-collapse: collapse; }
+.ab-tabelle th { text-align: left; font-weight: 500; color: var(--ab-leise); border-bottom: .3mm solid var(--ab-linie); padding: 1mm 0; }
+.ab-tabelle td { border-bottom: .2mm solid var(--ab-fein); padding: 1.2mm 0; height: 6.5mm; }
+.ab-tabelle .ab-menge { text-align: right; width: 18mm; font-variant-numeric: tabular-nums; }
+.ab-linien { display: grid; gap: 7mm; padding-top: 6mm; }
+.ab-linien i { display: block; border-bottom: .2mm solid #8e8e93; }
+.ab-zeiten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; margin-top: 5mm; }
+.ab-zeiten div { display: flex; flex-direction: column; gap: 1mm; }
+.ab-zeiten span, .ab-unterschriften span { font-size: 7.5pt; color: var(--ab-leise); }
+.ab-zeiten b { display: block; min-height: 6mm; border-bottom: .3mm solid var(--ab-linie); font-weight: 500; }
+.ab-janein { white-space: pre; }
+.ab-unterschriften { display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; margin-top: 12mm; }
+.ab-unterschriften div { display: flex; flex-direction: column; gap: 1mm; }
+.ab-unterschriften i { display: block; height: 10mm; border-bottom: .3mm solid var(--ab-linie); }
+.ab-fuss { display: flex; justify-content: space-between; margin-top: 6mm; padding-top: 2mm; border-top: .2mm solid var(--ab-fein); font-size: 7.5pt; color: var(--ab-leise); }
+@media (max-width: 767.98px) {
+  .auftragsblatt { padding: 16px; min-height: 0; font-size: .85rem; }
+  .ab-kopf, .ab-zwei, .ab-zeiten, .ab-unterschriften { grid-template-columns: 1fr; }
+}
+/* Eigene Druckseite nur für das Blatt (die QR-Etiketten behalten ihren Rand) */
+@page arbeitsauftrag { size: A4; margin: 8mm 11mm; }
+@media print {
+  .auftragsblatt { page: arbeitsauftrag; }
+  html:has(.auftragsblatt) .app-main { padding: 0 !important; max-width: none !important; }
+  .auftragsblatt { box-shadow: none; margin: 0; padding: 0; max-width: none; min-height: 0; font-size: 9pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Kompakter, damit der Auftrag möglichst auf eine Seite passt */
+  .auftragsblatt .ab-abschnitt { margin-bottom: 2.6mm; }
+  .auftragsblatt .ab-kopf { margin-bottom: 3.5mm; padding-bottom: 3mm; }
+  .auftragsblatt .zeichnung { height: 26mm; }
+  .auftragsblatt .ab-lage .zeichnung { height: 34mm; }
+  .auftragsblatt .ab-qr .qr-code { width: 21mm; height: 21mm; }
+  .auftragsblatt .ab-beschreibung { margin-top: 2mm; padding: 1.8mm 3mm; }
+  .auftragsblatt .ab-zeiten { margin-top: 3mm; }
+  .auftragsblatt .ab-abschnitt:last-of-type { break-inside: auto; }
+  .auftragsblatt .ab-unterschriften, .auftragsblatt .ab-zeiten { break-inside: avoid; }
+  .auftragsblatt .ab-checkliste li { padding: .7mm 0; }
+  .auftragsblatt .ab-tabelle td { height: 5.5mm; padding: .8mm 0; }
+  .auftragsblatt .ab-unterschriften { margin-top: 4mm; }
+  .auftragsblatt .ab-unterschriften i { height: 8mm; }
+  .auftragsblatt .ab-fuss { margin-top: 1.5mm; padding-top: 1.2mm; }
+  .auftragsblatt .ab-kopf { grid-template-columns: auto 1fr auto; }
+  .auftragsblatt .ab-zwei { grid-template-columns: 1fr 1fr; }
+  .auftragsblatt .ab-zeiten { grid-template-columns: repeat(3, 1fr); }
+  .auftragsblatt .ab-unterschriften { grid-template-columns: 1fr 1fr; }
+}

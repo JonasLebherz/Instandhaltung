@@ -457,13 +457,27 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
           <strong>{zahl(k.anzahl / Math.max(1, zeitraumTage / 7), 1, s)}</strong>
           <span>{t('Störungen pro Woche')}{info('proWoche', t('Störungen pro Woche'))}</span>
         </div>
+        <div className="karte-export">
+          <ExportKnopf titel={t('Weitere Kennzahlen')} daten={() => ({
+            spalten: [t('Kennzahl'), t('Wert')],
+            zeilen: [...document.querySelectorAll('.stat-leiste > div:not(.karte-export)')].map((d) => [
+              d.querySelector('span')?.childNodes[0]?.textContent ?? '', d.querySelector('strong')?.textContent ?? '']),
+          })} />
+        </div>
       </section>
     ),
     vergleich: stufe !== 'maschine' ? (
       <section className="karte" style={{ '--i': 6 }}>
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">{kinderTitel}{info('vergleich', kinderTitel)}</h2>
-          <span className="klein">{t('sortiert nach Ausfallzeit')}</span>
+          <span className="d-flex align-items-center gap-2">
+            <span className="klein">{t('sortiert nach Ausfallzeit')}</span>
+            <ExportKnopf titel={kinderTitel} daten={() => ({
+              spalten: [t('Name'), t('Störungen'), t('Offen'), t('MTTR (h)'), t('Ausfallzeit (h)'), t('Maschinen')],
+              zeilen: kinder.map((kind) => [kind.name, kind.anzahl, kind.offen,
+                kind.mttr_min === null ? '' : Math.round(kind.mttr_min / 6) / 10, Math.round(kind.ausfall_min / 6) / 10, kind.maschinen ?? '']),
+            })} />
+          </span>
         </div>
         <div className="stat-kacheln">
           {kinder.map((kind) => (
@@ -495,7 +509,11 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
       <section className="karte" style={{ '--i': 6 }}>
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">{t('Störungen dieser Maschine')}{info('maschinenListe', t('Störungen dieser Maschine'))}</h2>
-          <span className="d-flex gap-3">
+          <span className="d-flex gap-3 align-items-center">
+            <ExportKnopf titel={t('Störungen dieser Maschine')} daten={() => ({
+              spalten: [t('Zeitpunkt'), t('Beschreibung'), t('Ursache'), t('Priorität'), t('Status'), t('Auftrag')],
+              zeilen: a.liste.map((e) => [datumZeit(e.zeitpunkt, s), e.beschreibung, t(e.ursache), gross(t(e.prioritaet)), gross(t(e.status)), e.auftrag_id]),
+            })} />
             <Link href={`/maschinen/${maschine.id}`}>{t('Maschinenhistorie')}</Link>
             <Link href={`/melden?maschine=${maschine.id}`}>{t('Störung melden')}</Link>
           </span>
@@ -523,6 +541,12 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     streuung: stufe !== 'maschine' && a.streuung.length > 1 ? (
       <section className="karte" style={{ '--i': 7 }}>
         <h2 className="abschnitt-titel">{t('Maschinen: Häufigkeit × Reparaturdauer')}{info('streuung', t('Maschinen: Häufigkeit × Reparaturdauer'))}</h2>
+        <div className="karte-export">
+          <ExportKnopf titel={t('Maschinen: Häufigkeit × Reparaturdauer')} daten={() => ({
+            spalten: [t('Maschine'), t('Störungen'), t('MTTR (h)'), t('Ausfallzeit (h)')],
+            zeilen: a.streuung.map((p) => [p.name, p.anzahl, Math.round(p.mttr_h * 10) / 10, Math.round(p.ausfall_h * 10) / 10]),
+          })} />
+        </div>
         <Streuung punkte={a.streuung} onKlick={(id) => {
           const o = maschineVon[id];
           zoomen({ land: o.land, standortId: o.standort_id, gebaeudeId: o.gebaeude_id, maschineId: id }, 'rein');
@@ -566,6 +590,12 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     treemap: (
       <section className="karte" style={{ '--i': 10 }}>
         <h2 className="abschnitt-titel">{t('Ausfallzeit nach Ursache')}{info('ausfallUrsache', t('Ausfallzeit nach Ursache'))}</h2>
+        <div className="karte-export">
+          <ExportKnopf titel={t('Ausfallzeit nach Ursache')} daten={() => ({
+            spalten: [t('Ursache'), t('Ausfallzeit (h)'), t('Störungen')],
+            zeilen: a.ursachen.map((u) => [t(u.ursache), Math.round(u.ausfall_h * 10) / 10, u.anzahl]),
+          })} />
+        </div>
         <Kachelflaeche eintraege={a.ursachen.filter((u) => u.ausfall_h > 0).sort((x, y) => y.ausfall_h - x.ausfall_h)
           .map((u) => ({ schluessel: u.ursache, name: t(u.ursache), wert: u.ausfall_h, text: `${zahl(u.ausfall_h, 0, s)} h` }))}
                        auswahl={filter.ursache} onKlick={(w) => umschalten('ursache', w)} />
@@ -650,7 +680,7 @@ export default function StatistikExplorer({ daten, zeitraum, start }) {
     alter: (
       <section className="karte" style={{ '--i': 17 }}>
         <h2 className="abschnitt-titel">{t('Offene Aufträge nach Alter')}{info('alter', t('Offene Aufträge nach Alter'))}</h2>
-        <p className="klein text-leise">{t('Wie lange warten die noch offenen Störungen schon?')}</p>
+        <p className="klein text-leise">{t('Alter der offenen Störungen')}</p>
         {k.offen === 0 ? <p className="leer"><i className="bi bi-check-circle" />{t('Keine offenen Aufträge.')}</p> : (
           <BalkenListe titel={t('Offene Aufträge nach Alter')} zeilen={a.alter.map((st) => ({ name: t(st.name), wert: st.anzahl, text: String(st.anzahl) }))} />
         )}

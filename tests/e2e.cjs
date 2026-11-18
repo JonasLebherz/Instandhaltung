@@ -46,7 +46,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
     pruefe(`GET ${url}`, r.status() === 200, r.status());
   }
   const r404 = await p.goto(BASE + '/auftraege/99999');
-  pruefe('Unbekannter Auftrag → Nicht-gefunden-Seite', (await p.content()).includes('Nicht gefunden') && (await p.content()).includes('noindex'), r404.status());
+  pruefe('Unbekannter Auftrag → Nicht-gefunden-Seite', (await p.content()).includes('Seite nicht gefunden') && (await p.content()).includes('noindex'), r404.status());
   konsole.length = 0; // der 404 eben war Absicht
   await p.goto(BASE + '/karte/xyz');
   pruefe('Unbekanntes Werk → Deutschlandkarte', p.url().endsWith('/karte?werk=xyz') && (await p.$('.ebene-neu .dkarte')) !== null, p.url());
@@ -542,7 +542,7 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   await p.click(`.person-knopf:has-text("${techName}")`);
   await p.waitForSelector('.aufgaben-liste, .aufgaben-karte .leer'); await p.waitForTimeout(500);
   pruefe('Person: Seitenleiste zeigt die gewählte Person', (await p.textContent('.leiste-konto')).includes(techName));
-  pruefe('Person: "Dir zugewiesene Aufgaben" mit den offenen Aufträgen', (await p.textContent('.aufgaben-karte h2')) === 'Dir zugewiesene Aufgaben'
+  pruefe('Person: "Zugewiesene Aufgaben" mit den offenen Aufträgen', (await p.textContent('.aufgaben-karte h2')) === 'Zugewiesene Aufgaben'
     && (await p.$$eval('.aufgaben-liste li', (z) => z.length)) === Math.min(6, Number(techOffen)), `${await p.$$eval('.aufgaben-liste li', (z) => z.length)} / ${techOffen}`);
   pruefe('Person: zugewiesen von … wird angezeigt', (await p.textContent('.aufgaben-liste')).includes('zugewiesen von'));
   await p.screenshot({ path: SHOTS + 'p-uebersicht-techniker.png', fullPage: false });
@@ -575,12 +575,12 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Person: Produktion – Server lehnt Speichern ab', (await p.textContent('.hinweis-fehler')).includes('keine Aufträge bearbeiten') && sql(`SELECT status FROM wartungsauftrag WHERE id = ${freiId}`) === 'zugewiesen');
   await p.goto(BASE + '/melden'); await p.waitForTimeout(800);
   pruefe('Person: Melden startet im eigenen Werk (mit Hinweis)', (await p.$('.ebene-neu .lageplan')) !== null && (await p.textContent('.explorer-melden')).includes('Hamburg')
-    && (await p.textContent('.eigenes-werk-hinweis')).includes('Dein Werk'));
+    && (await p.textContent('.eigenes-werk-hinweis')).includes('Eigenes Werk'));
   // Mein Werk als fester Favorit in der Seitenleiste (Standard 3D)
   pruefe('Person: „Mein Werk“ als Favorit (3D)', (await p.getAttribute('.favorit-eigenes .favorit-link', 'href')) === '/karte?werk=ham&ansicht=3d');
   // Anderes Werk wählbar: über den Hinweis ins Land, eigenes Werk steht zuerst
   await p.click('.eigenes-werk-hinweis button'); await p.waitForTimeout(1500);
-  pruefe('Person: anderes Werk wählbar, eigenes zuerst', (await p.$('.ebene-neu .dkarte')) !== null && (await p.textContent('.explorer-info .ort-liste li:first-child')).includes('Dein Werk'));
+  pruefe('Person: anderes Werk wählbar, eigenes zuerst', (await p.$('.ebene-neu .dkarte')) !== null && (await p.textContent('.explorer-info .ort-liste li:first-child')).includes('Eigenes Werk'));
   await p.goto(BASE + '/melden?maschine=3'); await p.waitForTimeout(500);
   pruefe('Person: "Gemeldet von" vorbelegt', (await p.inputValue('#gemeldet_von')) === 'Julia Krause');
   await p.fill('#beschreibung', 'Test der Personenwahl beim Melden'); await waehle(p, 'ursache_kategorie', 'Sonstiges');
@@ -955,6 +955,54 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Anlegen: Mitarbeiter der Instandhaltung bekommt einen Techniker', sql("SELECT p.rolle || ' ' || t.qualifikation FROM person p JOIN techniker t ON t.id = p.techniker_id WHERE p.name='Tina Test'") === 'Instandhaltung Mechatroniker/in');
   await p.goto(BASE + '/karte?werk=tst&halle=h1'); await p.waitForTimeout(2000);
   pruefe('Anlegen: neue Halle samt Maschine auf der Karte', (await p.textContent('.explorer-karte')).includes('Halle 1 – Prüffeld'));
+
+  // 26. Suche (Strg+K), Arbeitsauftrag zum Drucken, Fehlerseite, PNG-Export, Melden ohne Symbol-Kachel
+  await p.goto(BASE + '/'); await p.waitForSelector('aside'); await p.waitForTimeout(500);
+  await p.keyboard.press('Control+k'); await p.waitForSelector('.suche-feld');
+  await p.fill('.suche-feld', 'ALB-H1-07'); await p.waitForSelector('.suche-treffer[data-art="maschine"]', { timeout: 5000 }).catch(() => {});
+  const sucheMaschine = sql("SELECT id FROM maschine WHERE anlagennummer = 'ALB-H1-07'");
+  pruefe('Suche: Strg+K findet Maschine über die Anlagennummer', (await p.textContent('.suche-treffer[data-art="maschine"]')).includes('ALB-H1-07'));
+  await p.click('.suche-treffer[data-art="maschine"]'); await p.waitForURL(/\/maschinen\/\d+/);
+  pruefe('Suche: Treffer öffnet die Maschinen-Seite', p.url().endsWith(`/maschinen/${sucheMaschine}`), p.url());
+  await p.click('.leiste-suche'); await p.waitForSelector('.suche-feld');
+  await p.fill('.suche-feld', '#12'); await p.waitForSelector('.suche-treffer[data-art="auftrag"]', { timeout: 5000 }).catch(() => {});
+  pruefe('Suche: Auftragsnummer mit # findet den Auftrag zuerst', (await p.textContent('.suche-treffer[data-art="auftrag"]')).startsWith('Nr. 12 '));
+  await p.keyboard.press('Escape');
+  pruefe('Suche: Esc schließt das Fenster', (await p.$('.suche-fenster')) === null);
+  const sucheRoh = await p.evaluate(() => fetch('/api/suche?q=%25').then((a) => a.json()));
+  pruefe('Suche: % wird wörtlich gesucht (keine Platzhalter)', Array.isArray(sucheRoh.treffer) && sucheRoh.treffer.length === 0, sucheRoh.treffer?.length);
+
+  await p.goto(BASE + '/auftraege/5'); await p.click('.auftrag-drucken'); await p.waitForURL(/\/auftraege\/5\/druck/); await p.waitForSelector('.auftragsblatt');
+  const blatt = await p.textContent('.auftragsblatt');
+  const druckTyp = sql("SELECT m.typ FROM wartungsauftrag w JOIN stoermeldung s ON s.id=w.stoermeldung_id JOIN maschine m ON m.id=s.maschine_id WHERE w.id=5");
+  pruefe('Arbeitsauftrag: Blatt mit Nummer, QR-Code und drei Zeichnungen', blatt.includes('Nr. 5') && (await p.$$('.auftragsblatt .qr-code')).length === 1
+    && (await p.$$('.auftragsblatt svg.zeichnung')).length === 3 && (await p.$$('.auftragsblatt .z-ziel')).length === 2, druckTyp);
+  pruefe('Arbeitsauftrag: Checkliste des Maschinentyps und Unterschriften', (await p.$$('.ab-checkliste li')).length >= 5 && (await p.$$('.ab-unterschriften > div')).length === 2);
+  await p.emulateMedia({ media: 'print' });
+  const pdfPfad = SHOTS + 'arbeitsauftrag.pdf';
+  await p.pdf({ path: pdfPfad, preferCSSPageSize: true, printBackground: true });
+  await p.emulateMedia({ media: 'screen' });
+  const pdfSeiten = (fs.readFileSync(pdfPfad, 'latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+  pruefe('Arbeitsauftrag: als PDF genau eine A4-Seite', pdfSeiten === 1, pdfSeiten);
+
+  const vor404 = konsole.length;
+  const r404b = await p.goto(BASE + '/maschinen/99999999');
+  pruefe('Fehlerseite 404: Code, Text und Wege zurück', r404b.status() === 404 && (await p.textContent('.fehlerseite-code')) === '404'
+    && (await p.$$('.fehlerseite-wege a, .fehlerseite-wege button')).length === 3);
+  // Die gewollte 404-Antwort meldet der Browser als Konsolenfehler – der zählt hier nicht
+  konsole.splice(vor404, konsole.length - vor404, ...konsole.slice(vor404).filter((x) => !x.includes('status of 404')));
+
+  await p.goto(BASE + '/statistik'); await p.waitForTimeout(2500);
+  pruefe('Statistik: jede Auswertung hat einen Export-Knopf', (await p.$$eval('.stat-zelle', (z) => z.filter((x) => !x.querySelector('.export-knopf')).length)) === 0);
+  await p.click('.stat-leiste .export-knopf .rund-knopf');
+  const [bildDl] = await Promise.all([p.waitForEvent('download'), p.click('.export-menue button:has-text("PNG")')]);
+  const bildPfad = SHOTS + 'export.png'; await bildDl.saveAs(bildPfad);
+  pruefe('Statistik: Export als PNG (echtes Bild)', bildDl.suggestedFilename() === 'Weitere-Kennzahlen.png'
+    && fs.readFileSync(bildPfad).subarray(1, 4).toString() === 'PNG', bildDl.suggestedFilename());
+
+  await p.goto(BASE + '/melden'); await p.waitForSelector('.melde-schritte');
+  pruefe('Melden: ohne Symbol-Kachel, Schritte als Balken mit Nummer', (await p.$('.melde-symbol')) === null
+    && (await p.textContent('.melde-schritte li:first-child .schritt-nr')).trim() === '01' && (await p.$('.melde-schritte .bi-check-lg')) === null);
 
   pruefe('Keine JavaScript-Fehler in der Konsole', konsole.length === 0, konsole.slice(0, 3).join(' | '));
   console.log('\nERGEBNIS:', fehler.length === 0 ? 'alles OK' : `${fehler.length} Fehler: ${fehler.join(', ')}`);

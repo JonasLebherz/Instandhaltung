@@ -1,6 +1,8 @@
 'use client';
 /**
- * components/ExportKnopf.js – kleiner Knopf „Export“ mit Menü: CSV, Excel, PDF
+ * components/ExportKnopf.js – kleiner Knopf „Export“ mit Menü: CSV, Excel, PNG, PDF
+ *
+ * PNG ist ein Bild der Karte, in der der Knopf steht (Überschrift + Inhalt). CSV/Excel/PDF nur mit `daten`.
  *
  *   <ExportKnopf titel="Störungen pro Monat" daten={() => ({ spalten, zeilen })} bild={() => canvas.toDataURL()} />
  *
@@ -26,6 +28,10 @@ export default function ExportKnopf({ titel, daten, bild, unterzeile }) {
 
   function los(format) {
     setOffen(false);
+    if (format === 'png') {
+      exportieren('png', { titel, element: ref.current?.closest('.karte') });
+      return;
+    }
     exportieren(format, { titel, unterzeile, ...daten(), bild: format === 'pdf' ? bild?.() : undefined });
   }
 
@@ -37,9 +43,10 @@ export default function ExportKnopf({ titel, daten, bild, unterzeile }) {
       </button>
       {offen && (
         <div className="export-menue" role="menu">
-          <button type="button" role="menuitem" onClick={() => los('csv')}><i className="bi bi-filetype-csv" aria-hidden="true" /> CSV</button>
-          <button type="button" role="menuitem" onClick={() => los('xlsx')}><i className="bi bi-file-earmark-excel" aria-hidden="true" /> Excel</button>
-          <button type="button" role="menuitem" onClick={() => los('pdf')}><i className="bi bi-file-earmark-pdf" aria-hidden="true" /> {t('PDF / Drucken')}</button>
+          {daten && <button type="button" role="menuitem" onClick={() => los('csv')}><i className="bi bi-filetype-csv" aria-hidden="true" /> CSV</button>}
+          {daten && <button type="button" role="menuitem" onClick={() => los('xlsx')}><i className="bi bi-file-earmark-excel" aria-hidden="true" /> Excel</button>}
+          <button type="button" role="menuitem" onClick={() => los('png')}><i className="bi bi-filetype-png" aria-hidden="true" /> {t('Bild (PNG)')}</button>
+          {daten && <button type="button" role="menuitem" onClick={() => los('pdf')}><i className="bi bi-file-earmark-pdf" aria-hidden="true" /> {t('PDF / Drucken')}</button>}
         </div>
       )}
     </div>

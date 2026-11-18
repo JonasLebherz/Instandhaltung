@@ -20,9 +20,9 @@ const SORTIERUNGEN = [
   { wert: 'name', text: T('Name') },
 ];
 
-export default function MitarbeiterBereich({ personen, ich }) {
+export default function MitarbeiterBereich({ personen, ich, startSuche = '' }) {
   const t = useT();
-  const [suche, setSuche] = useState('');
+  const [suche, setSuche] = useState(startSuche);
   const [ort, setOrt] = useState('');
   const [rolle, setRolle] = useState('');
   const [sortierung, setSortierung] = useState('werk');
@@ -107,7 +107,7 @@ export default function MitarbeiterBereich({ personen, ich }) {
                         <div className="mitarbeiter-name">
                           <span className="avatar" aria-hidden="true">{p.name.split(' ').map((x) => x[0]).slice(0, 2).join('')}</span>
                           <span>
-                            <strong>{p.name}</strong>{p.id === ich?.id && <span className="ich-marke">{t('Du')}</span>}
+                            <strong>{p.name}</strong>{p.id === ich?.id && <span className="ich-marke">{t('Ich')}</span>}
                             <span className="d-flex flex-wrap gap-1 align-items-center mt-1">
                               <RollenAbzeichen rolle={p.rolle} />
                               {p.qualifikation && <span className="klein d-none d-xxl-inline">{p.qualifikation}</span>}

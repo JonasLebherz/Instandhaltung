@@ -103,7 +103,7 @@ export default function MeldeFormular({ maschineId, startwerte, jetzt }) {
         {/* Priorität über die Ampel: Man klickt die Leuchte an, die an der Maschine leuchten soll. Jede Zeile ist
             ein großes Auswahlfeld (gut mit dem Finger zu treffen); links steht die Signalsäule mit den Leuchten. */}
         <fieldset className="mb-4">
-          <legend className="form-label fs-6">{t('Priorität – welche Ampel soll an der Maschine leuchten?')}</legend>
+          <legend className="form-label fs-6">{t('Priorität')}</legend>
           <div className={`prio-ampel${fehlerklasse(fehler, 'prioritaet')}`}>
             <span className="prio-saeule" aria-hidden="true" />
             {PRIORITAETEN.map((p) => (

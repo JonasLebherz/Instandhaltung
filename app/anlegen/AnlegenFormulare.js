@@ -44,7 +44,7 @@ export default function AnlegenFormulare({ art: start, laender, werke, hallen, v
           </button>
         ))}
       </div>
-      {gesperrt && <div className="hinweis hinweis-hinweis mt-3"><span className="hinweis-text">{t('Als Person aus der Produktion kannst du nichts anlegen.')}</span></div>}
+      {gesperrt && <div className="hinweis hinweis-hinweis mt-3"><span className="hinweis-text">{t('Die Rolle Produktion kann nichts anlegen.')}</span></div>}
       <fieldset disabled={gesperrt} className="mt-3">
         {art === 'werk' && <WerkFormular laender={laender} />}
         {art === 'halle' && <HalleFormular werkOptionen={werkOptionen} vorwahl={vorwahl.werk} />}

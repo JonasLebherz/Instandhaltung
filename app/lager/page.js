@@ -28,9 +28,14 @@ export default async function LagerSeite({ searchParams }) {
   const person = await aktuellePerson();
 
   // Welches Werk? Adresse → Person → Ansicht → alle
-  const werkId = idAus(q.werk) ? idAus(q.werk)
+  let werkId = idAus(q.werk) ? idAus(q.werk)
     : q.werk === 'alle' ? null
       : person?.standort_id ?? ansicht.standortId ?? null;
+  // Nur ein Teil angegeben (z. B. aus der Suche Strg+K), aber kein Werk: das Werk, in dem das Teil am knappsten ist
+  if (werkId === null && idAus(q.teil) && q.werk !== 'alle') {
+    werkId = (await sql`SELECT standort_id FROM lagerbestand WHERE ersatzteil_id = ${idAus(q.teil)}
+                        ORDER BY bestand - mindestbestand, standort_id LIMIT 1`)[0]?.standort_id ?? null;
+  }
 
   const [werke, teile, verteilung] = await Promise.all([
     // Alle Werke (der Ansicht) mit Zusammenfassung ihres Lagers

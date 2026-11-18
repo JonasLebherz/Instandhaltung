@@ -5,7 +5,7 @@
  * Zeigt alle Personen aus der Tabelle "person" (über /api/personen), gruppiert
  * nach Werk, mit Filter nach Rolle und Suche. Die Wahl landet im Cookie
  * "person" (JSON mit id, Name, Rolle, Stadt); danach lädt die Seite ihre Daten
- * neu (router.refresh), z. B. "Dir zugewiesene Aufgaben" auf der Übersicht.
+ * neu (router.refresh), z. B. "Zugewiesene Aufgaben" auf der Übersicht.
  *
  * Das Fenster wird per Portal direkt in <body> gezeichnet: Innerhalb der
  * Seitenleiste (Glas mit backdrop-filter) wäre "position: fixed" sonst auf die
@@ -98,7 +98,7 @@ export default function PersonWahl({ aktuelleId, onSchliessen }) {
       <div className="dialog person-dialog" role="dialog" aria-modal="true" aria-labelledby="person-titel">
         <div className="dialog-kopf">
           <div>
-            <h2 id="person-titel" className="abschnitt-titel mb-1">{t('Als welche Person arbeitest du?')}</h2>
+            <h2 id="person-titel" className="abschnitt-titel mb-1">{t('Person wählen')}</h2>
             <p className="klein mb-0">{t('Fiktive Personen des Unternehmens – so lassen sich die Abläufe aus jeder Rolle ausprobieren.')}</p>
           </div>
           <button type="button" className="rund-knopf" onClick={onSchliessen} aria-label={t('Schließen')}><i className="bi bi-x-lg" /></button>

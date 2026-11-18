@@ -4,7 +4,8 @@
  *
  *   1 Land → 2 Werk → 3 Gebäude → 4 Maschine → 5 Beschreibung
  *
- * Erledigte Schritte zeigen die getroffene Wahl und lassen sich anklicken,
+ * Aussehen: je Schritt ein Balken oben (erledigt dunkel, aktuell signalgelb, offen hell) mit
+ * zweistelliger Nummer – bewusst ohne Kreise und Haken. Erledigte Schritte zeigen die getroffene Wahl und lassen sich anklicken,
  * um dorthin zurückzugehen (onSchritt(nummer)). So sieht das Melden bewusst
  * anders aus als die Störungskarte, die nur zum Anschauen da ist.
  */
@@ -22,7 +23,7 @@ export default function MeldeSchritte({ schritt, werte = [], onSchritt }) {
         const zustand = nr < schritt ? 'fertig' : nr === schritt ? 'aktiv' : 'offen';
         const inhalt = (
           <>
-            <span className="schritt-nr" aria-hidden="true">{zustand === 'fertig' ? <i className="bi bi-check-lg" /> : nr}</span>
+            <span className="schritt-nr" aria-hidden="true">{String(nr).padStart(2, '0')}</span>
             <span className="schritt-text">
               <span className="schritt-name">{t(name)}</span>
               {zustand === 'fertig' && werte[i] && <span className="schritt-wert">{werte[i]}</span>}

@@ -19,7 +19,9 @@ import MitarbeiterBereich from './MitarbeiterBereich';
 export const dynamic = 'force-dynamic';
 export const generateMetadata = () => seitentitel('Mitarbeiter');
 
-export default async function MitarbeiterSeite() {
+export default async function MitarbeiterSeite({ searchParams }) {
+  // ?suche= (z. B. aus der Suche Strg+K) füllt das Suchfeld der Teamliste vor
+  const startSuche = String((await searchParams)?.suche ?? '').slice(0, 100);
   await benutzerPflicht();
   const t = await uebersetzer();
   const ansicht = await ansichtAusCookie();
@@ -70,7 +72,7 @@ export default async function MitarbeiterSeite() {
         </div>
       </div>
 
-      <MitarbeiterBereich personen={personen} ich={person ? { id: person.id, name: person.name } : null} />
+      <MitarbeiterBereich key={startSuche} startSuche={startSuche} personen={personen} ich={person ? { id: person.id, name: person.name } : null} />
     </>
   );
 }

@@ -131,8 +131,12 @@ export default async function AuftragSeite({ params }) {
 
   return (
     <>
-      <div className="mb-3">
+      <div className="mb-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <Link href="/auftraege"><i className="bi bi-chevron-left" aria-hidden="true" /> {t('Alle Aufträge')}</Link>
+        {/* Arbeitsauftrag als A4-Blatt mit QR-Code, Zeichnungen, Checkliste und Unterschriften */}
+        <Link href={`/auftraege/${auftragId}/druck`} className="btn btn-sekundaer btn-klein auftrag-drucken">
+          <i className="bi bi-printer" aria-hidden="true" /> {t('Arbeitsauftrag drucken')}
+        </Link>
       </div>
 
       <div className="seitenkopf">

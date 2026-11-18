@@ -72,7 +72,7 @@ export default function InfoKnopf({ titel, info, grundlage }) {
     <>
       <button ref={knopf} type="button" className={`info-knopf${lage ? ' offen' : ''}`} onClick={umschalten}
               aria-expanded={Boolean(lage)} aria-controls={lage ? id : undefined}
-              aria-label={t('Woher kommt „{titel}“?', { titel })} title={t('Quelle und Berechnung')}>
+              aria-label={t('Herkunft: {titel}', { titel })} title={t('Quelle und Berechnung')}>
         <i className="bi bi-info" aria-hidden="true" />
       </button>
       {lage && createPortal(

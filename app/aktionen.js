@@ -180,7 +180,7 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
   // Produktion darf melden, aber keine Aufträge bearbeiten
   const person = await aktuellePerson();
   if (!darfBearbeiten(person)) {
-    return { fehler: { allgemein: t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.') }, eingabe };
+    return { fehler: { allgemein: t('Die Rolle Produktion kann Störungen melden, aber keine Aufträge bearbeiten.') }, eingabe };
   }
 
   const [auftrag] = await sql`
@@ -280,7 +280,7 @@ export async function auftragSpeichern(auftragId, vorherigerZustand, formular) {
         const [info] = await tx`
           SELECT m.anlagennummer, m.bezeichnung, s.beschreibung FROM wartungsauftrag w
           JOIN stoermeldung s ON s.id = w.stoermeldung_id JOIN maschine m ON m.id = s.maschine_id WHERE w.id = ${auftragId}`;
-        const text = t('Neuer Auftrag für dich: {maschine} ({nummer}) – {beschreibung}', {
+        const text = t('Neuer Auftrag: {maschine} ({nummer}) – {beschreibung}', {
           maschine: info.bezeichnung, nummer: info.anlagennummer,
           beschreibung: info.beschreibung.length > 120 ? `${info.beschreibung.slice(0, 117)}…` : info.beschreibung,
         });
@@ -320,7 +320,7 @@ export async function teilBuchen(auftragId, vorherigerZustand, formular) {
 
   const person = await aktuellePerson();
   if (!darfBearbeiten(person)) {
-    fehler.allgemein = t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.');
+    fehler.allgemein = t('Die Rolle Produktion kann Störungen melden, aber keine Aufträge bearbeiten.');
   }
 
   // Gebucht wird aus dem Lager des Werks, in dem die Maschine des Auftrags steht
@@ -469,7 +469,7 @@ export async function teilNachbestellen(formular) {
   const t = await uebersetzer();
   const person = await aktuellePerson();
   if (!darfBearbeiten(person)) {
-    await flash('fehler', t('Als Person aus der Produktion kannst du keine Teile bestellen.'));
+    await flash('fehler', t('Die Rolle Produktion kann keine Teile bestellen.'));
     redirect(fruehVersion(formular) ? `/${fruehVersion(formular)}/lager` : '/lager');
   }
   const teilId = ganzzahl(feld(formular, 'ersatzteil_id'));
@@ -539,7 +539,7 @@ export async function wartungErledigen(planId, notiz = '') {
   await benutzerPflicht();
   const t = await uebersetzer();
   const person = await aktuellePerson();
-  if (!darfBearbeiten(person)) return { fehler: t('Als Person aus der Produktion kannst du keine Wartungen eintragen.') };
+  if (!darfBearbeiten(person)) return { fehler: t('Die Rolle Produktion kann keine Wartungen eintragen.') };
   const id = Number(planId);
   if (!Number.isInteger(id)) return { fehler: t('Ungültiger Wartungsplan.') };
   const text = String(notiz ?? '').trim().slice(0, 300) || null;
@@ -565,7 +565,7 @@ export async function wartungPlanen(vorherigerZustand, formular) {
     start_datum: feld(formular, 'start_datum'),
   };
   const person = await aktuellePerson();
-  if (!darfBearbeiten(person)) return { fehler: { allgemein: t('Als Person aus der Produktion kannst du keine Wartungen planen.') }, eingabe };
+  if (!darfBearbeiten(person)) return { fehler: { allgemein: t('Die Rolle Produktion kann keine Wartungen planen.') }, eingabe };
 
   const fehler = {};
   const maschineId = ganzzahl(eingabe.maschine_id);
@@ -595,7 +595,7 @@ export async function wartungsplanEntfernen(planId) {
   await benutzerPflicht();
   const t = await uebersetzer();
   const person = await aktuellePerson();
-  if (!darfBearbeiten(person)) return { fehler: t('Als Person aus der Produktion kannst du keine Wartungen planen.') };
+  if (!darfBearbeiten(person)) return { fehler: t('Die Rolle Produktion kann keine Wartungen planen.') };
   const id = Number(planId);
   if (!Number.isInteger(id)) return { fehler: t('Ungültiger Wartungsplan.') };
   await sql`UPDATE wartungsplan SET aktiv = false WHERE id = ${id}`;
@@ -634,7 +634,7 @@ export async function checklistePunkt(auftragId, nummer, erledigt) {
   await benutzerPflicht();
   const t = await uebersetzer();
   const person = await aktuellePerson();
-  if (!darfBearbeiten(person)) return { fehler: t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.') };
+  if (!darfBearbeiten(person)) return { fehler: t('Die Rolle Produktion kann Störungen melden, aber keine Aufträge bearbeiten.') };
   const id = Number(auftragId);
   const nr = Number(nummer);
   if (!Number.isInteger(id) || !Number.isInteger(nr) || nr < 0 || nr > 20) return { fehler: t('Ungültiger Prüfpunkt.') };
@@ -781,7 +781,7 @@ async function anlegenErlaubt() {
   await benutzerPflicht();
   const t = await uebersetzer();
   const person = await aktuellePerson();
-  return { t, verboten: !darfBearbeiten(person) ? t('Als Person aus der Produktion kannst du nichts anlegen.') : null };
+  return { t, verboten: !darfBearbeiten(person) ? t('Die Rolle Produktion kann nichts anlegen.') : null };
 }
 
 export async function werkAnlegen(vorherigerZustand, formular) {

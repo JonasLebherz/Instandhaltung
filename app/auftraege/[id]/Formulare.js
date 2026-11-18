@@ -68,7 +68,7 @@ export function BearbeitungsFormular({ auftragId, techniker, startwerte, person 
       {gesperrt && (
         <div className="hinweis hinweis-hinweis">
           <i className="bi bi-lock-fill" aria-hidden="true" />
-          <span className="hinweis-text">{t('Als Person aus der Produktion kannst du Störungen melden, aber keine Aufträge bearbeiten.')}</span>
+          <span className="hinweis-text">{t('Die Rolle Produktion kann Störungen melden, aber keine Aufträge bearbeiten.')}</span>
         </div>
       )}
 

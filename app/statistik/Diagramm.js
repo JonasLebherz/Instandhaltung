@@ -55,7 +55,7 @@ export default function Diagramm({ art = 'saeulen', labels, werte, einheit = '',
       diagramm?.destroy();
       const akzent = farbe('--akzent');
       const gitter = { color: farbe('--linie') };
-      const schrift = { family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', size: 12 };
+      const schrift = { family: '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', size: 12 };
       Chart.defaults.color = farbe('--text-leise');
       const waagerecht = art === 'balken';
       const tooltip = {

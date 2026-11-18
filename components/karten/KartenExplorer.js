@@ -34,7 +34,6 @@ import { MASCHINEN_SYMBOLE } from '@/lib/konstanten';
 import MeldeSchritte from './MeldeSchritte';
 import VollbildAuftraege from './VollbildAuftraege';
 import { useT } from '@/components/SpracheKontext';
-import { T } from '@/lib/sprache';
 import { startAusAdresse } from '@/lib/karten/adresse';
 import { laenderAus, landKarte, weltVerhaeltnis } from '@/lib/karten/laender';
 import { ampelZustand, AMPEL_TEXT, AMPEL_REIHENFOLGE, AMPEL_PRIORITAET, AmpelSymbol } from '@/lib/karten/ampel';
@@ -451,7 +450,7 @@ export default function KartenExplorer({
   }, [adresseMitfuehren]);
   function pinnen() {
     if (angepinnt?.person) {
-      setPinHinweis(t('Dein Werk steht immer in den Favoriten'));
+      setPinHinweis(t('Das eigene Werk steht immer in den Favoriten'));
       return;
     }
     if (angepinnt) {
@@ -627,15 +626,13 @@ export default function KartenExplorer({
   const schluessel = schluesselVon(ebene);
   const schrittNr = { welt: 1, land: 2, werk: 3, gebaeude: 4 }[stufeName];
   const titel = aktuellesGebaeude?.bezeichnung ?? standort?.name ?? (land ? t(land.name) : t('Weltweit'));
-  const hinweis = modus === 'auswahl'
-    ? t({ welt: T('In welchem Land?'), land: T('In welchem Werk?'), werk: T('In welchem Gebäude?'), gebaeude: T('An welcher Maschine?') }[stufeName])
-    : {
-      // Statt Bedienhinweisen eine Zahl zur Ebene (Länder, Werke, Gebäude, Maschinen)
-      welt: () => t('{n} Länder', { n: laender.length }),
-      land: () => t('{n} Werke', { n: standorte.filter((st) => st.land === land?.kuerzel).length }),
-      werk: () => t('{n} Gebäude', { n: gebaeude.filter((g) => g.standort_id === standort?.id).length }),
-      gebaeude: () => t('{n} Maschinen', { n: maschinen.filter((m) => m.gebaeude_id === aktuellesGebaeude?.id).length }),
-    }[stufeName]?.();
+  // Unter dem Titel eine Zahl zur Ebene statt Fragen oder Bedienhinweisen (auch beim Melden)
+  const hinweis = {
+    welt: () => t('{n} Länder', { n: laender.length }),
+    land: () => t('{n} Werke', { n: standorte.filter((st) => st.land === land?.kuerzel).length }),
+    werk: () => t('{n} Gebäude', { n: gebaeude.filter((g) => g.standort_id === standort?.id).length }),
+    gebaeude: () => t('{n} Maschinen', { n: maschinen.filter((m) => m.gebaeude_id === aktuellesGebaeude?.id).length }),
+  }[stufeName]?.();
 
   const buehne = (
     <div className="explorer-buehne-rahmen">
@@ -673,7 +670,7 @@ export default function KartenExplorer({
       {melden && eigenesWerk && standort?.id === eigenesWerk && (
         <div className="eigenes-werk-hinweis">
           <i className="bi bi-house-door-fill" aria-hidden="true" />
-          <span>{t('Dein Werk: {name}', { name: standort.name })}</span>
+          <span>{t('Eigenes Werk: {name}', { name: standort.name })}</span>
           <button type="button" className="link-knopf" onClick={zuLandRaus}>{t('anderes Werk wählen')}</button>
         </div>
       )}
@@ -822,7 +819,7 @@ function InfoSpalte({
       .sort((a, b) => Number(b.kuerzel === eigenesLand) - Number(a.kuerzel === eigenesLand));
     return (
       <section className="karte explorer-seite" style={{ '--i': 1 }}>
-        <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Land aus der Liste wählen') : t('Länder')}</h2>
+        <h2 className="abschnitt-titel">{t('Länder')}</h2>
         <ul className="ort-liste">
           {sortiert.map((l) => (
             <li key={l.kuerzel}>
@@ -831,7 +828,7 @@ function InfoSpalte({
                   <span className="ort-titel">
                     {t(l.name)}
                     {l.hauptsitz && <span className="hauptsitz-abzeichen"><i className="bi bi-star-fill" aria-hidden="true" /> {t('Hauptsitz')}</span>}
-                    {l.kuerzel === eigenesLand && <span className="hauptsitz-abzeichen eigenes-abzeichen"><i className="bi bi-house-door-fill" aria-hidden="true" /> {t('Dein Land')}</span>}
+                    {l.kuerzel === eigenesLand && <span className="hauptsitz-abzeichen eigenes-abzeichen"><i className="bi bi-house-door-fill" aria-hidden="true" /> {t('Eigenes Land')}</span>}
                   </span>
                   <span className="ort-unter">
                     {l.werke === 1 ? t('1 Werk') : t('{n} Werke', { n: l.werke })} · {t('{n} Maschinen', { n: l.maschinen })}
@@ -858,7 +855,7 @@ function InfoSpalte({
       .sort((a, b) => Number(b.id === eigenesWerk) - Number(a.id === eigenesWerk));
     return (
       <section className="karte explorer-seite" style={{ '--i': 1 }}>
-        <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Werk aus der Liste wählen') : t('Standorte')}</h2>
+        <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Werke') : t('Standorte')}</h2>
         <ul className="ort-liste">
           {sortiert.map((st) => (
             <li key={st.id}>
@@ -866,7 +863,7 @@ function InfoSpalte({
                 <span>
                   <span className="ort-titel">
                     {st.name}
-                    {st.id === eigenesWerk && <span className="hauptsitz-abzeichen eigenes-abzeichen"><i className="bi bi-house-door-fill" aria-hidden="true" /> {t('Dein Werk')}</span>}
+                    {st.id === eigenesWerk && <span className="hauptsitz-abzeichen eigenes-abzeichen"><i className="bi bi-house-door-fill" aria-hidden="true" /> {t('Eigenes Werk')}</span>}
                   </span>
                   <span className="ort-unter">{t(st.schwerpunkt)} · {t('{n} Gebäude', { n: st.gebaeude })} · {t('{n} Maschinen', { n: st.maschinen })}</span>
                 </span>
@@ -890,7 +887,7 @@ function InfoSpalte({
       <>
         <section className="karte explorer-seite" style={{ '--i': 1 }}>
           {modus === 'anzeige' && <p className="klein mb-3"><i className="bi bi-geo-alt" aria-hidden="true" /> {standort.adresse}</p>}
-          <h2 className="abschnitt-titel">{modus === 'auswahl' ? t('Gebäude aus der Liste wählen') : t('Gebäude')}</h2>
+          <h2 className="abschnitt-titel">{t('Gebäude')}</h2>
           <ul className="ort-liste">
             {hallen.map((g) => (
               <li key={g.id}>
@@ -942,7 +939,7 @@ function InfoSpalte({
   if (modus === 'auswahl') {
     return (
       <section className="karte explorer-seite" style={{ '--i': 1 }}>
-        <h2 className="abschnitt-titel">{t('Maschine aus der Liste wählen')}</h2>
+        <h2 className="abschnitt-titel">{t('Maschinen')}</h2>
         <ul className="ort-liste">
           {maschinenHier.map((m) => (
             <li key={m.id}>

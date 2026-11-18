@@ -263,6 +263,12 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
 
         <nav className="leiste-nav" onPointerOver={tippZeigen} onPointerLeave={() => setTipp(null)} onFocus={tippZeigen} onBlur={() => setTipp(null)}
              onScroll={() => setTipp(null)}>
+          {/* Suche (Strg+K) – öffnet components/Suche.js */}
+          <button type="button" className="leiste-link leiste-suche" aria-label={t('Suchen (Strg+K)')}
+                  onClick={() => { setMobilOffen(false); window.dispatchEvent(new Event('suche-oeffnen')); }}>
+            <span className="leiste-symbol"><i className="bi bi-search" aria-hidden="true" /></span>
+            <span className="leiste-text">{t('Suchen')}<kbd className="leiste-kbd">Strg K</kbd></span>
+          </button>
           {BEREICHE.map((bereich) => (
             <div key={bereich.titel} className="leiste-bereich">
               <div className="leiste-titel"><span>{t(bereich.titel)}</span></div>
@@ -376,7 +382,7 @@ export default function Seitenleiste({ benutzer, person, ansicht }) {
                   {benutzer.anzeigename}
                   <small>{benutzer.email}</small>
                 </div>
-                <div className="menue-titel">{t('Du arbeitest als')}</div>
+                <div className="menue-titel">{t('Aktive Person')}</div>
                 <div className="menue-info">
                   {person ? (
                     <>

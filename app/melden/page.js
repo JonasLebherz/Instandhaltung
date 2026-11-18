@@ -49,11 +49,9 @@ export default async function MeldenSeite({ searchParams }) {
 
   return (
     <>
-      <div className="seitenkopf seitenkopf-melden">
-        <span className="melde-symbol" aria-hidden="true"><i className="bi bi-exclamation-triangle-fill" /></span>
-        <div>
-          <h1>{t('Störung melden')}</h1>
-        </div>
+      <div className="seitenkopf">
+        <div className="eyebrow">{t('Instandhaltung')}</div>
+        <h1>{t('Störung melden')}</h1>
       </div>
       <MeldeAssistent daten={daten} startwerte={startwerte}
                       vorauswahlMaschine={vorauswahlMaschine} vorauswahlStandort={vorauswahlStandort}

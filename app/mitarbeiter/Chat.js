@@ -206,7 +206,7 @@ export default function Chat({ ich, personen, mit, onMit }) {
                     <strong>{g.name}</strong>
                     <span className="chat-wann">{wann(g.zeitpunkt, t.sprache)}</span>
                   </span>
-                  <span className="chat-vorschau">{g.von_mir && `${t('Du')}: `}{g.text}</span>
+                  <span className="chat-vorschau">{g.von_mir && `${t('Ich')}: `}{g.text}</span>
                 </span>
                 {g.ungelesen > 0 && <span className="chat-zahl" aria-label={t('{n} ungelesen', { n: g.ungelesen })}>{g.ungelesen}</span>}
               </button>
