@@ -351,8 +351,8 @@ const pruefe = (name, ok, info = '') => { console.log((ok ? 'OK   ' : 'FEHL ') +
   pruefe('Datenbasis: 17 Tabellen als Stationen im Netzplan', (await p.$$eval('.netz-station', (z) => z.length)) === 17);
   pruefe('Datenbasis: eine Strecke je Fremdschlüssel', (await p.$$eval('.netz-strecke', (z) => z.length)) === 26, await p.$$eval('.netz-strecke', (z) => z.length));
   pruefe('Datenbasis: 5 Views', (await p.$$eval('.netz-liste:not(.netz-werte) button', (z) => z.length)) === 5);
-  pruefe('Datenbasis: Verbindung zur Datenbank geprüft', (await p.textContent('.tafel-zeile[data-dienst="db"]')).includes('verbunden'));
-  pruefe('Datenbasis: einfach erklärt, ohne Power BI und Commit-Texte', (await p.$$eval('.tafel-zeile', (z) => z.length)) === 5
+  pruefe('Datenbasis: Verbindung zur Datenbank geprüft', (await p.textContent('.sys-station[data-dienst="db"]')).includes('verbunden'));
+  pruefe('Datenbasis: einfach erklärt, ohne Power BI und Commit-Texte', (await p.$$eval('.sys-station', (z) => z.length)) === 5
     && !(await p.textContent('main')).includes('Power BI') && !(await p.textContent('main')).includes('Commit'));
   await p.hover('.netz-station[data-tabelle="maschine"] .netz-ring'); await p.waitForTimeout(300);
   const maschStrecken = Number(sql("SELECT count(*) FROM information_schema.table_constraints tc JOIN information_schema.constraint_column_usage ccu USING (constraint_name, table_schema) WHERE tc.table_schema='public' AND tc.constraint_type='FOREIGN KEY' AND (tc.table_name='maschine' OR ccu.table_name='maschine')"));

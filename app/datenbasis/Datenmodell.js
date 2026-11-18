@@ -1,30 +1,51 @@
 'use client';
 /**
- * app/datenbasis/Datenmodell.js – das Datenmodell als Liniennetzplan
+ * app/datenbasis/Datenmodell.js – das Datenmodell im Stil eines U-Bahn-Plans
  *
  * Jede Tabelle ist eine Station, jeder Fremdschlüssel eine Strecke zur Tabelle, auf die er verweist
- * (z. B. maschine → gebaeude). Die Strecken verlaufen wie auf einem U-Bahn-Plan nur waagerecht,
- * senkrecht und im 45°-Winkel; zwischen den Stationsreihen liegen „Fahrspuren“, damit keine Strecke
- * durch eine fremde Station läuft. Farbe = Thema der verweisenden Tabelle, Größe der Station =
- * Zahl der Datensätze. Darüberfahren hebt die Strecken der Station hervor, Klick öffnet darunter
- * Spalten und Datensätze (über /api/datenbasis/<tabelle>).
+ * (z. B. maschine → gebaeude). Wie auf einem Netzplan verlaufen die Strecken nur waagerecht,
+ * senkrecht und im 45°-Winkel, mit runden Kurven. Die Lage der Stationen (PLATZ) und der Verlauf
+ * jeder Strecke (ROUTEN) sind von Hand so gelegt, dass sich keine Strecken kreuzen.
+ * Laufen zwei Strecken ein Stück gemeinsam (z. B. von standort nach unten), liegen sie als
+ * echte Parallelen nebeneinander (gleicher Abstand auch in den Kurven, `parallel()`).
+ * Farbe = Thema der verweisenden Tabelle. Darüberfahren hebt die Strecken der Station hervor,
+ * Klick öffnet darunter Spalten und Datensätze (über /api/datenbasis/<tabelle>).
  */
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '@/components/SpracheKontext';
 import { T } from '@/lib/sprache';
 import { datumZeit } from '@/lib/format';
 
-// Lage jeder Tabelle im Plan (x, y in Rastereinheiten, immer gerade Zahlen; ungerade = Fahrspuren).
-// Neue Tabellen, die hier fehlen, kommen in eine weitere Reihe unten.
+// Lage jeder Tabelle im Plan (x, y in Rastereinheiten) und wo der Name steht
+// (u = unten, o = oben, l = links, r = rechts, lo = links oben).
 const PLATZ = {
-  land: [0, 0], standort: [2, 0], gebaeude: [4, 0], maschine: [6, 0], wartungsplan: [8, 0], wartung_durchfuehrung: [10, 0],
-  bestellung: [0, 2], techniker: [2, 2], person: [4, 2], stoermeldung: [6, 2], stoermeldung_foto: [8, 2], nachricht: [10, 2],
-  lagerbestand: [0, 4], ersatzteil: [2, 4], auftrag_ersatzteil: [4, 4], wartungsauftrag: [6, 4], auftrag_verlauf: [8, 4],
+  land: [0, 0, 'u'], standort: [2, 0, 'lo'], gebaeude: [4.5, 0, 'u'], maschine: [7, 0, 'o'], stoermeldung: [14, 0, 'o'],
+  lagerbestand: [2, -3, 'l'], bestellung: [3.5, -1.5, 'r'], ersatzteil: [5, -3, 'o'], auftrag_ersatzteil: [11, -3, 'o'],
+  wartungsplan: [7, 1.2, 'l'], wartung_durchfuehrung: [7, 2.4, 'l'], stoermeldung_foto: [10.5, 1, 'o'],
+  person: [8, 4, 'uu'], wartungsauftrag: [14, 4, 'r'], auftrag_verlauf: [11, 2, 'u'], nachricht: [11, 6, 'o'], techniker: [5, 7, 'u'],
 };
-const RX = 112, RY = 96, RAND = 60, RAND_X = 100;   // Pixel je Rastereinheit, Rand (seitlich breiter für lange Namen)
-const px = ([x, y]) => [RAND_X + x * RX, RAND + 20 + y * RY];
+// Verlauf jeder Strecke: Zwischenpunkte von der verweisenden Tabelle zum Ziel (ohne Anfang und Ende)
+// und seitlicher Versatz in Pixeln für Strecken, die ein Stück gemeinsam fahren.
+const ROUTEN = {
+  'person.standort_id': { ueber: [[4, 4], [2, 2]], versatz: -5 },
+  'techniker.standort_id': { ueber: [[2, 4]], versatz: 5 },
+  'person.techniker_id': {},
+  'wartungsauftrag.techniker_id': { ueber: [[14, 7]] },
+  'wartungsauftrag.zugewiesen_von': {},
+  'wartungsauftrag.stoermeldung_id': {},
+  'auftrag_verlauf.person_id': { ueber: [[10, 2]] },
+  'auftrag_verlauf.auftrag_id': { ueber: [[12, 2]] },
+  'nachricht.von_id': { ueber: [[10, 6]], versatz: -5 },
+  'nachricht.an_id': { ueber: [[10, 6]], versatz: 5 },
+  'nachricht.auftrag_id': { ueber: [[12, 6]] },
+  'stoermeldung_foto.person_id': { ueber: [[8, 1]] },
+  'stoermeldung_foto.stoermeldung_id': { ueber: [[13, 1]] },
+  'wartung_durchfuehrung.person_id': { ueber: [[7, 3]] },
+  'auftrag_ersatzteil.auftrag_id': { ueber: [[16, -3], [16, 2]] },
+};
+const RASTER = 56, RAND = 70;   // Pixel je Rastereinheit, Rand um den Plan (Platz für Namen)
 
-// Thema jeder Tabelle (Farbe der Karte und Legende)
+// Thema jeder Tabelle (Farbe der Strecken und Legende)
 const GRUPPEN = [
   { id: 'orte', name: T('Werke & Maschinen'), tabellen: ['land', 'standort', 'gebaeude', 'maschine'] },
   { id: 'stoerung', name: T('Störungen & Aufträge'), tabellen: ['stoermeldung', 'wartungsauftrag', 'auftrag_verlauf', 'stoermeldung_foto'] },
@@ -32,8 +53,6 @@ const GRUPPEN = [
   { id: 'personen', name: T('Personen'), tabellen: ['techniker', 'person', 'nachricht'] },
   { id: 'material', name: T('Ersatzteile'), tabellen: ['ersatzteil', 'auftrag_ersatzteil', 'bestellung', 'lagerbestand'] },
 ];
-// Liniennummer je Thema (wie U1, U2 … auf einem Netzplan)
-const LINIE = { orte: 'U1', stoerung: 'U2', wartung: 'U3', personen: 'U4', material: 'U5', sonst: 'U6' };
 const gruppeVon = (name) => GRUPPEN.find((g) => g.tabellen.includes(name))?.id ?? 'sonst';
 
 // Kurzbeschreibung der Views (in der Datenbank gibt es dafür keinen Kommentar)
@@ -46,44 +65,50 @@ const VIEW_TEXTE = {
 };
 
 /**
- * Verlauf einer Strecke von a nach b (Rasterpunkte) im U-Bahn-Stil. versatz (px) schiebt die Strecke
- * auf der Fahrspur etwas zur Seite, damit parallele Strecken nebeneinander liegen statt übereinander.
+ * Strecke für Tabellen ohne festen Verlauf (neue Tabellen): erst waagerecht, dann im 45°-Winkel,
+ * dann senkrecht – so bleibt auch sie im Stil des Plans.
  */
-function strecke(a, b, versatz) {
+function automatisch(a, b) {
   const [x1, y1] = a, [x2, y2] = b;
-  const dx = x2 - x1, dy = y2 - y1, sx = Math.sign(dx) || 1, sy = Math.sign(dy) || -1;
-  let punkte;
-  if ((dy === 0 && Math.abs(dx) === 2) || (dx === 0 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 2)) {
-    punkte = [a, b];                                           // Nachbarn: gerade bzw. diagonal
-  } else if (dy === 0) {
-    punkte = [a, [x1 + sx, y1 - 1, 'h'], [x2 - sx, y1 - 1, 'h'], b];   // gleiche Reihe: über die Spur darüber
-  } else if (Math.abs(dy) === 2) {
-    punkte = [a, [x1 + sx, y1 + sy, 'h'], [x2 - sx, y1 + sy, 'h'], b];
-  } else {
-    const xs = dx === 0 ? x1 + 1 : x2 - sx;                    // senkrecht auf einer Spur zwischen zwei Spalten
-    punkte = [a, [x1 + (dx === 0 ? 1 : sx), y1 + sy, 'h'], [xs, y1 + sy, 'hv'], [xs, y2 - sy, 'v'], b];
-  }
-  const p = punkte.map(([x, y, art]) => {
-    const [X, Y] = px([x, y]);
-    const o = art?.includes('h') ? [0, versatz] : art === 'v' ? [versatz, 0] : [0, 0];
-    return [X + (art === 'hv' ? versatz : o[0]), Y + o[1]];
+  const dx = x2 - x1, dy = y2 - y1;
+  const d = Math.min(Math.abs(dx), Math.abs(dy));
+  const mitte = [x1 + Math.sign(dx) * (Math.abs(dx) - d), y1];
+  return [a, mitte, [mitte[0] + Math.sign(dx) * d, y1 + Math.sign(dy) * d], b];
+}
+
+/**
+ * Linienzug um `abstand` Pixel seitlich verschieben – an jeder Ecke über den Schnittpunkt der
+ * beiden verschobenen Teilstücke, damit die Strecke überall denselben Abstand hat (echte Parallele).
+ */
+function parallel(p, abstand) {
+  if (!abstand) return p;
+  const normale = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[1] - a[1]) / l, -(b[0] - a[0]) / l]; };
+  return p.map((punkt, i) => {
+    const n1 = i > 0 ? normale(p[i - 1], punkt) : null;
+    const n2 = i < p.length - 1 ? normale(punkt, p[i + 1]) : null;
+    if (!n1 || !n2) { const n = n1 ?? n2; return [punkt[0] + n[0] * abstand, punkt[1] + n[1] * abstand]; }
+    const m = [n1[0] + n2[0], n1[1] + n2[1]];
+    const faktor = abstand / (1 + n1[0] * n2[0] + n1[1] * n2[1]);   // Gehrung: Länge so, dass beide Seiten passen
+    return [punkt[0] + m[0] * faktor, punkt[1] + m[1] * faktor];
   });
-  return rundePfad(p, 16);
 }
 
 /** Linienzug mit abgerundeten Ecken (Radius r) – Kurven wie auf einem gedruckten Netzplan */
 function rundePfad(p, r) {
-  let d = `M ${p[0][0]} ${p[0][1]}`;
+  let d = `M ${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)}`;
   for (let i = 1; i < p.length - 1; i += 1) {
     const [a, b, c] = [p[i - 1], p[i], p[i + 1]];
     const l1 = Math.hypot(b[0] - a[0], b[1] - a[1]), l2 = Math.hypot(c[0] - b[0], c[1] - b[1]);
     const k = Math.min(r, l1 / 2, l2 / 2);
     const vor = [b[0] - ((b[0] - a[0]) / l1) * k, b[1] - ((b[1] - a[1]) / l1) * k];
     const nach = [b[0] + ((c[0] - b[0]) / l2) * k, b[1] + ((c[1] - b[1]) / l2) * k];
-    d += ` L ${vor[0]} ${vor[1]} Q ${b[0]} ${b[1]} ${nach[0]} ${nach[1]}`;
+    d += ` L ${vor[0].toFixed(1)} ${vor[1].toFixed(1)} Q ${b[0].toFixed(1)} ${b[1].toFixed(1)} ${nach[0].toFixed(1)} ${nach[1].toFixed(1)}`;
   }
-  return `${d} L ${p[p.length - 1][0]} ${p[p.length - 1][1]}`;
+  return `${d} L ${p[p.length - 1][0].toFixed(1)} ${p[p.length - 1][1].toFixed(1)}`;
 }
+
+// Lage des Namens relativ zur Station: [dx, dy, Ausrichtung]
+const BESCHRIFTUNG = { u: [0, 28, 'middle'], uu: [0, 50, 'middle'], o: [0, -16, 'middle'], l: [-16, 5, 'end'], r: [16, 5, 'start'], lo: [-12, -14, 'end'] };
 
 export default function Datenmodell({ tabellen, wertelisten }) {
   const t = useT();
@@ -94,34 +119,35 @@ export default function Datenmodell({ tabellen, wertelisten }) {
   const nurTabellen = tabellen.filter((x) => x.art === 'tabelle');
   const views = tabellen.filter((x) => x.art === 'view');
 
-  // Lage vergeben: bekannte aus PLATZ, unbekannte in eine neue Reihe unten
+  // Lage vergeben: bekannte aus PLATZ, unbekannte in eine weitere Reihe unten
   let frei = 0;
   const lage = Object.fromEntries(nurTabellen.map((tab) => {
     if (PLATZ[tab.name]) return [tab.name, PLATZ[tab.name]];
-    const l = [(frei % 6) * 2, 6 + Math.floor(frei / 6) * 2];
+    const l = [(frei % 6) * 3, 10 + Math.floor(frei / 6) * 2, 'u'];
     frei += 1;
     return [tab.name, l];
   }));
-  const maxX = Math.max(...Object.values(lage).map((l) => l[0]));
-  const maxY = Math.max(...Object.values(lage).map((l) => l[1]));
-  const breite = RAND_X * 2 + maxX * RX, hoehe = RAND * 2 + 40 + maxY * RY;
+  const xe = Object.values(lage).map((l) => l[0]), ye = Object.values(lage).map((l) => l[1]);
+  const minX = Math.min(...xe, 0), minY = Math.min(...ye, 0);
+  const maxX = Math.max(...xe, 16), maxY = Math.max(...ye);
+  const px = ([x, y]) => [RAND + 30 + (x - minX) * RASTER, RAND + (y - minY) * RASTER];
+  const breite = RAND * 2 + 60 + (maxX - minX) * RASTER, hoehe = RAND * 2 + (maxY - minY) * RASTER;
 
   // Strecken = Fremdschlüssel (Selbstverweise und Ziele außerhalb des Plans weglassen)
-  const strecken = nurTabellen.flatMap((tab) => tab.spalten.filter((s) => s.fk && lage[s.fk.tabelle] && s.fk.tabelle !== tab.name)
-    .map((s) => ({ von: tab.name, spalte: s.name, nach: s.fk.tabelle })));
-  // Strecken mit gleicher Fahrspur bekommen einen kleinen seitlichen Versatz
-  const zaehler = {};
-  const mitVersatz = strecken.map((s) => {
-    const schl = `${Math.min(lage[s.von][1], lage[s.nach][1])}`;
-    const n = (zaehler[schl] = (zaehler[schl] ?? 0) + 1);
-    return { ...s, d: strecke(lage[s.von], lage[s.nach], ((n % 5) - 2) * 4) };
-  });
+  const strecken = nurTabellen.flatMap((tab) => tab.spalten.filter((sp) => sp.fk && lage[sp.fk.tabelle] && sp.fk.tabelle !== tab.name)
+    .map((sp) => {
+      const schluessel = `${tab.name}.${sp.name}`;
+      const route = ROUTEN[schluessel];
+      const a = lage[tab.name], z = lage[sp.fk.tabelle];
+      const punkte = route ? [a, ...(route.ueber ?? []), z] : PLATZ[tab.name] && PLATZ[sp.fk.tabelle] ? [a, z] : automatisch(a, z);
+      return { von: tab.name, spalte: sp.name, nach: sp.fk.tabelle, d: rundePfad(parallel(punkte.map(px), route?.versatz ?? 0), 18) };
+    }));
 
   const aktiv = hervor ?? gewaehlt;
-  const betroffen = (s) => aktiv && (s.von === aktiv || s.nach === aktiv);
-  const nachbar = (name) => !aktiv || name === aktiv || strecken.some((s) => (s.von === aktiv && s.nach === name) || (s.nach === aktiv && s.von === name));
-  // Welche Linien halten an einer Station? Mehr als eine = Umsteigebahnhof (größerer Ring)
-  const linienAn = (name) => [...new Set([gruppeVon(name), ...strecken.filter((s) => s.nach === name || s.von === name).map((s) => gruppeVon(s.von))])];
+  const betroffen = (st) => aktiv && (st.von === aktiv || st.nach === aktiv);
+  const nachbar = (name) => !aktiv || name === aktiv || strecken.some((st) => (st.von === aktiv && st.nach === name) || (st.nach === aktiv && st.von === name));
+  // Knotenpunkte (viele Strecken) bekommen wie Umsteigebahnhöfe einen größeren Ring
+  const grad = (name) => strecken.filter((st) => st.von === name || st.nach === name).length;
 
   function waehlen(name) { setGewaehlt(gewaehlt === name ? null : name); }
   useEffect(() => {
@@ -134,43 +160,37 @@ export default function Datenmodell({ tabellen, wertelisten }) {
         <div className="karte-kopf">
           <h2 className="abschnitt-titel">{t('Datenmodell')}</h2>
           <div className="netz-legende klein">
-            {GRUPPEN.map((g) => <span key={g.id} className={`gruppe-${g.id}`}><b className="netz-schild">{LINIE[g.id]}</b>{t(g.name)}</span>)}
+            {GRUPPEN.map((g) => <span key={g.id} className={`gruppe-${g.id}`}><i aria-hidden="true" />{t(g.name)}</span>)}
           </div>
         </div>
 
         <div className="netzplan-rahmen">
           <svg className="netzplan" viewBox={`0 0 ${breite} ${hoehe}`} style={{ minWidth: breite * 0.72 }} role="img" aria-label={t('Datenmodell')}>
             <g className="netz-strecken">
-              {mitVersatz.map((s) => (
-                <path key={`${s.von}.${s.spalte}`} d={s.d}
-                      className={`netz-strecke gruppe-${gruppeVon(s.von)}${betroffen(s) ? ' aktiv' : aktiv ? ' gedimmt' : ''}`}>
-                  <title>{`${s.von}.${s.spalte} → ${s.nach}`}</title>
+              {strecken.map((st) => (
+                <path key={`${st.von}.${st.spalte}`} d={st.d}
+                      className={`netz-strecke gruppe-${gruppeVon(st.von)}${betroffen(st) ? ' aktiv' : aktiv ? ' gedimmt' : ''}`}>
+                  <title>{`${st.von}.${st.spalte} → ${st.nach}`}</title>
                 </path>
               ))}
             </g>
             {nurTabellen.map((tab) => {
               const [X, Y] = px(lage[tab.name]);
-              const linien = linienAn(tab.name);
-              const umsteigen = linien.length > 1;
+              const [dx, dy, anker] = BESCHRIFTUNG[lage[tab.name][2]] ?? BESCHRIFTUNG.u;
+              const knoten = grad(tab.name) >= 4;
               return (
-                <g key={tab.name} className={`netz-station gruppe-${gruppeVon(tab.name)}${umsteigen ? ' umsteigen' : ''}${gewaehlt === tab.name ? ' gewaehlt' : ''}${nachbar(tab.name) ? '' : ' gedimmt'}`}
+                <g key={tab.name} className={`netz-station gruppe-${gruppeVon(tab.name)}${knoten ? ' knoten' : ''}${gewaehlt === tab.name ? ' gewaehlt' : ''}${nachbar(tab.name) ? '' : ' gedimmt'}`}
                    data-tabelle={tab.name} transform={`translate(${X} ${Y})`} tabIndex={0} role="button" aria-pressed={gewaehlt === tab.name}
                    aria-label={`${tab.name}, ${tab.anzahl ?? 0} ${t('Datensätze')}`}
                    onClick={() => waehlen(tab.name)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); waehlen(tab.name); } }}
                    onMouseEnter={() => setHervor(tab.name)} onMouseLeave={() => setHervor(null)}
                    onFocus={() => setHervor(tab.name)} onBlur={() => setHervor(null)}>
-                  <circle r={22} className="netz-flaeche" />
-                  {umsteigen ? <rect x={-14} y={-9} width={28} height={18} rx={9} className="netz-ring" /> : <circle r={8} className="netz-ring" />}
-                  <text y={30} className="netz-name">{tab.name}</text>
-                  <g transform={`translate(${-(linien.length * 23 - 3) / 2} 38)`}>
-                    {linien.map((l, i) => (
-                      <g key={l} transform={`translate(${i * 23} 0)`} className={`gruppe-${l}`}>
-                        <rect width={20} height={13} rx={2.5} className="netz-mini-schild" />
-                        <text x={10} y={10} className="netz-mini-text">{LINIE[l]}</text>
-                      </g>
-                    ))}
-                  </g>
-                  <text y={66} className="netz-anzahl">{(tab.anzahl ?? 0).toLocaleString(t.sprache === 'en' ? 'en-US' : 'de-DE')}</text>
+                  <circle r={20} className="netz-flaeche" />
+                  <circle r={knoten ? 11 : 7.5} className="netz-ring" />
+                  <text x={dx} y={dy} textAnchor={anker} className="netz-name">
+                    {tab.name}
+                    <tspan className="netz-anzahl" dx={6}>{(tab.anzahl ?? 0).toLocaleString(t.sprache === 'en' ? 'en-US' : 'de-DE')}</tspan>
+                  </text>
                   <title>{`${tab.name} · ${(tab.anzahl ?? 0)} ${t('Datensätze')}`}</title>
                 </g>
               );

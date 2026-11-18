@@ -3105,25 +3105,22 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
    ===================================================================== */
 .netz-legende { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--text); }
 .netz-legende span { display: inline-flex; align-items: center; gap: 7px; font-weight: 500; }
-/* Linienschild wie auf dem U-Bahn-Plan: Farbe des Themas, weiße fette Schrift */
-.netz-schild { display: inline-grid; place-items: center; min-width: 30px; height: 20px; padding: 0 5px; border-radius: 4px; background: var(--gruppe); color: #fff; font-size: .74rem; font-weight: 800; letter-spacing: .02em; }
+.netz-legende i { width: 22px; height: 6px; border-radius: 3px; background: var(--gruppe); }
 .netzplan-rahmen { overflow-x: auto; margin: 4px -8px 0; padding: 0 8px; }
 .netzplan { width: 100%; height: auto; display: block; font-family: "Inter", -apple-system, "Segoe UI", sans-serif; }
-.netz-strecke { fill: none; stroke: var(--gruppe); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: .92; transition: opacity .2s, stroke-width .2s; }
-.netz-strecke.aktiv { opacity: 1; stroke-width: 10; }
+.netz-strecke { fill: none; stroke: var(--gruppe); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .92; transition: opacity .2s, stroke-width .2s; }
+.netz-strecke.aktiv { opacity: 1; stroke-width: 8.5; }
 .netz-strecke.gedimmt { opacity: .12; }
 .netz-station { cursor: pointer; outline: none; transition: opacity .2s; }
 .netz-station.gedimmt { opacity: .28; }
 .netz-flaeche { fill: transparent; }
-/* Station: weißer Punkt mit dunklem Rand; Umsteigebahnhof als breite Kapsel */
+/* Station: weißer Punkt mit dunklem Rand; Knotenpunkte (≥ 4 Strecken) größer wie Umsteigebahnhöfe */
 .netz-ring { fill: #fff; stroke: #1d1d1f; stroke-width: 3; transition: stroke-width .15s; }
 :root[data-theme="dark"] .netz-ring { stroke: #0b0b0c; }
 .netz-station:hover .netz-ring, .netz-station:focus-visible .netz-ring { stroke-width: 4.5; }
 .netz-station.gewaehlt .netz-ring { fill: var(--gruppe); }
-.netz-name { text-anchor: middle; font-size: 13px; font-weight: 700; fill: var(--text); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 5px; stroke-linejoin: round; letter-spacing: -.01em; }
-.netz-mini-schild { fill: var(--gruppe); }
-.netz-mini-text { text-anchor: middle; font-size: 9px; font-weight: 800; fill: #fff; }
-.netz-anzahl { text-anchor: middle; font-size: 11px; fill: var(--text-leise); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 4px; font-variant-numeric: tabular-nums; }
+.netz-name { font-size: 13px; font-weight: 700; fill: var(--text); paint-order: stroke; stroke: var(--karte-solid); stroke-width: 5px; stroke-linejoin: round; letter-spacing: -.01em; }
+.netz-anzahl { font-size: 11px; font-weight: 500; fill: var(--text-leise); font-variant-numeric: tabular-nums; }
 .netz-unten { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px 32px; margin-top: 8px; border-top: 1px solid var(--linie); padding-top: 4px; }
 .netz-liste { list-style: none; margin: 0; padding: 0; }
 .netz-liste li { border-bottom: 1px solid var(--linie); }
@@ -3193,28 +3190,25 @@ html[data-v3] body .fv-fuss { text-align: center; color: #9ca3af; font-size: 13p
 @media (max-width: 991.98px) { .stat-raster { grid-template-columns: minmax(0, 1fr); } }
 
 /* =====================================================================
-   „So funktioniert die App“ als Anzeigetafel (app/datenbasis/Verbindungen.js)
-   Bewusst dunkel wie eine Bahnsteig-Anzeige – in Hell- und Dunkelmodus gleich (feste Tafelfarben).
+   „So funktioniert die App“ als kleiner Liniennetzplan (app/datenbasis/Verbindungen.js)
+   Gleiche Bildsprache wie das Datenmodell; Farbe der Strecke = Zustand (--zustand aus .status-*).
    ===================================================================== */
-.tafel { --tafel-grund: #0f1b26; --tafel-linie: #22313f; --tafel-text: #e9eef2; --tafel-leise: #8fa3b3; --tafel-gelb: #ffd24a;
-  background: var(--tafel-grund); color: var(--tafel-text); border-radius: 14px; padding: 6px 18px 12px; overflow-x: auto;
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; box-shadow: inset 0 0 0 1px #1d2b38, inset 0 10px 30px rgba(0,0,0,.35); }
-.tafel-kopf, .tafel-zeile { display: grid; grid-template-columns: 64px minmax(110px, 1fr) minmax(200px, 2.2fr) minmax(70px, .8fr) 70px 140px; gap: 14px; align-items: center; min-width: 760px; }
-.tafel-kopf { padding: 10px 0 8px; font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--tafel-leise); border-bottom: 1px solid var(--tafel-linie); }
-.tafel-zeile { padding: 11px 0; border-bottom: 1px dashed var(--tafel-linie); font-size: .9rem; }
-.tafel .rechts { text-align: right; }
-.tafel-schild { display: inline-grid; place-items: center; height: 26px; min-width: 52px; padding: 0 6px; border-radius: 5px; font-weight: 800; font-size: .74rem; letter-spacing: .04em; color: #fff; }
-.schild-br { background: #4a6072; } .schild-vc { background: #1c7f85; } .schild-db { background: #2f7d32; } .schild-au { background: #6e3fc4; } .schild-gh { background: #b45a00; }
-.tafel-dienst { color: var(--tafel-gelb); font-weight: 700; }
-.tafel-aufgabe small { display: block; color: var(--tafel-leise); font-size: .75rem; margin-top: 2px; }
-.tafel-ort, .tafel-ms { color: var(--tafel-text); font-variant-numeric: tabular-nums; }
-.tafel-status { display: inline-flex; align-items: center; gap: 9px; color: var(--tafel-text); }
-.tafel-led { width: 10px; height: 10px; border-radius: 50%; background: #5d6b78; box-shadow: 0 0 0 2px rgba(255,255,255,.06); flex: none; }
-.status-ok .tafel-led { background: #3ee06a; box-shadow: 0 0 8px #3ee06a; }
-.status-warnung .tafel-led { background: #ffb020; box-shadow: 0 0 8px #ffb020; }
-.status-fehler .tafel-led { background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; }
-.status-pruefe .tafel-led { background: #9fb3c4; animation: tafel-blinken 1s steps(2) infinite; }
-@keyframes tafel-blinken { 50% { opacity: .25; } }
-.tafel-fuss { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 10px; font-size: .75rem; color: var(--tafel-leise); min-width: 760px; }
-.tafel-weg { color: var(--tafel-gelb); letter-spacing: .06em; }
-@media (prefers-reduced-motion: reduce) { .status-pruefe .tafel-led { animation: none; } }
+.systemplan { width: 100%; min-width: 600px; height: auto; display: block; font-family: "Inter", -apple-system, "Segoe UI", sans-serif; }
+.sys-linie { fill: none; stroke: var(--zustand); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; transition: stroke .3s; }
+.sys-strecke.status-pruefe .sys-linie, .sys-strecke.status-unbekannt .sys-linie { stroke: var(--grau); opacity: .45; stroke-dasharray: 2 12; }
+.sys-zug { fill: #fff; stroke: var(--zustand); stroke-width: 2.5; }
+.sys-ms { text-anchor: middle; font-size: 13px; font-weight: 600; fill: var(--text-leise); font-variant-numeric: tabular-nums; }
+.sys-ring { fill: #fff; stroke: #1d1d1f; stroke-width: 3.5; }
+:root[data-theme="dark"] .sys-ring { stroke: #0b0b0c; }
+.sys-led { fill: var(--zustand); }
+.sys-station.status-pruefe .sys-led { animation: sys-blinken 1s steps(2) infinite; }
+@keyframes sys-blinken { 50% { opacity: .2; } }
+.sys-name { font-size: 16px; font-weight: 700; fill: var(--text); letter-spacing: -.01em; }
+.sys-aufgabe { font-size: 13px; fill: var(--text-leise); }
+.sys-zustand { font-size: 13px; font-weight: 600; fill: var(--zustand); }
+.sys-fuss { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: center; padding-top: 10px; border-top: 1px solid var(--linie); color: var(--text-leise); }
+.sys-hinweis { display: inline-flex; align-items: center; gap: 7px; }
+.sys-hinweis i { width: 8px; height: 8px; border-radius: 50%; background: var(--zustand); flex: none; }
+.sys-hinweis strong { color: var(--text); font-weight: 600; }
+.sys-zeit { margin-left: auto; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .sys-zug { display: none; } .sys-station.status-pruefe .sys-led { animation: none; } }
